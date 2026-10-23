@@ -1,0 +1,21 @@
+SCR_ChimeraCharacter : "{37578B1666981FCE}Prefabs/Characters/Core/Character_Base.et" {
+ ID "520EC961A090B1EE"
+ components {
+  INS_BodySearchedComponent "{6A968899BFAA15FC}" {
+  }
+  ActionsManagerComponent "{520EA1D2F659CE02}" {
+   additionalActions {
+    INS_BodySearchAction "{6A968899BFAA1A17}" {
+     ParentContextList {
+      "LowerTorso"
+     }
+     UIInfo UIInfo "{6A968899BFAA1A15}" {
+      Name "Search for Intel"
+     }
+     VisibilityRange 2
+     Duration 1
+    }
+   }
+  }
+ }
+}

@@ -1,0 +1,19 @@
+SCR_GameModeEditor : "{DA3986AF1B5032B8}Prefabs/MP/Modes/Editor/GameMode_Editor_Full.et" {
+ ID "56B2B479C6B96951"
+ components {
+  SCR_MapConfigComponent "{5C669498E250A34B}" {
+   m_sEditorMapConfigPath "{6AA19CB200000200}Configs/Map/INF_MapEditor.conf"
+  }
+  INS_GarrisonManager "{68B2B72E61E88AD0}" {
+   m_bINFShowZoneAreas 1
+  }
+  INS_AmbientPatrolManager "{69226EB846FFAEFF}" {
+   m_bINFBuildingGrid 1
+   m_sINFCampComposition "{8809D070C43CD78C}Prefabs/Compositions/Slotted/SlotFlatSmall/PlayerHub_S_USSR_01.et"
+   m_fINFCampFootprintRadius 9
+  }
+  INS_IntelManager "{68B0FED5DE2D4E3A}" {
+   m_bINFCacheObjective 1
+  }
+ }
+}

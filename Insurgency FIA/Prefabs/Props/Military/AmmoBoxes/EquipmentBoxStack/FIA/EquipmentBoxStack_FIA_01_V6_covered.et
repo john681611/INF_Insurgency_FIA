@@ -1,0 +1,13 @@
+GenericEntity : "{F392E73F4E513B77}Prefabs/Props/Military/AmmoBoxes/EquipmentBoxStack/FIA/EquipmentBoxStack_FIA_01_V6.et" {
+ ID "F0DBA538AC2A0552"
+ components {
+  INS_CacheComponent "{6A97107B4E1ADBF8}" {
+  }
+  SCR_DestructionMultiPhaseComponent "{58F89684469E44B1}" {
+   Enabled 1
+  }
+  RplComponent "{5476B36C54387F41}" {
+   Enabled 1
+  }
+ }
+}

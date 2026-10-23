@@ -1,0 +1,18 @@
+SCR_GameModeEditor : "{DA3986AF1B5032B7}Prefabs/MP/Modes/Editor/GameMode_Editor_Full.et" {
+ ID "56B2B479C6B96951"
+ components {
+  INS_AmbientPatrolManager "{69226EB846FFAEFF}" {
+   m_aGroupPrefabs + {
+    "{A864CDF02E7A1102}Prefabs/Groups/INDFOR/FIA/Group_FIA_Militia_Pair.et"
+    "{A864CDF02E7A1103}Prefabs/Groups/INDFOR/FIA/Group_FIA_Militia_Fireteam.et"
+    "{A864CDF02E7A1104}Prefabs/Groups/INDFOR/FIA/Group_FIA_Militia_Squad8.et"
+   }
+  }
+  INS_GarrisonManager "{68B2B72E61E88AD0}" {
+   m_aInfantryGroupPrefabs + {
+    "{A864CDF02E7A1102}Prefabs/Groups/INDFOR/FIA/Group_FIA_Militia_Pair.et"
+    "{A864CDF02E7A1103}Prefabs/Groups/INDFOR/FIA/Group_FIA_Militia_Fireteam.et"
+   }
+  }
+ }
+}

@@ -1,0 +1,14 @@
+Turret : "{8C68C54F9C50A9AF}Prefabs/Vehicles/Wheeled/M998/VehParts/M1025_gun_mount.et" {
+ ID "51ACD0965653D003"
+ components {
+  SCR_BaseCompartmentManagerComponent "{51ACFBB07A14CFA6}" {
+   CompartmentSlots {
+    TurretCompartmentSlot TurretCompartment {
+     m_DefaultOccupantData SCR_DefaultOccupantData "{59C895971731BBD2}" {
+      m_sDefaultOccupantPrefab "{8515E8BD26A5D5F8}Prefabs/Characters/Factions/INDFOR/FIA/Character_FIA_Randomized.et"
+     }
+    }
+   }
+  }
+ }
+}

@@ -1,0 +1,654 @@
+INSURGENCY ADVANCED - HOSTILE BUILDING GRID
+
+Debug marker lifecycle
+Cache and camp visibility are independent per-GM preferences, default off.
+Any GM with EDIT-mode access, including limited GMs, can use them. Admin status
+alone, construction mode and photo mode do not grant access. Server-validated
+snapshots go only to that GM's player-controller owner, never to all players.
+One GM's toggle cannot change another GM's markers. Local cleanup checks
+access every second; server refreshes every five seconds revalidate access.
+Preferences are session-only and reset with a new player controller on rejoin.
+If the map marker manager is unavailable, cleanup retains handles for retry.
+Ordinary intel hints and zone markers are unchanged. Test two GMs independently,
+including a limited GM, an admin without GM access, and an ordinary player.
+Disable with maps closed, reopen both maps, revoke access and reconnect.
+
+Defender materialisation
+AI-agent entries alone do not prove a defender character spawned. Capture
+eligibility and counterattack outcome credit require an observed living,
+controlled character with a non-destroyed damage component. Empty/placeholder
+groups retain the existing materialisation grace and retry paths rather than
+unlocking capture or spending a successful counterattack. A living inbound
+wave is not defeated merely because it has not reached the target.
+
+Addon ownership
+This addon owns reusable gameplay, editor attributes, map rendering, camp
+resources and their regression tests. It depends on Insurgency Reforged and
+base-game data, not on an INF map, FIA or WCS.
+Scenarios opt in by inheriting:
+  {CC46DF266B89439D}Prefabs/MP/Modes/InsurgencyAdvanced/GameMode_InsurgencyAdvanced.et
+That prefab enables the grid, shared objectives and GM zone rendering.
+INF Insurgency Everon now owns only its scenario resources and overrides.
+See README.txt for migration, publishing and validation instructions.
+
+Unified zone architecture
+Faction-addon compatibility
+Ordinary grid/camp/cache defenders read INS_AmbientPatrolManager.m_aGroupPrefabs.
+Grid counterattacks read INS_CounterAttackManager.m_aSquadPrefabs. The mission
+does not hard-code Soviet groups or replace these inherited pools, so the
+Insurgency FIA addon can supply its configured FIA prefabs and character gear.
+Exact four-/six-member prefabs are preferred. Otherwise a larger configured
+group uses only its first four/six roster slots, retaining those units' loadouts
+while preserving the existing AI reservations. Smaller groups cannot fill that
+allocation; an empty/unsuitable pool logs an error rather than spawning a
+different faction. The selected prefab and reserved size are logged.
+The FIA vehicle/cache/field-threat overrides remain independent and unchanged.
+Retired authored-garrison vehicle overrides remain unused by design.
+Load order can still affect conflicting overrides from other addons, but is
+not a substitute for consuming the configured pools in the grid spawn paths.
+
+Mission header, construction and optional loadout addons
+Advanced does not supply a mission header or a terrain. The Everon scenario
+uses SCR_MissionHeader, matching stock Game Master, retaining its common weather,
+faction limits and marker settings. Advanced's shared objectives use their
+existing task system.
+Player construction remains enabled. INF does not override construction,
+editor-placement or catalog-spawner rank checks. Rank requirements, supply
+costs, cooldowns, faction checks and placement limits use inherited behaviour.
+The experimental rank bypasses were removed; their removal is not evidence
+that a particular addon or setting caused the dedicated-server restrictions.
+The stock full-GM construction-manager block is also present in vanilla; it
+was not a uniquely Insurgency-added rank mechanism.
+WCS Loadout Editor is no longer a direct dependency and has no mission settings
+or INF diagnostic script. Servers can load it independently; removing this
+integration does not uninstall it, delete player saves or prove the saved-kit
+problem fixed. Arsenal rank locking is independent and is not changed here.
+
+Camp configuration (mission start)
+The game mode prefab's INS_AmbientPatrolManager exposes Forest Camps:
+  Camp Composition: full USSR Encampment by default (PlayerHub_S_USSR_01).
+  Camp Footprint Radius: 9m by default; size this for custom compositions.
+This spawns the full replicated composition hierarchy, not separate tents.
+Embedded player respawn points remain enabled for the composition's faction,
+then transfer to the configured main player faction when permanently secured.
+Native deployment restrictions still apply. Compositions containing AI groups
+are rejected so the zone director remains the only camp defender allocator.
+Composition/footprint changes require a mission restart, not a live GM swap.
+Saved sites are revalidated; obstructed larger replacements hold startup safely.
+Site strength, attack chance, victory mode and camp debug markers are also
+exposed as Workbench attributes on their owning game-mode components.
+The live GM maximum-attacks and attempt-interval entries are separate siblings
+of regional cooldown, not incorrectly nested inside its configuration.
+
+Startup: index woodland/placement constraints, discover/restore and spawn camp
+compositions, select/restore and verify caches, restore intel, finalise non-cache
+documents, then scan buildings and register camp/cache sites into unique grid
+zones. Camp props and their children do not count as buildings. Isolated cache
+sites create zones even without buildings. Influence affects existing zones;
+it does not create eight empty neighbour zones.
+INF_ZoneStateSystem owns territory, capture, site influence and one-shot attack
+state. Its independent one-second capture loop keeps working when ordinary
+zone defenders are disabled. The AI managers consume these states for
+allocation, cleanup and counterattacks; they do not own a separate capture model.
+Cache destruction events remove live-cache influence. Zone capture events
+award camp/zone credit and remove that camp's influence from future allocations.
+Objective refresh also takes snapshots for startup and late join.
+
+A camp or live cache influences its containing square and eight neighbours
+(Chebyshev distance <= 1 in integer grid coordinates, including negatives).
+Influence does not stack. Camp/Cache Zone Strength offers 1x/2x/3x/4x, default
+2x, applied to defender group counts and counterattack wave group counts.
+Base density remains at most 16 AI per building cell; 2x influence can reserve
+32 in one zone, still within the shared 128-AI budget and local/global limits.
+Base and bonus groups are allocated together on activation, retaining spawn
+staggering and safety rechecks. Existing living groups are never deleted just
+because a site loses influence or the multiplier changes.
+All site types use the same defender spawn/reinforcement path; there is no
+special camp/cache defender controller. Field threats and vehicle routes remain
+unchanged and are included in hostile-presence checks.
+
+GM cleanup: town/village/settlement patrol counts, ordinary respawn delay and
+min/max squads per attack are hidden in grid mode because they no longer
+control these zones. Legacy non-grid mode retains those controls. Garrison
+controls remain retired. The defender switch is labelled Zone Defenders Enabled.
+Counterattack enable, chance, attempt interval, regional cooldown and concurrent
+attack limit remain relevant. Concurrency is shown as 0..2 attacks, not groups.
+Intel, debug markers, mission-end requirements, field threats and vehicles
+retain their controls. New settings are server-authoritative and replicated.
+Zone capture credit, territory and attack-spent/permanent flags are runtime
+mission state, not a new crash-recovery save. Static site/cache/search recovery
+continues independently; do not assume territory flags survive a server crash.
+
+Coverage and allocation
+Shared objectives and mission victory
+The cache objective is joined by "Captured X/Y Camps" and "Captured X/Y Zones",
+using the same shared list-only task style, ownership and late-join assignment.
+Camps are counted separately. Zones are unique non-camp 100m building
+capture squares, supplied only by the building-grid manager.
+There are no additional authored-garrison capture sources or footprint squares.
+Unspawned hostile sites still count toward their totals.
+Capture credit is retained for this mission after an AI counterattack retakes
+the zone; it does not force the zone's map colour to stay green.
+These new per-grid capture credits and the GM victory selection are session
+state, not a new crash-recovery save. Existing cache saves still apply.
+
+GM Scenario Properties > Insurgency Reforged > Mission End Requirements offers:
+  Caches only (default, preserving the original win condition)
+  Caches and camps
+  Caches, camps and zones
+All three progress tasks remain visible regardless of the chosen victory mode.
+Counts wait for camp discovery/cache recovery to finish.
+During discovery all three tasks are already visible with "initialising"
+titles rather than being absent or presenting misleading 0/0 completion.
+Cache totals replace their initialising title after saved intel is recovered;
+camp/zone counters replace theirs after static-site/grid setup. Victory remains gated.
+An empty validated
+camp/zone set is complete (0/0); an empty cache registry cannot trigger victory.
+After the required objectives are satisfied, the normal five-second victory
+delay applies. Live setting changes cancel/re-evaluate queued victory, and
+the final callback checks the current mode again. Choosing a stricter mode
+after the mission has already ended cannot undo the result.
+
+Acceptance: destroy all caches with camps still hostile in each mode; ensure
+only caches-only ends. Capture camps with zones still hostile; ensure the
+two-objective mode ends but the three-objective mode waits. Check a shared
+building square counts only once, repeated captures never add credit,
+AI retaking does not reduce the counters, and late joiners see all three tasks.
+During the five-second delay, change to a stricter incomplete mode and ensure
+victory is cancelled. Then choose an already complete mode and verify victory.
+
+Game Master map
+The scenario uses INF_MapEditor.conf, inheriting the stock GM map and adding
+the shared static/dynamic marker renderer. Camp/building zone squares,
+capture/counterattack colours, intel hints and shared player markers now have
+the same rendering path on the GM map as on the player map. Existing faction,
+streaming and user-generated-content restrictions are retained; this does not
+reveal other factions' private markers. GM entity selection/menu inputs remain
+with GM rather than the player-map marker editing controls.
+The GM root is itself MapFrame, whereas stock static/dynamic marker renderers
+find MapFrame only among descendants. The GM marker layer provides a stretched,
+cursor-transparent child frame before creating markers or enabling updates.
+The frame is reused on reopening; its marker children are removed on close
+after native marker updates stop. Setup failure logs an error and does not
+enable updates on uncreated marker widgets. Test GM-first opening, player-map
+to GM-map switching, repeated close/reopen, zoom/pan and new intel/debug markers.
+The "Debug: Show Cache Locations (Only Me)" GM setting displays exact cache
+markers on both maps for that GM only, including limited GMs with EDIT access.
+The separate "Debug: Show Camp Locations" checkbox in the same scenario
+category adds [DBG CAMP N] markers at every selected camp's actual layout
+position, including dormant and captured camps. It defaults off, does not spawn
+camps and does not reveal which camps contain caches. The camp/cache toggles
+are independent; turning either off removes only its own debug markers.
+Camps use the fortification symbol; caches use the objective-marker symbol.
+Icons are resolved by name from the active marker palette rather than fixed
+indices, retaining [DBG CAMP N]/[DBG CACHE N] labels on both maps.
+With debug enabled, owner-only snapshots refresh every five seconds, including
+delayed camp/cache discovery. Disabling clears only the requesting GM's markers.
+Exact debug positions are not broadcast by Advanced to ordinary clients.
+Check both maps, repeated open/close and zoom, a late-joining GM, toggle off/on,
+and a normal non-admin player. Exact debug cache markers remain opt-in.
+
+Automatic forest camps are enabled with the building grid. The implementation
+and acceptance checklist are documented in FOREST_CAMPS_PLAN.md.
+Up to 24 automatically validated woodland sites add normal 100m zone markers
+and a base four-person infantry team each (normally doubled by site influence),
+sharing the existing 128-AI budget,
+32-block ceiling, player-group scaling, fast-travel and cleanup rules.
+They are red while hostile, yellow during capture and green when cleared.
+Camp locations do not reveal which contain a cache.
+
+Static sites are created during startup before grid defender activation:
+discover/restore layouts, place compositions, choose/restore and verify caches, recover
+intel, place non-cache documents, then build grid zones and release activation.
+Compositions/documents remain
+for the mission regardless of player distance, travel speed, AI budget, capture,
+capacity eviction or defender cleanup. They have no player-distance/visibility
+gate. Defenders use the shared grid separation/concealment and reinforcement rules.
+No suitable site means no forced camp. Static placement errors are logged and
+hold startup readiness rather than declaring a ready but empty camp.
+Camp placement clearance excludes owned props/cache. Discovery checks loaded,
+valid navmesh at the camp infantry point as well as its connectivity probe.
+AI activation does not rerun that random discovery probe. Camp props are reconstructed from their manifest
+on recovery and excluded from engine persistence tracking to avoid duplicates;
+their lifetime is mission-persistent, not an additional engine save identity.
+Search runs up to eight candidates per 100ms tick (pausing for streamed navmesh),
+retaining the 120-second cap and all geometry/navigation acceptance checks.
+New site discovery is paced and may delay initial cache selection by up to
+two minutes. Camps join the existing cache candidate pool without increasing
+the configured cache count. Saved cache recovery restores the saved camp layout
+manifest first. Cache objective entities are never owned by camp prop cleanup.
+Non-cache documents give an 80% chance of one intel reward. Search consumption
+is saved before rolling; distance/capacity cleanup never replaces documents.
+Clean mission end resets these sidecar saves alongside upstream cache saves;
+crash recovery retains them. Search/save failures are logged and fail closed.
+An empty saved camp manifest retries automatic discovery rather than locking
+future sessions to zero camps. Existing saved cache positions stay unchanged.
+Discovery reports rejection counts for spatial exclusions, terrain, physical
+clearance and navigation, alongside cells visited/layouts tested. Clearance
+trace endpoints follow local terrain with 5cm separation instead of touching
+or intersecting the ground; entity/world/ocean obstacle tests remain enabled.
+Camp and isolated cache zones are now counterattack targets like building zones.
+
+The scenario enables m_bINFBuildingGrid on INS_AmbientPatrolManager.
+This replaces its named-location and designer ambient-zone discovery with
+fixed, world-origin-aligned 100 x 100 metre cells. The native map coordinate
+helper documents resolution 2 as 100 metres; cells do not change with zoom.
+
+The server queries buildings once during mission start. Each Building entity
+counts in the cell containing its origin. Building children of other buildings
+are not counted again; non-building parents do not disqualify a building.
+This is a qualifying building-entity count, not a count of rooms or accessible interiors.
+Isolated buildings and island buildings use the same rule as town buildings.
+Decorative objects not typed as Building do not contribute. Both patrol counts
+and marker building exceptions use the same predicate: top-level Building
+entities with prefab metadata, excluding prefab paths containing rock, wall,
+pier, jetty, breakwater, quay, bridge, fence or revetment (case-insensitive).
+This is a prefab-name filter, not an interior/accessibility classification;
+unusually named modded assets may require additional classification.
+
+Starting base balance: 2 AI per building, capped at 16 before site multipliers, rounded to the
+nearest achievable composition of the installed 4-person light fireteam or
+6-person rifle squad. Ties choose fewer AI. Examples:
+  1 building: 4 AI (smallest supported team)
+  3 buildings: 6 AI
+  5 buildings: 8 AI (tie rounded down)
+  6 buildings: 12 AI
+  8 or more buildings: 16 AI
+Groups in a cell use the same selected composition.
+
+Authored garrison infantry and vehicle spawning are retired. The inherited
+INS_GarrisonManager component remains only as a compatibility host for the
+shared map renderer; it does not start upstream discovery, spawn queues or
+cleared-zone persistence. Attempts to enable it are rejected with a warning.
+Its two obsolete GM attributes are unavailable. Existing authored zone entities
+may remain in the world but have no allocation, capture or exclusion effect.
+The zone-state system alone owns territory, capture and counterattack eligibility.
+The building-grid AI adapter owns defender activation and local activation slots.
+Separate ambient vehicle routes and field-threat systems are unchanged.
+Cells touching INS_SafeZone are still excluded, using square/circle geometry.
+Base building counts do not depend on cache selection; camp/cache influence
+scales the resulting allocation.
+Old garrison-cleared saves no longer suppress building-grid activation or
+failed-spawn retries. Former garrison buildings are ordinary grid counterattack targets.
+Reinforcement/camp placement searches ignore old garrison footprints while
+retaining safe-zone, geometry, terrain and player-safety checks.
+
+The trial reserves at most 128 intended AI across active grid zones and
+grid counterattacks. Both queued and materialised groups reserve capacity;
+a failed/skipped group releases
+its unused reservation without cancelling later queued groups. Entirely empty
+or never-materialised activations release for retry. Vehicle crews and field
+threats are NOT included in this cap; it is not a server-wide
+AI limit. Cells waiting for capacity remain dormant and retry on proximity checks.
+
+Population diagnostics
+While the grid manager is enabled, the server prints two [INF_Population]
+lines on its first proximity check and every 30 seconds thereafter. These
+report active blocks against the 32-block cap, actual living grid soldiers,
+living inbound soldiers (a subset of grid living), grid and counterattack
+reservations against the shared 128-AI cap, and the managed hostile snapshot
+used by capture checks (including field threats and vehicle crews).
+The snapshot is collected before that tick's activation/cleanup; newly queued
+groups may not have soldiers yet. These are not counts of civilian or unmanaged AI.
+The second line also reports dormant nearby blocks ready for activation versus
+those on cooldown, dormant distant blocks, JIP pause and the activation radius.
+Spawn failures and building activation capacity denials count attempts since the
+previous report, not unique blocks; counterattack budget denials are not counted.
+Capacity denials can reflect local player-group quotas as well as the AI/block cap.
+These logs distinguish budget pressure, inbound troops, cooldowns and
+reservations retained after casualties without
+changing spawning, cleanup or budget rules. Reservations are intended allocations,
+not living counts, and 128 is a ceiling rather than a target population.
+
+Player-group scaling and fast travel
+In building-grid mode, living controlled characters within 200m of one another
+form connected player groups. Separate groups receive independent local coverage;
+dead characters, spectator/editor cameras and characters more than 50m above
+terrain do not drive activation. Passengers use their vehicle's physics velocity,
+not their character's local velocity or movement caused by teleporting.
+Fast-mode speed includes vertical motion; the forward corridor uses horizontal
+velocity. A fast vertical climb/descent with no horizontal direction therefore
+does not activate ground zones.
+
+The nonlinear local activation limits are:
+  1 player: 4 zones
+  2 players: 6 zones
+  3-4 players: 10 zones
+  5-8 players: 18 zones
+  9 or more players: 32 zones
+Allowances rise immediately when players gather. Each member retains the group's
+recent pressure when teammates die or separate. After three minutes without
+supporting that tier, the allowance steps down one tier per minute (32, 18, 10,
+6, 4); the first drop occurs after four minutes. Repeated checks and splitting
+do not restart the decay timer. Regathering enough living players refreshes it.
+Surviving members carry the recent pressure into their separated groups;
+disconnected IDs are removed and mission end clears the memory. Dead players
+cannot activate zones themselves. Fast-only travel still overrides this retained
+allowance with the two-zone forward corridor. The global budget stays unchanged.
+Nearby active building/camp blocks consume these local slots.
+There is no independent garrison source. The shared 128 grid-AI ceiling and
+32 active-grid-block ceiling remain unchanged. Counterattacks retain their own
+concurrency limits and shared AI reservations; they do not consume a zone slot.
+Grid counterattack targets also require current engagement relevance, preventing
+high flyovers and fast-only drive-throughs from triggering attacks behind them.
+
+When every member of a group is travelling fast, its local limit becomes two.
+Fast mode enters after 20 continuous seconds at or above 50km/h. It exits
+after 15 continuous seconds below 30km/h. A speed interruption resets the
+pending timer. All four values are editable in the GM Travel Efficiency
+controls and Workbench manager attributes. Exit speed must be below entry
+speed. GM changes reset travel state/timers, not group-pressure budgets.
+Respawn, disconnect and altitude exclusion discard old travel observations.
+These are activation rules, not capture permissions; vehicle occupants cannot
+capture zones.
+Activation is restricted to a forward corridor: at least 100m ahead, up to eight
+seconds of predicted travel clamped to 250-600m, with up to 200m lateral offset,
+and always inside the manager's activation radius. There is no surrounding
+activation circle for fast members. A slow member still activates its normal
+nearby area; a fast vehicle cannot suppress a nearby foot player's coverage.
+This is a direction-based encounter opportunity, not a guaranteed roadblock
+or pathfinding prediction. No new blockers or ambush types are introduced.
+
+Grid blocks safely away from combat are trimmed farthest-first when a local
+quota shrinks or a fast group has passed their area. Player-occupied blocks,
+blocks with a capture hold in progress, and blocks with soldiers within 200m
+of any player remain protected, so quotas are
+admission targets rather than forced despawns of ongoing fights. New admission
+waits if safe grid eviction cannot make room.
+Slots are assigned to the nearest ground player group within each
+manager's activation radius; distant lingering sources do not consume local
+coverage, but their grid reservations still count toward the global budget.
+
+Grid infantry queues recheck current engagement relevance
+before spawning. Queued grid activations with no groups are released if players
+move away. Infantry safety distance, concealment, capture and stale-generation
+guards remain.
+Every population report includes [INF_Activation] group sizes, local limits,
+current nearby zone counts and fast-only status.
+Legacy mode without the building grid, existing field-threat patrols, ambient
+vehicle routes and civilians retain their separate activation/budget rules.
+
+Activation priority and capture
+Building-grid mode allows up to 32 active building blocks, with 128 intended AI
+shared with counterattacks. Every block reserves at least four AI, so the
+128-AI budget is reached at or before the block cap (32 four-person blocks).
+Larger allocations and counterattacks reduce the number of blocks that fit.
+Candidates are processed nearest
+first, measuring distance to the nearest living controlled player. When a
+closer block or counterattack needs capacity, the farthest unoccupied building
+blocks are deactivated first. Enough victims must be available before any
+are removed; a farther candidate cannot evict a closer block, and player-occupied
+blocks are protected. Any block with a living soldier within 200m of any player
+is also protected, even if its soldiers have left their original block.
+Captured blocks can now be evicted under the same rules. Capacity eviction
+deletes the selected groups and frees reservations immediately on the admitting
+proximity check (normally every 5 seconds), without the normal 60-second grace
+or 800m cleanup requirement. It removes enough farthest eligible blocks to admit
+the incoming allocation and logs the block count and reserved AI freed under
+[INF_Population]. If every farther block is protected, admission still waits.
+Authored garrisons are retired, not an additional source outside these limits.
+Activation generations prevent old queued spawns from a deactivated block
+appearing during its next activation.
+
+Capture requires a living controlled character on foot, within a circular
+100m horizontal radius of the marked 100m square's centre (200m diameter),
+and between -1m and 5m above terrain, for 15 continuously eligible seconds,
+and no living managed hostile AI within 200m horizontally of its centre.
+Vehicle occupants and aircraft flyovers cannot advance capture. Leaving,
+boarding a vehicle, exceeding the height limit or an enemy entering the
+contest radius resets the hold. Presence is sampled by the independent zone
+state system every second; movements entirely between samples are not observed.
+The player capture radius applies to building, camp and cache-zone capture,
+eligible on-foot activation priority and living-player eviction protection.
+Players in vehicles protect nearby zones but cannot capture them. Visible grid
+geometry, spawn allocation and enemy-retake square occupancy remain unchanged.
+Adjacent capture areas overlap, so a player
+near a shared edge can advance both blocks when both meet the remaining rules.
+The larger contest radius prevents capture merely by drawing enemies just
+across the square boundary. It counts zone infantry,
+counterattacks, field threats and ambient vehicle crews, regardless of which
+block originally spawned them. Unmanaged/scripted enemies outside these
+managers are not included. Bodies do not contest. Initial spawn completion
+has a grace period and must have materialised group members before capture.
+
+Grid zones capture individually; a camp in a captured zone earns camp credit.
+The independent capture loop continues for previously materialised zones even
+when ordinary defenders are disabled/deactivated. Never-spawned zones do not
+earn free capture credit. Pending group attempts must finish before capture.
+There is no separate authored-garrison capture/save model.
+
+Capture itself never calls group deletion/deactivation. Surviving enemies
+continue their existing behaviour and still consume reserved grid capacity.
+Normal cleanup requires every player to remain beyond the configured
+deactivation radius (normally 800m) of both the block/zone centre and all its
+living managed soldiers for 60 continuous seconds. Returning resets that timer.
+This applies to active/captured grid zones.
+Existing mission-end, last-player-disconnect and explicit manager-disable
+cleanup remain immediate. Capacity eviction is a separate exception for building
+blocks, including captured ones: their survivors can be removed to admit closer
+blocks or counterattacks, subject to player occupancy and 200m troop protection.
+Ordinary defenders cannot reset captured territory or restart after capture.
+Only the zone's one random counterattack can retake it.
+
+Spawn and lifecycle
+The existing activation/deactivation distances (600/800m), staggered group
+spawning and JIP pause remain. Failed spawns retain the 30-second retry delay.
+Nearby dormant blocks are eligible too; there is no 450m minimum activation
+distance. First try physically clear land positions inside the square,
+at least 200m horizontally from every controlled player in sparse cells.
+Dense cells (at least four qualifying buildings in the assigned 100m square)
+use a shorter 100m minimum. This is a building-count heuristic, not a town-name
+or interior/accessibility test. Inside the configured
+minimum spawn distance (normally 500m), the position must also be concealed from
+every player. Exposed in-block positions still require the configured separation,
+with the density-specific floor applying even if that setting is lower.
+If these are unavailable, first try 40 reinforcement positions 150-400m from a
+dense block or 250-500m from a sparse block, then retain the 40-position 550-900m
+search as a last resort. All require clear land outside exclusions and the same
+density-specific horizontal separation from every player.
+Each reinforcement position must have world geometry blocking the eye-height
+trace to every player; there is no exposed-position fallback. If no safe
+position exists the normal 30-second retry applies. Patrol waypoints bring
+the groups toward their assigned block. Capture is blocked while any surviving
+inbound group has not yet reached the 200m contest area; eliminating that
+inbound group also resolves it. Positions need not be inside buildings.
+The terrain helper is not a guarantee of navmesh reachability; reinforcement
+routes around islands/cliffs need gameplay testing. Patrol waypoints retain the base manager's 50m
+circle inside the cell. Saved group positions are revalidated on reactivation.
+Unavailable positions retry through the existing 30-second retry mechanism;
+they do not mark an unspawned cell as cleared.
+Capacity is reused by the nearest eligible dormant blocks in the same proximity
+check, with queued spawns rechecking every current controlled player. These
+nearby/concealed rules apply to building-grid patrols only;
+ambient vehicles and counterattacks retain their existing spawn-distance rules.
+The grid startup log prints the density threshold, both safety distances and
+the configured exposed-spawn distance so tests identify the loaded policy.
+
+Green means successfully captured, not distance-despawned. Captured zones do
+not restart ordinary defenders on a timer; only their one counterattack can
+retake them. Town/village/settlement counts and ordinary respawn delay are
+irrelevant in grid mode and hidden from GM properties.
+Set m_bINFBuildingGrid to 0 to restore base ambient discovery and counterattacks;
+this does not restore retired authored garrisons.
+
+Counterattacks
+In grid mode, every zone capture rolls once, default 10%, including camps.
+A failed roll permanently secures the zone. A successful roll commits an attack
+with up to three spawn attempts, five seconds apart. If all attempts fail, players
+within 300m secure the zone; otherwise it returns to hostile.
+A base 4- or 6-person group approximates half the normal base
+allocation; site influence multiplies the wave's group count, not its budget
+exemption. The whole wave is reserved together; partial entity spawn failure
+rolls back the wave. A wave that never produces members is released for retry.
+The target and all zones within 300m share the configured regional cooldown.
+Active attacks exclude other targets within 300m. At most two attacks run
+concurrently; each may have multiple groups. Both sides share the 128-AI budget.
+Attackers use the base outside-target spawn search, additionally checked for
+safe-zone exclusion, land, physical clearance and 500m player separation.
+Attackers also require concealment from every controlled player. If living
+attackers occupy the square for 15 seconds with no player within 200m, the zone
+returns to hostile. Capture credit remains earned. Once a launched attack ends,
+a still-captured zone becomes permanent; if retaken, its next player capture
+is permanent. There are no further waves or ordinary respawns for that zone.
+Distant attack groups clean up after the configured abandonment delay beyond
+800m from both the target and group. Disabling attacks removes their groups.
+
+Map appearance and cache privacy
+Building patrols and camps use filled 100m squares. Old authored garrison
+footprints do not generate additional squares.
+Markers show authoritative registered zones, not another independently filtered
+zone list. Building origins and validated static camp/cache positions create
+coverage; rocks, seawalls and similar excluded structures do not create cells.
+Coastal site zones remain visible even if most of their 100m square is water.
+The old 50%-land filter was needed for broad authored-garrison footprints; it
+must not now hide an actual camp/cache objective zone.
+There is one marker per grid coordinate. Shared-cell priority is counterattack, capture
+progressing, active hostile, dormant hostile, then cleared: green requires all contributors cleared.
+With building-grid spawning disabled, ambient location circles remain supported;
+authored garrisons remain retired.
+Only INF markers use the filled renderer; unrelated dotted markers are unchanged.
+Faint red dormant (AI not spawned): approximately 18% opacity.
+Strong red active (AI spawned or inbound): approximately 50% opacity.
+Yellow capture progressing: approximately 50% opacity.
+Faint green captured: approximately 25% opacity.
+Orange counterattack: approximately 50% opacity.
+Yellow requires an active capture hold and current capture eligibility, on
+building/camp cells. It disappears on the next marker
+update when player eligibility is lost or an enemy contests the square; starting
+and completing the hold still follow the normal proximity-check interval.
+Counterattack orange takes precedence over yellow. No flashing is used.
+Active does not necessarily mean currently engaged in combat. Captured green
+can still have surviving enemies outside its contest area awaiting cleanup.
+Orange applies only to the targeted cell for grid attacks,
+not every adjacent square. It returns to the underlying state after the attack.
+States, geometry and square/circle shape replicate to late joiners.
+Markers update once a second; appearance redraws on map zoom/state changes.
+Canvas positions/sizes convert screen pixels to DPI-independent layout units;
+polygon vertices remain in screen pixels. Explicit top-left anchoring avoids
+an inherited slot-alignment offset. Grid coordinates are not shifted to
+compensate for UI scaling.
+Mission end removes markers and the update callback.
+
+Building-derived base density does not depend on caches. Registered cache sites
+can create their own zone and influence future zone allocations. Destruction
+removes their influence via an event, without deleting defenders, changing
+territory ownership or revealing private cache locations through marker icons.
+Ordinary grid markers use the same colours for every zone type.
+Authored garrisons do not contribute geometry or defenders.
+Existing intended cache intel hints and objective remain unchanged.
+Moving vehicle patrols and player-relative field threats are not grid allocation.
+
+Validation
+Each extended manager and ambient state has one modded declaration in this
+addon. Enforce modded classes form an inheritance chain, not partial classes;
+shared custom fields and the methods using them must not depend on a later
+modded layer. Class consolidation preserves existing method/field bodies.
+The user successfully tested the preceding filled-circle revision.
+This building-grid revision has offline validation only: no game or Workbench
+has been launched by the assistant. Compilation, actual building discovery,
+performance, map alignment/layering and multiplayer need user testing.
+
+Acceptance checks in the intended mission/server
+1. Startup log reports eligible 100m building cells with no script errors.
+2. Check Regina, Provins, isolated farms and island buildings outside exclusions.
+3. Squares align with 100m map coordinates at different zoom levels.
+   Old authored garrison footprints add no squares, circles or extra troops.
+4. Compare low/high building counts with spawned group totals and the 16-AI cap.
+5. Spread players out: grid/counterattack reservations must stay at or below 128.
+6. Approach, leave and return: no unsafe close spawns, duplicate groups or
+   false green on failed spawns; distance despawn returns to dormant red.
+7. Capture a cell: green, no timed ordinary respawn.
+8. Counterattack a captured occupied cell: site-scaled wave, only target orange,
+   nearby cells share cooldown, and no attacks on untouched dormant cells.
+   Verify 0% prevents waves, 100% rolls always pass eligibility, and 25% is
+   random rather than a guaranteed capture response. Failed spawns spend nothing.
+   Let attackers retake an undefended square; recapture it and confirm permanent
+   ownership. Defeat an attack before retake and confirm no second wave.
+9. Eliminate/abandon attack: target recovers its underlying colour.
+10. Join late and restart: matching geometry/state, no duplicate markers.
+11. Compare cache placement/destruction without a combat-state change: the cache
+    site has a zone, but normal colours do not identify cache assignments.
+    Destruction removes future strength influence, not living defenders or
+    already-earned capture credit.
+12. Disable m_bINFBuildingGrid and confirm legacy ambient/counterattack behaviour.
+13. Old garrison-cleared saves must not suppress building-grid spawning.
+    GM properties must not offer garrison enable/cache-group controls.
+14. At different resolutions/UI scales and map zooms, confirm all square edges
+    remain on grid lines with no consistent up/left offset.
+15. Check coastal cells: real building/camp/cache zones remain visible and
+    count consistently in objectives. Rocks/seawalls/piers alone create none.
+16. Enter an unspawned block before capacity becomes available: when admitted,
+    squads reinforce from safe hidden positions rather than spawning beside
+    players. It cannot capture merely while inbound squads remain far away.
+    After capacity eviction, confirm nearest ready blocks activate first.
+    Test another player near the proposed spawn: no group origin may spawn
+    within 100m of either player for dense cells (four or more buildings), or
+    within 200m for sparser cells. Positions inside the configured 500m
+    separation must be concealed from both. Check saved positions too, and
+    verify the 3-to-4-building density boundary.
+17. Draw soldiers out of their source block and cause budget pressure: soldiers
+    within 200m of any player must not be removed by eviction. Beyond 200m,
+    the farthest unoccupied eligible blocks, including captured ones, should
+    despawn on admission without waiting 60 seconds. Verify the capacity-eviction
+    log, enough released reservations, and no removal if insufficient eligible
+    blocks exist. Capture alone must still not delete surviving soldiers.
+18. Fly/drive through a clear square: no capture. Stand on foot within its
+    circular 100m capture radius for 15 seconds:
+    capture. Interrupt the hold with an enemy, leaving or boarding a vehicle:
+    the timer must restart. Repeat on a camp square.
+19. Confirm player capture works at 100m from the centre, but not beyond it.
+    Check diagonal positions too: 60m/80m offsets qualify; 75m/75m do not.
+    The 200m enemy contest radius and visible 100m grid must remain unchanged.
+20. Compare faint dormant red with strong active red. Start a capture hold:
+    yellow must appear, then faint green on completion. Leaving, boarding a
+    vehicle or an enemy entering the contest radius must remove yellow on the
+    next marker update. Repeat on camp cells and check late-join colours.
+    Counterattacks override yellow with orange. A shared cell has one territory
+    state, not separate camp/building/cache captures.
+21. Restart and enter Saint-Philippe: qualifying building cells receive normal
+    per-building allocations under the shared 128 grid-AI budget. No authored
+    garrison troops/vehicles should appear. Safe-zone cells remain absent.
+    Former garrison buildings follow ordinary capture and one-shot counterattack
+    rules, with no suppression from legacy garrison-cleared saves.
+22. Test nearby groups of 1, 2, 3, 4, 5, 8 and 9 living players: local zone
+    limits must be 4, 6, 10, 10, 18, 18 and 32, sharing building/camp slots.
+    Split into groups more than 200m apart and confirm independent coverage
+    under the unchanged 128 grid-AI and 32-grid-block caps. Keep combatants near
+    players while splitting: protected troops must remain, even above a local cap.
+23. Drive at least 50km/h for 20 continuous seconds: only then should the
+    fast-only group use the two-zone forward corridor. Short bursts must not
+    switch mode. Stay below 30km/h for 15 continuous seconds to restore normal
+    coverage; touching 30km/h resets the exit timer. Change all four GM settings
+    and confirm timer reset, input validation and updated activation logs.
+    Check passengers, turns, teleports, queued spawns, a nearby foot player and
+    aircraft just below/above 50m above terrain. High flyovers alone must not
+    activate ground zones. Verify [INF_Activation] logs and empty-source retries.
+24. Gather four players: allowance rises to 10 immediately. Kill or separate
+    teammates: survivors retain 10 through the three-minute hold, drop to 6
+    after four minutes and 4 after five. Repeated checks must not extend this.
+    Regather before expiry and confirm immediate growth and a refreshed hold.
+    Repeat splitting/merging groups, respawning, fast travel and mission restart.
+25. Start a zone's queued wave with an early/middle group failing: later attempts
+    must still run and failed reservations must release. Capture cannot complete
+    while attempts remain pending. If no group ever materialises, the allocation
+    must release after the spawn grace plus 30 seconds and retry after 30 seconds.
+26. Disable Zone Defenders after troops have materialised, then clear/capture
+    the zone: the independent capture loop must still work. Never-spawned zones
+    must not grant free capture credit merely because defenders are disabled.
+27. Interrupt an AI retake with an empty-attacker sample: a later arrival must
+    hold for a fresh 15 seconds, not inherit an old timer.
+28. During partial cache startup, destroy a verified cache while another cache
+    is still failing: retries must not recreate the destroyed cache. Two selected
+    positions resolving to one entity or mismatched cache snapshot arrays must
+    log an error and hold readiness, not reduce the objective total or crash.
+29. Compile/restart with the default Forest Camps configuration. Each camp must
+    contain the full USSR Encampment (tents, camo, furniture and equipment), not
+    two bare tents. Its embedded player respawn point must not be usable.
+    Check the composition resource picker and footprint radius in Workbench,
+    plus site-strength/chance/victory/debug settings on their owning components.
+    In GM, confirm max concurrent attacks and attempt interval are independent
+    controls alongside regional cooldown; obsolete grid-mode controls stay hidden.
+    Test a custom static composition with its correct footprint, a missing
+    resource, a composition containing AI, and recovery at an obstructed saved
+    site. Invalid configurations must log and hold readiness, never silently
+    substitute tents, force placement or add unbudgeted defenders.

@@ -1,0 +1,53 @@
+SCR_GameModeEditor : "{DA3986AF1B5032B7}Prefabs/MP/Modes/Editor/GameMode_Editor_Full.et" {
+ ID "56B2B479C6B96951"
+ components {
+  INS_AmbientPatrolManager "{69226EB846FFAEFF}" {
+   m_aGroupPrefabs {
+    "{CE41AF625D05D0F0}Prefabs/Groups/INDFOR/Group_FIA_RifleSquad.et" "{2CC26054775FBA2C}Prefabs/Groups/INDFOR/Group_FIA_Team_AT.et" "{9328FE7DD0019E60}Prefabs/Groups/INDFOR/Group_FIA_Team_LAT.et" "{22F33D3EC8F281AB}Prefabs/Groups/INDFOR/Group_FIA_MachineGunTeam.et" "{1BB20A4B3A53D0F5}Prefabs/Groups/INDFOR/Group_FIA_LightFireTeam.et" "{5BEA04939D148B1D}Prefabs/Groups/INDFOR/Group_FIA_FireTeam.et" "{C1E39427E43B1E79}Prefabs/Groups/INDFOR/Group_FIA_AmmoTeam.et" "{DB3D2D4FC5922C6A}Prefabs/Groups/INDFOR/AmbientPatrols/Group_FIA_PartisanTeam_NotSpawned.et" "{4FB92A28AC66B970}Prefabs/Groups/INDFOR/AmbientPatrols/Group_FIA_SniperTeam_NotSpawned.et"
+   }
+  }
+  INS_AmbientVehicleManager "{69226EB8BFD90B34}" {
+   m_aVehiclePrefabs {
+    "{442939C9617DF228}Prefabs/Vehicles/Wheeled/BRDM2/BRDM2_FIA.et" "{22B327C6752EC4D4}Prefabs/Vehicles/Wheeled/UAZ469/UAZ469_PKM_FIA.et" "{B47110AA1A806556}Prefabs/Vehicles/Wheeled/BTR70/BTR70_FIA.et" "{E72D78E7F45532EC}Prefabs/Vehicles/Wheeled/UAZ469/UAZ469_UK59_FIA.et" "{9B6708D7E9950488}Prefabs/Vehicles/Wheeled/S105/S105_FIA.et" "{F0EC3EFF70B174B0}Prefabs/Vehicles/Wheeled/UAZ452/UAZ452_ambulance_FIA.et" "{70DFE5F50B4DC70B}Prefabs/Vehicles/Wheeled/S1203/S1203_cargo_FIA.et"
+   }
+  }
+  INS_CacheSpawnManager "{68B0FED62435BCC3}" {
+   m_sCachePrefab "{07AA3565B2DDDE08}Prefabs/Props/Military/AmmoBoxes/EquipmentBoxStack/FIA/EquipmentBoxStack_FIA_01_V6_covered.et"
+  }
+  INS_CounterAttackManager "{69226E8E281D0511}" {
+   m_aSquadPrefabs {
+    "{870472E4AE81F971}Prefabs/Groups/INDFOR/AmbientPatrols/Group_FIA_MachineGunTeam_Elite_NotSpawned.et" "{2E9C920C3ACA2C6F}Prefabs/Groups/INDFOR/Group_FIA_ReconTeam.et" "{265B11E8E53F9FBA}Prefabs/Groups/INDFOR/AmbientPatrols/Group_FIA_RifleSquad_NotSpawned.et"
+   }
+  }
+  INS_FieldThreatManager "{698A92B7AC6D98DB}" {
+   m_aGroupPrefabs {
+    "{CE41AF625D05D0F0}Prefabs/Groups/INDFOR/Group_FIA_RifleSquad.et" "{2CC26054775FBA2C}Prefabs/Groups/INDFOR/Group_FIA_Team_AT.et" "{0C9C86FCE951AF19}Prefabs/Groups/INDFOR/AmbientPatrols/Group_FIA_LoneWolfSniper_NotSpawned.et"
+   }
+  }
+  INS_GarrisonManager "{68B2B72E61E88AD0}" {
+   m_aInfantryGroupPrefabs {
+    "{CE41AF625D05D0F0}Prefabs/Groups/INDFOR/Group_FIA_RifleSquad.et" "{DB3D2D4FC5922C6A}Prefabs/Groups/INDFOR/AmbientPatrols/Group_FIA_PartisanTeam_NotSpawned.et"
+   }
+   m_aVehicleGroupPrefabs {
+    "{442939C9617DF228}Prefabs/Vehicles/Wheeled/BRDM2/BRDM2_FIA.et" "{B47110AA1A806556}Prefabs/Vehicles/Wheeled/BTR70/BTR70_FIA.et" "{22B327C6752EC4D4}Prefabs/Vehicles/Wheeled/UAZ469/UAZ469_PKM_FIA.et" "{E72D78E7F45532EC}Prefabs/Vehicles/Wheeled/UAZ469/UAZ469_UK59_FIA.et"
+   }
+  }
+ }
+ {
+  SCR_FactionManager "6A96889460DF1C3E" {
+   ID "56E685E92F1B7E7A"
+   Factions {
+    SCR_Faction "{56DEAC40D3C2E623}" {
+     m_aFriendlyFactionsIds {
+      "FIA"
+     }
+    }
+    SCR_Faction "{56DEAC40D132400B}" {
+     m_aFriendlyFactionsIds {
+      "USSR"
+     }
+    }
+   }
+  }
+ }
+}

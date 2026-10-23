@@ -1,0 +1,14 @@
+Turret : "{4AD877DEA242E512}Prefabs/Weapons/Core/Turret_Base.et" {
+ ID "51ACD0965653D003"
+ components {
+  SCR_BaseCompartmentManagerComponent "{51ACFBB07A14CFA6}" {
+   CompartmentSlots {
+    TurretCompartmentSlot TurretCompartment {
+     m_DefaultOccupantData SCR_DefaultOccupantData "{69513C4F401508CC}" {
+      m_sDefaultOccupantPrefab "{8515E8BD26A5D5F8}Prefabs/Characters/Factions/INDFOR/FIA/Character_FIA_Randomized.et"
+     }
+    }
+   }
+  }
+ }
+}

@@ -1,0 +1,29 @@
+Vehicle : "{5674FAEB9AB7BDD0}Prefabs/Vehicles/Wheeled/M998/M998_uncovered.et" {
+ ID "BBCBA43A9778AE21"
+ components {
+  SCR_BaseCompartmentManagerComponent "{20FB66C5DCB8DF72}" {
+   CompartmentSlots {
+    PilotCompartmentSlot PilotCompartment {
+     m_DefaultOccupantData SCR_DefaultOccupantData "{59BA9CCC46FB2886}" {
+      m_sDefaultOccupantPrefab "{8515E8BD26A5D5F8}Prefabs/Characters/Factions/INDFOR/FIA/Character_FIA_Randomized.et"
+     }
+    }
+    CargoCompartmentSlot Passenger_r01 {
+     m_DefaultOccupantData SCR_DefaultOccupantData "{59BA9CCC445C0454}" {
+      m_sDefaultOccupantPrefab "{8515E8BD26A5D5F8}Prefabs/Characters/Factions/INDFOR/FIA/Character_FIA_Randomized.et"
+     }
+    }
+    CargoCompartmentSlot Passenger_l02 {
+     m_DefaultOccupantData SCR_DefaultOccupantData "{59BA9CCC41A88D86}" {
+      m_sDefaultOccupantPrefab "{8515E8BD26A5D5F8}Prefabs/Characters/Factions/INDFOR/FIA/Character_FIA_Randomized.et"
+     }
+    }
+    CargoCompartmentSlot Passenger_r02 {
+     m_DefaultOccupantData SCR_DefaultOccupantData "{59BA9CCC5F699BAD}" {
+      m_sDefaultOccupantPrefab "{8515E8BD26A5D5F8}Prefabs/Characters/Factions/INDFOR/FIA/Character_FIA_Randomized.et"
+     }
+    }
+   }
+  }
+ }
+}

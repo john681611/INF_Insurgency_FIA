@@ -1,0 +1,15 @@
+GenericEntity {
+ ID "6AA19CB200000525"
+ components {
+  SignalsManagerComponent "{6AA19CB200000522}" {
+  }
+  SoundComponent "{6AA19CB200000523}" {
+   Filenames {
+    "{C45837D7F7445964}Sounds/Editor/LightningStrike/Editor_LightningStrike.acp"
+   }
+   DistanceManagement 0
+  }
+  HitEffectComponent "{6AA19CB200000524}" {
+  }
+ }
+}

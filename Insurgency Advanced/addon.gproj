@@ -1,0 +1,8 @@
+GameProject {
+ ID "InsurgencyAdvanced"
+ GUID "78926100260C48E5"
+ TITLE "Insurgency Advanced"
+ Dependencies {
+  "E55A9FA78E5FCFE4" "58D0FB3206B6F859"
+ }
+}

@@ -1,0 +1,7 @@
+GenericEntity : "{6E9190BC2713551D}Prefabs/Compositions/Slotted/BuildableComposition_Base.et" {
+ ID "5282DCB5DFC8538F"
+ components {
+  INF_CampOwnershipComponent "{6AA19CB200000510}" {
+  }
+ }
+}

@@ -1,0 +1,21 @@
+Projectile : "{A8FFCD3F3697D77F}Prefabs/Editor/Lightning/LightningStrike.et" {
+ ID "DA5C6308000CDEF2"
+ components {
+  MissileMoveComponent "{0EF36690881261EF}" {
+   InitSpeed 0
+   ThrustForce 0
+   ProjectileEffects {
+    ProjectileDamage "{56829D01651CE9A7}" {
+     DamageValue 0
+    }
+   }
+  }
+  BaseTriggerComponent "{58AAA3E2CF5CABFE}" {
+   PROJECTILE_EFFECTS {
+    ExplosionEffect "{58AAA3E2D7F13E11}" {
+     EffectPrefab "{6AA19CB200000521}Prefabs/Effects/Pastafarian/PrisonerRebukeEffect.et"
+    }
+   }
+  }
+ }
+}

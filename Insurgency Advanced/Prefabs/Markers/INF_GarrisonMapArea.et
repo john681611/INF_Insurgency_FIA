@@ -1,0 +1,8 @@
+INF_GarrisonMapArea {
+ ID "6AA19CB200000003"
+ components {
+  RplComponent "{6AA19CB200000004}" {
+  }
+ }
+ Flags 0 0x3
+}

@@ -1,0 +1,16 @@
+SCR_GameModeEditor : "{DA3986AF1B5032B7}Prefabs/MP/Modes/Editor/GameMode_Editor_Full.et" {
+ ID "56B2B479C6B96951"
+ components {
+  INS_AmbientVehicleManager "{69226EB8BFD90B34}" {
+   m_aVehiclePrefabs {
+    "{442939C9617DF228}Prefabs/Vehicles/Wheeled/BRDM2/BRDM2_FIA.et" "{22B327C6752EC4D4}Prefabs/Vehicles/Wheeled/UAZ469/UAZ469_PKM_FIA.et" "{B47110AA1A806556}Prefabs/Vehicles/Wheeled/BTR70/BTR70_FIA.et" "{E72D78E7F45532EC}Prefabs/Vehicles/Wheeled/UAZ469/UAZ469_UK59_FIA.et" "{F0EC3EFF70B174B0}Prefabs/Vehicles/Wheeled/UAZ452/UAZ452_ambulance_FIA.et" "{F1707238BCDB5BFF}Prefabs/Vehicles/Wheeled/UAZ469/UAZ469_DShKM_FIA.et" "{A47A0F6238249034}Prefabs/Vehicles/Wheeled/UAZ469/UAZ469_SPG9_FIA.et" "{EAE67B00C6B197E2}Vehicles/HighLux/KILUXnew7725_Armed_WZNP.et" "{47F415627EED66EB}Vehicles/HighLux/KILUXnew7725_Armed_SPG9_WZNP.et" "{500CB7E90BF06BB0}Weapons/ZPU-1/KILUXnew7725_Armed_ZPU1_WZNP.et" "{D873FE12B2AEFDAF}Vehicles/AZPS60Ural/Ural4320_WZNP_AZPS60.et" "{479AB5B7FA667925}Vehicles/Bus/ZagorusBB.et" "{D44DEE1930F41218}Vehicles/LR/LROffender_WZNP_HMG.et" "{F9E9C19E3DC1C0A7}Vehicles/LR/LROffender_WZNP_SPG9.et" "{C4C02EEDE6582F39}Weapons/ZPU-1/LROffender_WZNP_ZPU.et" "{FA4BEE6BC997C57B}Vehicles/BTR40/BTR40WZNParmednew.et" "{910C654D2A802A1C}Vehicles/BTR40/Slatpack/BTR40WZNParmednewheavy.et" "{1CA553733A50A2AD}Prefabs/Vehicles/Wheeled/Ural4320/Ural4320_APC.et"
+   }
+   m_fMinSpawnDistance 495.3
+  }
+  INS_GarrisonManager "{68B2B72E61E88AD0}" {
+   m_aVehicleGroupPrefabs + {
+    "{F1707238BCDB5BFF}Prefabs/Vehicles/Wheeled/UAZ469/UAZ469_DShKM_FIA.et" "{A47A0F6238249034}Prefabs/Vehicles/Wheeled/UAZ469/UAZ469_SPG9_FIA.et" "{EAE67B00C6B197E2}Vehicles/HighLux/KILUXnew7725_Armed_WZNP.et" "{47F415627EED66EB}Vehicles/HighLux/KILUXnew7725_Armed_SPG9_WZNP.et" "{500CB7E90BF06BB0}Weapons/ZPU-1/KILUXnew7725_Armed_ZPU1_WZNP.et" "{D873FE12B2AEFDAF}Vehicles/AZPS60Ural/Ural4320_WZNP_AZPS60.et" "{D44DEE1930F41218}Vehicles/LR/LROffender_WZNP_HMG.et" "{F9E9C19E3DC1C0A7}Vehicles/LR/LROffender_WZNP_SPG9.et" "{C4C02EEDE6582F39}Weapons/ZPU-1/LROffender_WZNP_ZPU.et" "{FA4BEE6BC997C57B}Vehicles/BTR40/BTR40WZNParmednew.et" "{910C654D2A802A1C}Vehicles/BTR40/Slatpack/BTR40WZNParmednewheavy.et" "{1CA553733A50A2AD}Prefabs/Vehicles/Wheeled/Ural4320/Ural4320_APC.et"
+   }
+  }
+ }
+}

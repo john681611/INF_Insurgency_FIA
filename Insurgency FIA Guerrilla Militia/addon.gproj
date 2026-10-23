@@ -1,0 +1,8 @@
+GameProject {
+ ID "InsurgencyFIAGuerrillaMilitia"
+ GUID "6AA950D719EC42B8"
+ TITLE "Insurgency FIA Guerrilla Militia"
+ Dependencies {
+  "6A9686E2AB28E681" "6AA910478FB3EBEB"
+ }
+}

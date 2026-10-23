@@ -1,0 +1,22 @@
+GameProject {
+ ID "InsurgencyFIAExtVeh"
+ GUID "6A96B704523AF218"
+ TITLE "Insurgency FIA Ext Veh"
+ Dependencies {
+  "6A9686E2AB28E681" "58D0FB3206B6F859" "617AC5E57EF1D9E3"
+ }
+ Configurations {
+  GameProjectConfig PC {
+  }
+  GameProjectConfig XBOX_ONE {
+  }
+  GameProjectConfig XBOX_SERIES {
+  }
+  GameProjectConfig PS4 {
+  }
+  GameProjectConfig PS5 {
+  }
+  GameProjectConfig HEADLESS {
+  }
+ }
+}

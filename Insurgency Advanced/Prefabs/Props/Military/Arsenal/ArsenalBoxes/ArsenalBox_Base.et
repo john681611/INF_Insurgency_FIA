@@ -1,0 +1,21 @@
+GenericEntity {
+ ID "56F2C6D6F7C6DAFA"
+ components {
+  INF_ForestCampSearchComponent "{6AA19CB200000600}" {
+  }
+  ActionsManagerComponent "{56F2C6D1431ADB12}" {
+   additionalActions {
+    INF_ForestCampSearchAction "{6AA19CB200000601}" {
+     ParentContextList {
+      "default"
+     }
+     UIInfo UIInfo "{6AA19CB200000602}" {
+      Name "Search camp for intel"
+     }
+     VisibilityRange 2
+     Duration 2
+    }
+   }
+  }
+ }
+}

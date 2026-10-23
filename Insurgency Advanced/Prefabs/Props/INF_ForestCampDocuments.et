@@ -1,0 +1,34 @@
+GenericEntity {
+ ID "6AA19CB200000101"
+ components {
+  RplComponent "{6AA19CB200000102}" {
+  }
+  MeshObject "{6AA19CB200000103}" {
+   Object "{599B4D48FED538FC}Assets/Items/Equipment/Maps/Map_Paper_01/Map_Paper_01_unfolded_table.xob"
+  }
+  INF_ForestCampSearchComponent "{6AA19CB200000104}" {
+  }
+  ActionsManagerComponent "{6AA19CB200000105}" {
+   ActionContexts {
+    UserActionContext "{6AA19CB200000106}" {
+     ContextName "CampDocuments"
+     Position PointInfo "{6AA19CB200000107}" {
+     }
+     Radius 2
+    }
+   }
+   additionalActions {
+    INF_ForestCampSearchAction "{6AA19CB200000108}" {
+     ParentContextList {
+      "CampDocuments"
+     }
+     UIInfo UIInfo "{6AA19CB200000109}" {
+      Name "Search camp documents"
+     }
+     VisibilityRange 2
+     Duration 2
+    }
+   }
+  }
+ }
+}
