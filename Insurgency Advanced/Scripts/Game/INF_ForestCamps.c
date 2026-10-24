@@ -877,6 +877,9 @@ class INF_ForestCamps
 			if (search)
 			{
 				search.BindSite(site.m_RewardID);
+				SCR_ArsenalComponent arsenal = SCR_ArsenalComponent.Cast(search.GetOwner().FindComponent(SCR_ArsenalComponent));
+				if (arsenal)
+					arsenal.SetArsenalSaveType(SCR_EArsenalSaveType.NO_RESTRICTIONS);
 				return true;
 			}
 		}
