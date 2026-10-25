@@ -53,6 +53,8 @@ modded class INS_AmbientVehicleManager
 	[Attribute("2", UIWidgets.Slider, "Zone vehicle cap, independent of ambient route vehicles. Lowering affects future admissions.", "0 32 1", category: "Zone Vehicles"), RplProp()]
 	protected int m_iINFZoneVehicleLimit = 2;
 	protected ref array<ref INF_ZoneVehicle> m_INFZoneVehicles = {};
+	protected INF_StaggerGate m_INFSpawnGate = INF_StaggerGate.Spawns();
+	protected INF_StaggerGate m_INFDespawnGate = INF_StaggerGate.Despawns();
 	protected ref map<string, bool> m_INFZoneVehicleRolls = new map<string, bool>();
 	protected bool m_INFZoneVehiclesStopped;
 	protected float m_fINFZonePauseUntil;
@@ -706,6 +708,8 @@ modded class INS_AmbientVehicleManager
 			Print("[INF_ZoneVehicles] Cannot load configured vehicle: " + prefab, LogLevel.ERROR);
 			return;
 		}
+		if (!m_INFSpawnGate.TryReserve())
+			return;
 		EntitySpawnParams params = new EntitySpawnParams();
 		params.TransformMode = ETransformMode.WORLD;
 		Math3D.AnglesToMatrix(Vector(yaw, 0, 0), params.Transform);
@@ -864,18 +868,27 @@ modded class INS_AmbientVehicleManager
 		}
 		if (removeVehicle && !playerAboard)
 		{
-			foreach (IEntity member : members)
-			{
-				if (member && !INF_PrisonerComponent.INF_Preserve(member)
-					&& GetGame().GetPlayerManager().GetPlayerIdFromControlledEntity(member) <= 0)
-					SCR_EntityHelper.DeleteEntityAndChildren(member);
-			}
+			array<IEntity> doomed = {};
+			doomed.Copy(members);
 			if (vehicle && !preserve)
-				SCR_EntityHelper.DeleteEntityAndChildren(vehicle);
+				doomed.Insert(vehicle);
+			m_CallQueue.CallLater(INF_DeleteVehicleParts, m_INFDespawnGate.Reserve(), false, doomed);
 		}
 		if (vehicle && !m_INFZoneVehiclesStopped && m_fWreckLifetime > 0
 			&& (!removeVehicle || (preserve && !playerAboard)))
 			GetGame().GetCallqueue().CallLater(INF_ZoneWreckCheck, (int)(m_fWreckLifetime * 1000), false, vehicle);
+	}
+
+	// Crew and vehicle are re-checked at deletion time because players may board during the delay.
+	protected void INF_DeleteVehicleParts(array<IEntity> entities)
+	{
+		foreach (IEntity entity : entities)
+		{
+			if (!entity || INF_PrisonerComponent.INF_Preserve(entity)
+				|| GetGame().GetPlayerManager().GetPlayerIdFromControlledEntity(entity) > 0 || HasPlayerOccupant(entity))
+				continue;
+			SCR_EntityHelper.DeleteEntityAndChildren(entity);
+		}
 	}
 
 	override protected void DespawnVehicle(INS_AmbientVehicleAgent agent)

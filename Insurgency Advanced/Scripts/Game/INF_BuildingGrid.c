@@ -4,6 +4,48 @@ modded class INS_MissionParams
 	int m_iINFCampCount;
 }
 
+// Hands out evenly spaced time slots so spawns or deletes never land in the same moment.
+// All AI managers share one spawn gate and one despawn gate.
+class INF_StaggerGate
+{
+	static const int GAP_MS = 2000;
+	protected static ref INF_StaggerGate s_Spawns = new INF_StaggerGate();
+	protected static ref INF_StaggerGate s_Despawns = new INF_StaggerGate();
+	protected float m_fNextAt;
+
+	static INF_StaggerGate Spawns()
+	{
+		return s_Spawns;
+	}
+
+	static INF_StaggerGate Despawns()
+	{
+		return s_Despawns;
+	}
+
+	int Reserve()
+	{
+		float now = GetGame().GetWorld().GetWorldTime();
+		float at = Math.Max(now, m_fNextAt);
+		m_fNextAt = at + GAP_MS;
+		return (int)(at - now);
+	}
+
+	// Non-queuing variant for callers that retry on their own tick.
+	bool TryReserve()
+	{
+		if (Backlog() > 0)
+			return false;
+		Reserve();
+		return true;
+	}
+
+	float Backlog()
+	{
+		return Math.Max(0, m_fNextAt - GetGame().GetWorld().GetWorldTime());
+	}
+}
+
 class INF_BuildingGrid
 {
 	static const float SIZE = 100;
@@ -825,7 +867,7 @@ modded class INS_AmbientPatrolManager
 			state.m_fINFDistantSince = -1;
 			state.m_fINFCaptureSince = -1;
 			state.m_iINFRememberedAI = 0;
-			state.m_fINFSpawnReadyAt = GetGame().GetWorld().GetWorldTime() + Math.Max(5000, state.m_iGroupCount * m_iSpawnStaggerMs + 2000);
+			state.m_fINFSpawnReadyAt = GetGame().GetWorld().GetWorldTime() + Math.Max(5000, state.m_iGroupCount * INF_StaggerGate.GAP_MS + 2000 + m_INFSpawnGate.Backlog());
 			state.m_iINFActivationGeneration++;
 			state.m_bActive = true;
 			state.m_bEverHadLiving = false;
@@ -833,15 +875,13 @@ modded class INS_AmbientPatrolManager
 			state.m_iINFPendingGroups = state.m_iGroupCount;
 			state.m_iINFReservedAI = state.m_iINFPlannedAI;
 			m_INFZoneStates.NotifyChanged(state);
-			int spawnIndex = 0;
 			for (int i = 0; i < state.m_iGroupCount; i++)
 			{
 				vector pos = INS_ZoneHelpers.RandomPositionInRadius(state.m_vCenter, state.m_fRadius);
 				if (i < state.m_aSavedPositions.Count())
 					pos = state.m_aSavedPositions[i];
-				m_CallQueue.CallLater(INF_SpawnQueued, spawnIndex * m_iSpawnStaggerMs, false,
+				m_CallQueue.CallLater(INF_SpawnQueued, m_INFSpawnGate.Reserve(), false,
 					pos, state, state.m_iINFActivationGeneration);
-				spawnIndex++;
 			}
 			state.m_aSavedPositions.Clear();
 			return;
@@ -1079,7 +1119,7 @@ modded class INS_AmbientPatrolManager
 				{
 					presence = m_INFZoneStates.GetPresence(false, true);
 					if (INF_BlockRules.IsDistant(state.m_vCenter, state.m_aAgents, presence.m_Players, m_fDeactivationRadius))
-						DeactivateZone(state);
+						INF_QueueZoneDespawn(state);
 					else
 						state.m_fINFDistantSince = -1;
 				}
@@ -1110,6 +1150,37 @@ modded class INS_AmbientPatrolManager
 		foreach (INS_AmbientPatrolZoneState next : candidates)
 			ActivateZone(next);
 		m_INFDecisionPolicy = null;
+	}
+
+	protected ref array<INS_AmbientPatrolZoneState> m_aINFDespawningZones = {};
+	protected INF_StaggerGate m_INFSpawnGate = INF_StaggerGate.Spawns();
+	protected INF_StaggerGate m_INFDespawnGate = INF_StaggerGate.Despawns();
+
+	// Distance-based despawns share one queue so zones are removed a few seconds apart.
+	protected void INF_QueueZoneDespawn(INS_AmbientPatrolZoneState state)
+	{
+		if (m_aINFDespawningZones.Find(state) >= 0)
+			return;
+		int delay = m_INFDespawnGate.Reserve();
+		if (delay <= 0)
+		{
+			DeactivateZone(state);
+			return;
+		}
+		m_aINFDespawningZones.Insert(state);
+		m_CallQueue.CallLater(INF_DespawnZoneQueued, delay, false, state, state.m_iINFActivationGeneration);
+	}
+
+	protected void INF_DespawnZoneQueued(INS_AmbientPatrolZoneState state, int generation)
+	{
+		m_aINFDespawningZones.RemoveItem(state);
+		if (!state.m_bActive || state.m_iINFActivationGeneration != generation)
+			return;
+		INF_BlockPresence presence = m_INFZoneStates.GetPresence(false, true);
+		if (INF_BlockRules.IsDistant(state.m_vCenter, state.m_aAgents, presence.m_Players, m_fDeactivationRadius))
+			DeactivateZone(state);
+		else
+			state.m_fINFDistantSince = -1;
 	}
 
 	protected bool INF_MakeRoom(INS_AmbientPatrolZoneState candidate)
@@ -1260,7 +1331,23 @@ modded class INS_AmbientPatrolManager
 		state.m_fINFCaptureSince = -1;
 		state.m_bINFInboundWaiting = false;
 		state.m_bINFAttemptCountable = false;
+		array<ref INS_PatrolAgent> staggered = {};
+		if (state.m_bINFBuildingCell)
+		{
+			// The base despawns every group at once, so hand all but the first group to the despawn queue.
+			while (state.m_aAgents.Count() > 1)
+			{
+				staggered.Insert(state.m_aAgents[1]);
+				state.m_aAgents.Remove(1);
+			}
+		}
 		super.DeactivateZone(state);
+		foreach (INS_PatrolAgent held : staggered)
+		{
+			if (held.m_Group)
+				state.m_aSavedPositions.Insert(held.m_Group.GetOrigin());
+			m_CallQueue.CallLater(INF_DespawnDefenderGroup, m_INFDespawnGate.Reserve(), false, held);
+		}
 		state.m_fINFDistantSince = -1;
 		if (state.m_bINFBuildingCell && state.m_bINFMarkedCleared)
 			state.m_aSavedPositions.Clear();
@@ -1269,6 +1356,29 @@ modded class INS_AmbientPatrolManager
 			m_INFZoneStates.InvalidatePresence();
 			m_INFZoneStates.NotifyChanged(state);
 		}
+	}
+
+	protected void INF_DespawnDefenderGroup(INS_PatrolAgent agent)
+	{
+		SCR_AIGroup group = agent.m_Group;
+		if (!group)
+			return;
+		array<AIAgent> members = {};
+		group.GetAgents(members);
+		bool preserve;
+		foreach (AIAgent member : members)
+		{
+			IEntity entity = member.GetControlledEntity();
+			if (!entity)
+				continue;
+			if (INF_PrisonerComponent.INF_Preserve(entity) || GetGame().GetPlayerManager().GetPlayerIdFromControlledEntity(entity) > 0)
+				preserve = true;
+			else
+				SCR_EntityHelper.DeleteEntityAndChildren(entity);
+		}
+		if (!preserve)
+			SCR_EntityHelper.DeleteEntityAndChildren(group);
+		m_INFZoneStates.InvalidatePresence();
 	}
 
 	protected void INF_FailedActivation(INS_AmbientPatrolZoneState state)
@@ -1581,6 +1691,10 @@ modded class INS_CounterAttackManager
 		}
 	}
 
+	protected ref array<INS_CounterAttackSquad> m_aINFDespawning = {};
+	protected INF_StaggerGate m_INFLaunchGate = INF_StaggerGate.Spawns();
+	protected INF_StaggerGate m_INFDespawnGate = INF_StaggerGate.Despawns();
+
 	protected bool INF_TrySpawnAttack(INS_CounterAttackZone selected, INS_AmbientPatrolManager patrols, array<vector> players, float now)
 	{
 		INF_BuildingGrid.Plan(selected.m_iINFMembers * patrols.INF_ZoneMultiplier(selected.m_INFCell),
@@ -1612,40 +1726,45 @@ modded class INS_CounterAttackManager
 		}
 		if (!patrols.INF_MakeRoomForBudget(selected.m_iINFTotalAI, selected.m_vCenter, false))
 			return false;
-		array<INS_CounterAttackSquad> spawned = {};
-		for (int group = 0; group < selected.m_iINFGroupCount; group++)
-		{
-			IEntity entity = INF_BuildingGrid.Spawn(positions[group], selected.m_aINFPlan[group], m_aSquadPrefabs);
-			if (!entity)
-			{
-				foreach (INS_CounterAttackSquad partial : spawned)
-					DespawnSquad(partial);
-				Print("[INF_Zones] Counterattack spawn failed; rolled back wave without spending the zone's attack.", LogLevel.ERROR);
-				return false;
-			}
-			INS_CounterAttackSquad squad = new INS_CounterAttackSquad(entity, selected);
-			m_aActiveSquads.Insert(squad);
-			spawned.Insert(squad);
-		}
 		selected.m_bINFEverHadLiving = false;
 		selected.m_bINFDefeated = false;
 		selected.m_aINFParticipants.Clear();
-		selected.m_fINFStartedAt = now;
+		int lastDelay;
+		for (int group = 0; group < selected.m_iINFGroupCount; group++)
+		{
+			lastDelay = m_INFLaunchGate.Reserve();
+			m_CallQueue.CallLater(INF_SpawnAttackSquad, lastDelay, false, selected, positions[group], selected.m_aINFPlan[group]);
+		}
+		// The 30 s "nobody alive" failure check must not start before the last squad exists.
+		selected.m_fINFStartedAt = now + lastDelay;
 		selected.m_fINFLastLaunchAt = now;
 		patrols.INF_GetZoneStates().AttackStarted(selected.m_INFCell);
 		patrols.INF_GetZoneStates().InvalidatePresence();
-		foreach (INS_CounterAttackSquad ready : spawned)
-		{
-			INF_RecordAttackers(ready);
-			m_CallQueue.CallLater(InitSquad, 500, false, ready);
-			m_CallQueue.CallLater(AssignWaypoint, 1500, false, ready, selected.m_vCenter);
-		}
 		foreach (INS_CounterAttackZone neighbour : m_aZones)
 		{
 			if (vector.DistanceSqXZ(neighbour.m_vCenter, selected.m_vCenter) <= 90000)
 				neighbour.m_fINFNextAttackAt = Math.Max(neighbour.m_fINFNextAttackAt, now + m_fZoneCooldown * 1000);
 		}
 		return true;
+	}
+
+	protected void INF_SpawnAttackSquad(INS_CounterAttackZone zone, vector pos, int members)
+	{
+		if (!zone.m_INFCell || !zone.m_INFCell.m_bINFAttackActive)
+			return;
+		IEntity entity = INF_BuildingGrid.Spawn(pos, members, m_aSquadPrefabs);
+		if (!entity)
+		{
+			// Keeps the defeat check (participants >= total) reachable for the squads that did spawn.
+			zone.m_iINFTotalAI -= members;
+			Print("[INF_Zones] Counterattack squad spawn failed; the wave continues without it.", LogLevel.ERROR);
+			return;
+		}
+		INS_CounterAttackSquad squad = new INS_CounterAttackSquad(entity, zone);
+		m_aActiveSquads.Insert(squad);
+		INF_RecordAttackers(squad);
+		m_CallQueue.CallLater(InitSquad, 500, false, squad);
+		m_CallQueue.CallLater(AssignWaypoint, 1500, false, squad, zone.m_vCenter);
 	}
 
 	protected bool INF_GridAttackPositionSafe(vector pos, array<vector> players)
@@ -1784,10 +1903,20 @@ modded class INS_CounterAttackManager
 					member.m_fNoPlayerTimer += m_fCheckInterval;
 				else
 					member.m_fNoPlayerTimer = 0;
-				if (failed || member.m_fNoPlayerTimer >= m_fAbandonDelay)
-					DespawnSquad(member);
+				if ((failed || member.m_fNoPlayerTimer >= m_fAbandonDelay) && m_aINFDespawning.Find(member) < 0)
+				{
+					m_aINFDespawning.Insert(member);
+					m_CallQueue.CallLater(INF_DespawnStaggered, m_INFDespawnGate.Reserve(), false, member);
+				}
 			}
 		}
+	}
+
+	protected void INF_DespawnStaggered(INS_CounterAttackSquad squad)
+	{
+		m_aINFDespawning.RemoveItem(squad);
+		if (squad.m_bActive && m_aActiveSquads.Find(squad) >= 0)
+			DespawnSquad(squad);
 	}
 
 	override protected void DespawnSquad(INS_CounterAttackSquad squad)

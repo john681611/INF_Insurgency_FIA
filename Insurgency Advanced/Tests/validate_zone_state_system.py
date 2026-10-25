@@ -106,7 +106,7 @@ class ZoneArchitecture(unittest.TestCase):
         zone.finish(had_living=False)
         self.assertFalse(zone.spent)
         self.assertTrue(zone.launch(0))
-        self.assertIn("DespawnSquad(partial)", AI)
+        self.assertIn("the wave continues without it", AI)
         self.assertIn("if (!hadLiving || !defeated)", CORE)
         self.assertIn("state.m_bINFAttackSpent = false", CORE)
 
@@ -172,8 +172,8 @@ class ZoneArchitecture(unittest.TestCase):
         self.assertLess(attack.index("positions.Insert(groupPosition)"), attack.index("INF_MakeRoomForBudget"))
         self.assertIn("float lateralOffset = slot * 12.0", attack)
         self.assertIn("empty + tangent * lateralOffset", attack)
-        self.assertIn("INF_BuildingGrid.Spawn(positions[group]", attack)
-        self.assertLess(attack.index("spawned.Insert(squad)"), attack.index(".AttackStarted("))
+        self.assertIn("CallLater(INF_SpawnAttackSquad", attack)
+        self.assertLess(attack.index("m_INFLaunchGate.Reserve()"), attack.index(".AttackStarted("))
         self.assertIn("activeAttacks < Math.Min(m_iMaxConcurrentCounterAttacks, 2)", attack)
 
     def test_registered_zone_markers_match_objective_registry(self):

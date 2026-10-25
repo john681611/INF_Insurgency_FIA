@@ -15,7 +15,7 @@ def candidates(pool, members):
 class FIACompatibility(unittest.TestCase):
     def test_both_spawn_paths_use_their_own_configured_pools(self):
         self.assertIn("INF_BuildingGrid.Spawn(pos, members, m_aGroupPrefabs)", SOURCE)
-        self.assertIn("INF_BuildingGrid.Spawn(positions[group], selected.m_aINFPlan[group], m_aSquadPrefabs)", SOURCE)
+        self.assertIn("INF_BuildingGrid.Spawn(pos, members, m_aSquadPrefabs)", SOURCE)
         self.assertNotIn("Prefabs/Groups/OPFOR/", SOURCE)
         self.assertNotIn("Group_USSR_", SOURCE)
 
