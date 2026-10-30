@@ -120,7 +120,7 @@ class ZoneVehicles(unittest.TestCase):
 
     def test_safe_road_spawns_use_ambient_distance_and_full_vehicle_clearance(self):
         road = body("protected bool INF_ZoneRoadPosition(")
-        for condition in ("GetClosestRoad", "distance > 100", "INF_BuildingGrid.IsExcluded(point)",
+        for condition in ("GetClosestRoad", "distance > 100", "INF_BuildingGrid.IsSpawnBlocked(point)",
                           "< minimumDistance", "INF_ZoneHidden(point, players)",
                           "> m_fActivationRadius",
                           "FindEmptyTerrainPosition(empty, point, 5.1, 5, 4)",
@@ -291,7 +291,7 @@ class ZoneVehicles(unittest.TestCase):
         ground = body("protected bool INF_ZoneOpenPosition(")
         for check in ("attempt < 32", "heading < 4", "INF_BuildingGrid.Contains(center, point)",
                       "nearest < minimumDistance", "nearest > m_fActivationRadius",
-                      "INF_BuildingGrid.IsExcluded(point)", "INF_VehiclePositionOccupied(point)",
+                      "INF_BuildingGrid.IsSpawnBlocked(point)", "INF_VehiclePositionOccupied(point)",
                       "INF_ZoneHidden(point, players)", "INF_ForestCamps.ClearVolume(point, 5, 4)",
                       "INF_VehiclePositionClear(point, direction, null, true)"):
             self.assertIn(check, ground)

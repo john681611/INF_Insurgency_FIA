@@ -46,6 +46,37 @@ class INF_StaggerGate
 	}
 }
 
+class INF_SpawnProtection
+{
+	static const float RADIUS = 150;
+
+	// Hostile AI never spawn near an enabled friendly spawn point, such as a player-built base.
+	static bool Contains(vector pos)
+	{
+		BaseGameMode mode = GetGame().GetGameMode();
+		if (!mode)
+			return false;
+		INS_AmbientPatrolManager patrols = INS_AmbientPatrolManager.Cast(mode.FindComponent(INS_AmbientPatrolManager));
+		if (!patrols)
+			return false;
+		Faction faction = patrols.INF_GetPlayerFaction();
+		if (!faction)
+			return false;
+		array<SCR_SpawnPoint> points = SCR_SpawnPoint.GetSpawnPointsForFaction(faction.GetFactionKey());
+		if (!points)
+			return false;
+		foreach (SCR_SpawnPoint point : points)
+		{
+			// Personal spawn points follow a player and are not a base.
+			if (!point || !point.IsSpawnPointEnabled() || SCR_PlayerSpawnPoint.Cast(point))
+				continue;
+			if (vector.DistanceSqXZ(pos, point.GetOrigin()) <= RADIUS * RADIUS)
+				return true;
+		}
+		return false;
+	}
+}
+
 class INF_BuildingGrid
 {
 	static const float SIZE = 100;
@@ -180,6 +211,11 @@ class INF_BuildingGrid
 		}
 
 		return false;
+	}
+
+	static bool IsSpawnBlocked(vector pos)
+	{
+		return IsExcluded(pos) || INF_SpawnProtection.Contains(pos);
 	}
 
 	static bool Overlaps(vector center, vector circle, float radius)
@@ -931,7 +967,7 @@ modded class INS_AmbientPatrolManager
 				continue;
 			float playerDistance = INF_BlockRules.Nearest(empty, players);
 			if (!INF_BuildingGrid.Contains(state.m_vCenter, empty) || empty[1] <= 0.5
-				|| playerDistance < minDistance)
+				|| INF_SpawnProtection.Contains(empty) || playerDistance < minDistance)
 				continue;
 			if (playerDistance < m_fMinSpawnDistFromPlayer && !INF_IsConcealedSpawn(empty, players))
 				continue;
@@ -958,7 +994,7 @@ modded class INS_AmbientPatrolManager
 			vector candidate = center + Vector(Math.Cos(angle) * distance, 0, Math.Sin(angle) * distance);
 			vector empty;
 			if (!SCR_WorldTools.FindEmptyTerrainPosition(empty, candidate, 10, 2, 2)
-				|| empty[1] <= 0.5 || INF_BuildingGrid.IsExcluded(empty)
+				|| empty[1] <= 0.5 || INF_BuildingGrid.IsSpawnBlocked(empty)
 				|| INF_BlockRules.Nearest(empty, players) < minDistance)
 				continue;
 			if (INF_IsConcealedSpawn(empty, players))
@@ -1781,7 +1817,7 @@ modded class INS_CounterAttackManager
 
 	protected bool INF_GridAttackPositionSafe(vector pos, array<vector> players)
 	{
-		if (pos[1] <= 0.5 || INF_BuildingGrid.IsExcluded(pos))
+		if (pos[1] <= 0.5 || INF_BuildingGrid.IsSpawnBlocked(pos))
 			return false;
 		foreach (vector player : players)
 		{

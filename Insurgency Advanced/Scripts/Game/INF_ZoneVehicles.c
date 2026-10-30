@@ -518,7 +518,7 @@ modded class INS_AmbientVehicleManager
 			{
 				continue;
 			}
-			if (INF_BuildingGrid.IsExcluded(point))
+			if (INF_BuildingGrid.IsSpawnBlocked(point))
 			{
 				continue;
 			}
@@ -585,7 +585,7 @@ modded class INS_AmbientVehicleManager
 			{
 				continue;
 			}
-			if (point[1] <= 0.5 || INF_BuildingGrid.IsExcluded(point)
+			if (point[1] <= 0.5 || INF_BuildingGrid.IsSpawnBlocked(point)
 				|| INF_VehiclePositionOccupied(point) || !INF_ZoneHidden(point, players)
 				|| !INF_ForestCamps.ClearVolume(point, 5, 4))
 			{
