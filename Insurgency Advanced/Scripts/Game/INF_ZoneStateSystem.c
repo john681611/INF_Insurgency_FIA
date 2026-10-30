@@ -312,7 +312,7 @@ class INF_ZoneStateSystem
 				continue;
 			array<vector> living = presence.GroupPositions(agent.m_Group);
 			if (!living.IsEmpty() && agent.m_fINFInboundDeadline < 0)
-				agent.m_fINFInboundDeadline = now + 300000;
+				agent.m_fINFInboundDeadline = now + 120000;
 			bool arrived = living.IsEmpty() && (agent.m_fINFInboundDeadline >= 0
 				|| now >= state.m_fINFSpawnReadyAt + 30000);
 			foreach (vector soldier : living)
@@ -495,12 +495,14 @@ class INF_ZoneStateSystem
 			&& settled && presence.CanCapture(state.m_vCenter);
 		float since = state.m_fINFCaptureSince;
 		float previousSince = since;
-		if (eligible && since >= 0 && GetGame().GetWorld().GetWorldTime() - since >= INF_BlockRules.CAPTURE_HOLD_MS)
+		float hold = INF_BlockRules.CaptureHold(presence.CapturersInArea(state.m_vCenter));
+		if (eligible && since >= 0 && GetGame().GetWorld().GetWorldTime() - since >= hold)
 		{
 			presence = GetPresence(true, true);
 			eligible = presence.CanCapture(state.m_vCenter);
+			hold = INF_BlockRules.CaptureHold(presence.CapturersInArea(state.m_vCenter));
 		}
-		bool captured = INF_BlockRules.AdvanceCapture(eligible, GetGame().GetWorld().GetWorldTime(), since);
+		bool captured = INF_BlockRules.AdvanceCapture(eligible, GetGame().GetWorld().GetWorldTime(), since, hold);
 		state.m_fINFCaptureSince = since;
 		if ((since >= 0) != (previousSince >= 0))
 			NotifyChanged(state);

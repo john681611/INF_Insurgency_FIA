@@ -306,7 +306,7 @@ class RuntimeEfficiency(unittest.TestCase):
         samples.get(1, enemies=True, fresh=True)
         self.assertEqual((samples.players, samples.enemies), (3, 3))
         capture = method_body(CORE, "void CheckCapture(")
-        self.assertIn("INF_BlockRules.CAPTURE_HOLD_MS", capture)
+        self.assertIn("INF_BlockRules.CaptureHold", capture)
         self.assertIn("GetPresence(true, true)", capture)
         self.assertIn("GetPresence(false, true).m_AllPlayers",
                       method_body(GRID, "override protected vector FindSafeSpawnPosition("))
@@ -321,9 +321,9 @@ class RuntimeEfficiency(unittest.TestCase):
                      for point in buckets[(x, z)] if point[0] ** 2 + point[1] ** 2 <= 40000]
         self.assertEqual(set(inspected), set(points) - {(200.01, 0)})
         query = method_body(PRESENCE, "bool CanCapture(")
-        self.assertIn("center[0] - 200", query)
+        self.assertIn("center[0] - CLEAR_RADIUS", query)
         self.assertIn("x <= maximumX", query)
-        self.assertIn("vector.DistanceSqXZ(center, enemy) <= 40000", query)
+        self.assertIn("vector.DistanceSqXZ(center, enemy) <= CLEAR_RADIUS * CLEAR_RADIUS", query)
 
     def test_objective_events_coalesce_and_missing_dependencies_retry_only(self):
         queue = method_body(INTEL, "void INF_QueueCampaignObjectives(")

@@ -331,7 +331,7 @@ modded class INS_AmbientPatrolZoneState
 	ref array<int> m_aINFPlan = {};
 	int m_iINFPlannedAI;
 	int m_iINFReservedAI;
-	int m_iINFRememberedAI;
+	int m_iINFRememberedAI = -1;
 	float m_fINFRememberedAt = -1;
 	int m_iINFSpawnSize;
 	int m_iINFBaseGroups = 1;
@@ -851,9 +851,21 @@ modded class INS_AmbientPatrolManager
 			int fullAI = state.m_iINFTargetAI * INF_ZoneMultiplier(state);
 			int limitAI = fullAI;
 			// Recently despawned zones come back with only their survivors; old memory regenerates to full.
-			if (state.m_iINFRememberedAI > 0
+			if (state.m_iINFRememberedAI >= 0
 				&& GetGame().GetWorld().GetWorldTime() - state.m_fINFRememberedAt < INF_BuildingGrid.DEFENDER_MEMORY_MS)
+			{
+				// A wiped-out zone stays empty (but capturable) until the memory expires.
+				if (state.m_iINFRememberedAI == 0)
+				{
+					if (!state.m_bEverHadLiving)
+					{
+						state.m_bEverHadLiving = true;
+						m_INFZoneStates.NotifyChanged(state);
+					}
+					return;
+				}
 				limitAI = Math.Min(fullAI, state.m_iINFRememberedAI);
+			}
 			INF_BuildingGrid.Plan(limitAI,
 				INF_BuildingGrid.Buckets(m_aGroupPrefabs, m_aINFGroupBuckets), state.m_aINFPlan);
 			state.m_iGroupCount = state.m_aINFPlan.Count();
@@ -866,7 +878,7 @@ modded class INS_AmbientPatrolManager
 			}
 			state.m_fINFDistantSince = -1;
 			state.m_fINFCaptureSince = -1;
-			state.m_iINFRememberedAI = 0;
+			state.m_iINFRememberedAI = -1;
 			state.m_fINFSpawnReadyAt = GetGame().GetWorld().GetWorldTime() + Math.Max(5000, state.m_iGroupCount * INF_StaggerGate.GAP_MS + 2000 + m_INFSpawnGate.Backlog());
 			state.m_iINFActivationGeneration++;
 			state.m_bActive = true;
@@ -1192,7 +1204,7 @@ modded class INS_AmbientPatrolManager
 	{
 		DeactivateZone(state);
 		// An abandoned zone is a fresh start: forget any remembered survivors.
-		state.m_iINFRememberedAI = 0;
+		state.m_iINFRememberedAI = -1;
 		state.m_bEverHadLiving = false;
 		state.m_iINFFailedActivations = 0;
 		state.m_bINFSpawnExhausted = false;
@@ -1319,7 +1331,7 @@ modded class INS_AmbientPatrolManager
 			// Members of freshly spawned groups may not exist yet; remember the planned strength instead.
 			if (GetGame().GetWorld().GetWorldTime() < state.m_fINFSpawnReadyAt)
 				survivors = Math.Max(survivors, state.m_iINFPlannedAI);
-			if (survivors > 0)
+			if (survivors > 0 || state.m_bEverHadLiving)
 			{
 				state.m_iINFRememberedAI = survivors;
 				state.m_fINFRememberedAt = GetGame().GetWorld().GetWorldTime();

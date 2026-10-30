@@ -42,7 +42,7 @@ class Attempt:
 
 def inbound_wait(now, deadline, distances, materialisation_deadline=35000):
     if distances and deadline < 0:
-        deadline = now + 300000
+        deadline = now + 120000
     arrived = (not distances and (deadline >= 0 or now >= materialisation_deadline)) or any(
         d <= 200 for d in distances)
     return not (arrived or (deadline >= 0 and now >= deadline)), deadline
@@ -114,12 +114,12 @@ class InitialDefenderRecovery(unittest.TestCase):
         self.assertIn("vector.DistanceSqXZ(center, player) <= PLAYER_CAPTURE_RADIUS * PLAYER_CAPTURE_RADIUS", area)
         self.assertIn("static const float PLAYER_CAPTURE_RADIUS = 100;", RULES)
         self.assertNotIn("PLAYER_CAPTURE_MARGIN", RULES)
-        self.assertIn("static const float CAPTURE_HOLD_MS = 15000;", RULES)
+        self.assertIn("static const float CAPTURE_HOLD_MS = 10000;", RULES)
         self.assertIn("INF_BlockRules.InCaptureArea(center, player)", method_body(RULES, "bool CanCapture("))
         retake = method_body(STATE, "void CheckRetake(")
         self.assertIn("vector.DistanceSqXZ(player, state.m_vCenter) <= 40000", retake)
         manual = (ROOT / "Configs/FieldManual/FieldManualConfigRoot.conf").read_text()
-        self.assertIn("within 100m of the zone centre for 15 seconds", manual)
+        self.assertIn("The more players holding the ground, the faster it is secured", manual)
 
     def test_multiple_evictions_preserve_farthest_first_order(self):
         possible = [(900, 1), (800, 0), (700, 1), (600, 0)]
@@ -262,15 +262,15 @@ class InitialDefenderRecovery(unittest.TestCase):
     def test_five_minute_exact_boundary_and_arrival(self):
         waiting, deadline = inbound_wait(1000, -1, [201, 500])
         self.assertTrue(waiting)
-        self.assertEqual(deadline, 301000)
-        for now, expected in ((300999, True), (301000, False), (301001, False)):
+        self.assertEqual(deadline, 121000)
+        for now, expected in ((120999, True), (121000, False), (121001, False)):
             self.assertEqual(inbound_wait(now, deadline, [500])[0], expected)
         self.assertFalse(inbound_wait(2000, deadline, [200, 500])[0])
         self.assertTrue(inbound_wait(2000, deadline, [200.01])[0])
         self.assertTrue(inbound_wait(34999, -1, [])[0])
         self.assertFalse(inbound_wait(35000, -1, [])[0])
         settled = method_body(STATE, "bool ReinforcementsSettled(")
-        self.assertIn("agent.m_fINFInboundDeadline = now + 300000", settled)
+        self.assertIn("agent.m_fINFInboundDeadline = now + 120000", settled)
         self.assertIn("now >= agent.m_fINFInboundDeadline", settled)
         self.assertIn("vector.DistanceSqXZ(soldier, state.m_vCenter) <= 40000", settled)
         self.assertIn("state.m_bINFInboundWaiting = waiting", settled)
@@ -293,7 +293,7 @@ class InitialDefenderRecovery(unittest.TestCase):
         self.assertIn("Color.FromRGBA(155, 90, 180, ACTIVE_ALPHA)", MARKERS)
         manual = (ROOT / "Configs/FieldManual/FieldManualConfigRoot.conf").read_text()
         self.assertIn("Defenders approaching", manual)
-        self.assertIn("five minutes", manual)
+        self.assertIn("take too long to reach the area", manual)
 
     def test_occupied_priority_keeps_distance_ties_and_all_eviction_protections(self):
         zones = [(False, 10, "near"), (True, 80, "occupied-far"),

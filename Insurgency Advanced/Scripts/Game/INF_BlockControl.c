@@ -5,6 +5,8 @@ class INF_PresenceBucket
 
 class INF_BlockPresence
 {
+	static const float CLEAR_RADIUS = 150;
+	static const int MAX_REMAINING_ENEMIES = 1;
 	ref array<int> m_PlayerIDs = {};
 	ref array<vector> m_AllPlayers = {};
 	ref array<vector> m_Players = {};
@@ -154,6 +156,17 @@ class INF_BlockPresence
 		return false;
 	}
 
+	int CapturersInArea(vector center)
+	{
+		int count = 0;
+		foreach (vector player : m_Capturers)
+		{
+			if (INF_BlockRules.InCaptureArea(center, player))
+				count++;
+		}
+		return count;
+	}
+
 	bool CanCapture(vector center)
 	{
 		bool grounded = false;
@@ -164,10 +177,11 @@ class INF_BlockPresence
 		}
 		if (!grounded)
 			return false;
-		int minimumX = INF_BuildingGrid.CellIndex(center[0] - 200);
-		int maximumX = INF_BuildingGrid.CellIndex(center[0] + 200);
-		int minimumZ = INF_BuildingGrid.CellIndex(center[2] - 200);
-		int maximumZ = INF_BuildingGrid.CellIndex(center[2] + 200);
+		int minimumX = INF_BuildingGrid.CellIndex(center[0] - CLEAR_RADIUS);
+		int maximumX = INF_BuildingGrid.CellIndex(center[0] + CLEAR_RADIUS);
+		int minimumZ = INF_BuildingGrid.CellIndex(center[2] - CLEAR_RADIUS);
+		int maximumZ = INF_BuildingGrid.CellIndex(center[2] + CLEAR_RADIUS);
+		int remaining = 0;
 		for (int x = minimumX; x <= maximumX; x++)
 		{
 			for (int z = minimumZ; z <= maximumZ; z++)
@@ -177,12 +191,12 @@ class INF_BlockPresence
 					continue;
 				foreach (vector enemy : bucket.m_Positions)
 				{
-					if (vector.DistanceSqXZ(center, enemy) <= 40000)
-						return false;
+					if (vector.DistanceSqXZ(center, enemy) <= CLEAR_RADIUS * CLEAR_RADIUS)
+						remaining++;
 				}
 			}
 		}
-		return true;
+		return remaining <= MAX_REMAINING_ENEMIES;
 	}
 }
 
@@ -245,7 +259,7 @@ class INF_TravelState
 
 class INF_ActivationPolicy
 {
-	static const float GROUP_RADIUS = 200;
+	static const float GROUP_RADIUS = 300;
 	static const float MAX_ALTITUDE = 50;
 	static const float PRESSURE_HOLD_MS = 180000;
 	static const float PRESSURE_STEP_MS = 60000;
@@ -509,7 +523,8 @@ class INF_BlockRules
 	static const float MIN_DENSE_GRID_SPAWN_DISTANCE = 100;
 	static const float DESPAWN_DELAY_MS = 60000;
 	static const float COUNTERATTACK_DESPAWN_RADIUS = 800;
-	static const float CAPTURE_HOLD_MS = 15000;
+	static const float CAPTURE_HOLD_MS = 10000;
+	static const float MIN_CAPTURE_HOLD_MS = 2000;
 	static const float PLAYER_CAPTURE_RADIUS = 100;
 
 	static bool IsConcealed(vector position, array<vector> players, float height)
@@ -532,7 +547,13 @@ class INF_BlockRules
 		return vector.DistanceSqXZ(center, player) <= PLAYER_CAPTURE_RADIUS * PLAYER_CAPTURE_RADIUS;
 	}
 
-	static bool AdvanceCapture(bool eligible, float now, inout float since)
+	// Each extra player in the capture area shortens the hold by 20% of the base time, down to a floor.
+	static float CaptureHold(int players)
+	{
+		return Math.Max(MIN_CAPTURE_HOLD_MS, CAPTURE_HOLD_MS * (1 - 0.2 * (Math.Max(1, players) - 1)));
+	}
+
+	static bool AdvanceCapture(bool eligible, float now, inout float since, float hold = CAPTURE_HOLD_MS)
 	{
 		if (!eligible)
 		{
@@ -541,7 +562,7 @@ class INF_BlockRules
 		}
 		if (since < 0)
 			since = now;
-		return now - since >= CAPTURE_HOLD_MS;
+		return now - since >= hold;
 	}
 
 	static bool SoldiersDistant(array<ref INS_PatrolAgent> patrols, array<vector> players, float distance, INF_BlockPresence presence = null)
