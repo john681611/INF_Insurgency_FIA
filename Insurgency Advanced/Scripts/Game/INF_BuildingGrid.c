@@ -31,15 +31,6 @@ class INF_StaggerGate
 		return (int)(at - now);
 	}
 
-	// Non-queuing variant for callers that retry on their own tick.
-	bool TryReserve()
-	{
-		if (Backlog() > 0)
-			return false;
-		Reserve();
-		return true;
-	}
-
 	float Backlog()
 	{
 		return Math.Max(0, m_fNextAt - GetGame().GetWorld().GetWorldTime());
@@ -853,8 +844,6 @@ modded class INS_AmbientPatrolManager
 		{
 			m_CallQueue.Remove(INF_OnCampCaptured);
 			m_CallQueue.Remove(INF_RetryCampCapture);
-			if (m_bINFBuildingGrid)
-				m_CallQueue.Remove(TickProximityCheck);
 		}
 		GetGame().GetCallqueue().Remove(INF_NotifyStartupProgress);
 		GetGame().GetCallqueue().Remove(INF_PublishStartupProgress);
