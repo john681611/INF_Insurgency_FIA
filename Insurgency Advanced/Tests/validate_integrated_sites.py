@@ -35,7 +35,7 @@ class IntegratedSites(unittest.TestCase):
             self.assertTrue(state["cache"])
 
     def test_building_defenders_can_admit_before_static_sites_but_victory_cannot(self):
-        tick = GRID.split("override protected void TickProximityCheck()", 1)[1].split(
+        tick = GRID.split("bool INF_StepProximity()", 1)[1].split(
             "protected bool INF_MakeRoom", 1)[0]
         self.assertLess(tick.index("!INF_AreZonesReady()"), tick.index("m_INFZoneStates.GetPresence()"))
         self.assertNotIn("!INF_AreCampsReady()", tick)

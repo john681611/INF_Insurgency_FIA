@@ -369,7 +369,7 @@ class ZoneVehicles(unittest.TestCase):
         self.assertNotIn("m_bJIPPause", maintain)
         self.assertNotIn("m_aRoutes", maintain)
         self.assertNotIn("m_CallQueue", maintain)
-        tick = method_body(GRID, "override protected void TickProximityCheck()")
+        tick = method_body(GRID, "bool INF_StepProximity()")
         self.assertIn("INF_MaintainZoneVehicles(presence)", tick)
         self.assertIn("INF_HasZoneVehicles()", tick)
 

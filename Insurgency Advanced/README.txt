@@ -205,6 +205,10 @@ spawn safety and destructive cleanup refresh decision inputs before committing.
 All controlled-player positions remain separate from living capture-eligible
 players so vehicle/prisoner cleanup retains its original protection rules.
 Capture checks query player-near cells plus running holds, not all territory.
+Capture and the patrol proximity work (activation, distance despawn, zone vehicle
+upkeep) share one zone loop on a fixed two-second beat. The proximity work keeps
+its own five-second (or check-interval) due time inside that beat, and the loop
+sleeps when no players, candidates, active zones or zone vehicles need it.
 Capture is a 0-1 progress value advanced every two seconds: each eligible step adds
 elapsed time divided by the current hold (10 s, 20% shorter per extra player in
 the area, 2 s minimum), and any failed condition drains it at the single-player

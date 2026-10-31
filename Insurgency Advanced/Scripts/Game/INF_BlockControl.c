@@ -527,7 +527,7 @@ class INF_BlockRules
 	static const float COUNTERATTACK_DESPAWN_RADIUS = 800;
 	static const float CAPTURE_HOLD_MS = 10000;
 	static const float MIN_CAPTURE_HOLD_MS = 2000;
-	static const float CAPTURE_TICK_MS = 2000;
+	static const float ZONE_TICK_MS = 2000;
 	static const float CAPTURE_MAX_STEP_MS = 5000;
 	static const float PLAYER_CAPTURE_RADIUS = 100;
 
@@ -561,7 +561,7 @@ class INF_BlockRules
 	// at the slowest (single capturer) rate. Returns true once it is full.
 	static bool AdvanceCaptureProgress(bool eligible, float now, inout float progress, inout float updatedAt, int capturers)
 	{
-		float step = CAPTURE_TICK_MS;
+		float step = ZONE_TICK_MS;
 		if (updatedAt >= 0)
 			step = Math.Min(now - updatedAt, CAPTURE_MAX_STEP_MS);
 		updatedAt = now;

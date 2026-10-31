@@ -158,7 +158,7 @@ class ReviewRegressions(unittest.TestCase):
         self.assertIn("reserved -= victim.m_iINFReservedAI", AI)
 
     def test_never_materialised_groups_eventually_release_for_retry(self):
-        tick = AI.split("override protected void TickProximityCheck()", 1)[1].split(
+        tick = AI.split("bool INF_StepProximity()", 1)[1].split(
             "protected bool INF_MakeRoom", 1)[0]
         self.assertIn("now >= state.m_fINFSpawnReadyAt + 30000", tick)
         self.assertIn("!INF_BlockRules.HasMembers(state.m_aAgents)", tick)

@@ -155,7 +155,7 @@ class InitialDefenderRecovery(unittest.TestCase):
         for text in ("step / CaptureHold(capturers)", "step / CAPTURE_HOLD_MS",
                      "Math.Min(now - updatedAt, CAPTURE_MAX_STEP_MS)"):
             self.assertIn(text, progress)
-        self.assertIn("static const float CAPTURE_TICK_MS = 2000;", RULES)
+        self.assertIn("static const float ZONE_TICK_MS = 2000;", RULES)
 
     def test_multiple_evictions_preserve_farthest_first_order(self):
         possible = [(900, 1), (800, 0), (700, 1), (600, 0)]

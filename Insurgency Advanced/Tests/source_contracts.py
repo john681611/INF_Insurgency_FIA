@@ -10,7 +10,15 @@ def mask_literals(source):
     )
 
 
+RENAMED_METHODS = {
+    "override protected void TickProximityCheck(": "bool INF_StepProximity(",
+    "protected void CaptureTick(": "protected INF_BlockPresence StepCapture(",
+}
+
+
 def method_body(source, signature, strip_literals=False):
+    # The proximity and capture ticks were folded into the shared zone loop but keep their bodies.
+    signature = RENAMED_METHODS.get(signature, signature)
     start = source.index("{", source.index(signature))
     tail = source[start:]
     masked = mask_literals(tail)

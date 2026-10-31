@@ -33,7 +33,7 @@ class MaterialisedDefenders(unittest.TestCase):
         self.assertIn("INF_BlockRules.HasMembers(state.m_aAgents, presence)", observe)
         capture = ZONES.split("void CheckCapture(", 1)[1].split("void AttackStarted(", 1)[0]
         self.assertIn("(state.m_bEverHadLiving || state.m_bINFSpawnExhausted) && state.m_iINFPendingGroups == 0", capture)
-        tick = AI.split("override protected void TickProximityCheck()", 1)[1].split("protected bool INF_MakeRoom", 1)[0]
+        tick = AI.split("bool INF_StepProximity()", 1)[1].split("protected bool INF_MakeRoom", 1)[0]
         self.assertIn("!INF_BlockRules.HasMembers(state.m_aAgents)", tick)
         self.assertIn("Defender groups never materialised", tick)
 

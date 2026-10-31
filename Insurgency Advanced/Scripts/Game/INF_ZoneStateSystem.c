@@ -23,7 +23,7 @@ class INF_ZoneStateSystem
 	protected ref INF_BlockPresence m_Presence;
 	protected float m_PlayerSampleAt = -1;
 	protected float m_EnemySampleAt = -1;
-	protected bool m_CaptureQueued;
+	protected bool m_LoopQueued;
 	protected bool m_Stopped;
 	protected int m_SaveRetryMS = 5000;
 	protected IEntity m_Owner;
@@ -149,13 +149,13 @@ class INF_ZoneStateSystem
 			m_Presence.Invalidate();
 	}
 
-	void WakeCapture()
+	// Starts the single zone loop if it is asleep; every wake-up (players, zone changes) funnels through here.
+	void WakeLoop()
 	{
-		if (!m_Stopped && !m_Candidates.IsEmpty() && !m_CaptureQueued)
-		{
-			m_CaptureQueued = true;
-			GetGame().GetCallqueue().CallLater(CaptureTick, INF_BlockRules.CAPTURE_TICK_MS, false);
-		}
+		if (m_Stopped || m_LoopQueued || !Replication.IsServer())
+			return;
+		m_LoopQueued = true;
+		GetGame().GetCallqueue().CallLater(ZoneTick, INF_BlockRules.ZONE_TICK_MS, false);
 	}
 
 	void NotifyChanged(INS_AmbientPatrolZoneState state, bool objective = false)
@@ -167,12 +167,7 @@ class INF_ZoneStateSystem
 			m_DefenderChecks.Insert(state);
 		m_Active.RemoveItem(state);
 		if (state.m_bActive)
-		{
 			m_Active.Insert(state);
-			INS_AmbientPatrolManager patrols = INS_AmbientPatrolManager.Cast(m_Owner.FindComponent(INS_AmbientPatrolManager));
-			if (patrols)
-				patrols.INF_ScheduleProximity();
-		}
 		m_Attacks.RemoveItem(state);
 		if (state.m_bINFAttackPending || state.m_bINFAttackActive)
 			m_Attacks.Insert(state);
@@ -190,11 +185,8 @@ class INF_ZoneStateSystem
 		m_Holds.RemoveItem(state);
 		if (state.m_bINFCaptureCandidate && state.INF_IsCapturing())
 			m_Holds.Insert(state);
-		if (!m_Candidates.IsEmpty() && !m_CaptureQueued)
-		{
-			m_CaptureQueued = true;
-			GetGame().GetCallqueue().CallLater(CaptureTick, INF_BlockRules.CAPTURE_TICK_MS, false);
-		}
+		if (state.m_bActive || !m_Candidates.IsEmpty())
+			WakeLoop();
 		m_OnChanged.Invoke(state);
 		if (objective)
 			m_OnObjectivesChanged.Invoke();
@@ -244,18 +236,32 @@ class INF_ZoneStateSystem
 	void Stop()
 	{
 		m_Stopped = true;
-		GetGame().GetCallqueue().Remove(CaptureTick);
+		GetGame().GetCallqueue().Remove(ZoneTick);
 		GetGame().GetCallqueue().Remove(FlushPermanent);
 		m_Persistence.Flush();
 		m_Presence = null;
 	}
 
-	protected void CaptureTick()
+	// The single zone loop: one fixed beat that steps capture and the patrol proximity work, and sleeps when idle.
+	protected void ZoneTick()
 	{
-		m_CaptureQueued = false;
-		if (m_Stopped || !IsPersistenceReady() || m_Candidates.IsEmpty())
+		m_LoopQueued = false;
+		if (m_Stopped || !IsPersistenceReady())
 			return;
+		INF_BlockPresence presence = StepCapture();
+		bool keepAlive = !m_Candidates.IsEmpty() && !presence.m_PlayerIDs.IsEmpty();
+		INS_AmbientPatrolManager patrols = INS_AmbientPatrolManager.Cast(m_Owner.FindComponent(INS_AmbientPatrolManager));
+		if (patrols && patrols.INF_StepProximity())
+			keepAlive = true;
+		if (keepAlive)
+			WakeLoop();
+	}
+
+	protected INF_BlockPresence StepCapture()
+	{
 		INF_BlockPresence presence = GetPresence(false, false, 1000);
+		if (m_Candidates.IsEmpty())
+			return presence;
 		array<INS_AmbientPatrolZoneState> defenderChecks = {};
 		defenderChecks.Copy(m_DefenderChecks);
 		foreach (INS_AmbientPatrolZoneState active : defenderChecks)
@@ -286,11 +292,7 @@ class INF_ZoneStateSystem
 			presence = GetPresence(true, false, 1000);
 			CheckCapture(state, presence, !state.m_bINFInboundWaiting);
 		}
-		if (!m_Candidates.IsEmpty() && !m_CaptureQueued && !presence.m_PlayerIDs.IsEmpty())
-		{
-			m_CaptureQueued = true;
-			GetGame().GetCallqueue().CallLater(CaptureTick, INF_BlockRules.CAPTURE_TICK_MS, false);
-		}
+		return presence;
 	}
 
 	bool ReinforcementsSettled(INS_AmbientPatrolZoneState state)

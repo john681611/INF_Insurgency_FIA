@@ -367,12 +367,14 @@ class RuntimeEfficiency(unittest.TestCase):
         self.assertIn("intel.INF_QueueCampaignObjectives()", ready)
         self.assertIn("intel.INF_DebugContentChanged()", ready)
 
-    def test_idle_timers_sleep_and_player_connections_wake_capture(self):
-        capture = method_body(CORE, "protected void CaptureTick(")
-        self.assertIn("!presence.m_PlayerIDs.IsEmpty()", capture)
-        self.assertNotIn("interval = 1000", capture)
-        self.assertIn("CallLater(CaptureTick, INF_BlockRules.CAPTURE_TICK_MS, false)", capture)
-        self.assertIn("WakeCapture()", method_body(GRID, "override void OnPlayerConnected("))
+    def test_idle_timers_sleep_and_player_connections_wake_the_zone_loop(self):
+        loop = method_body(CORE, "protected void ZoneTick(")
+        self.assertIn("!presence.m_PlayerIDs.IsEmpty()", loop)
+        self.assertIn("INF_StepProximity()", loop)
+        self.assertIn("if (keepAlive)\n\t\t\tWakeLoop();", loop)
+        wake = method_body(CORE, "void WakeLoop(")
+        self.assertIn("CallLater(ZoneTick, INF_BlockRules.ZONE_TICK_MS, false)", wake)
+        self.assertIn("WakeLoop()", method_body(GRID, "override void OnPlayerConnected("))
         self.assertNotIn("CallLater(INF_ZoneVehicleTick", VEHICLES)
 
     def test_slow_maintenance_keeps_fresh_cleanup_inputs_and_elapsed_thresholds(self):
@@ -415,7 +417,7 @@ class RuntimeEfficiency(unittest.TestCase):
         stop = method_body(CORE, "void Stop(")
         self.assertIn("m_Stopped = true", stop)
         self.assertIn("Remove(FlushPermanent)", stop)
-        self.assertIn("Remove(CaptureTick)", stop)
+        self.assertIn("Remove(ZoneTick)", stop)
         self.assertIn("GetOnChanged().Remove(INF_QueueZoneArea)", MAP)
         self.assertIn("m_INFDirtyAreas.Clear()", MAP)
         self.assertIn("m_aINFDebugSubscribers.Clear()", INTEL)

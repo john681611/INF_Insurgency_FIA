@@ -132,11 +132,12 @@ class ZoneArchitecture(unittest.TestCase):
         self.assertNotIn("state.m_bINFObjectiveCaptured = false", CORE)
 
     def test_capture_owner_is_independent_of_ai_enabled_setting(self):
-        tick = CORE.split("protected void CaptureTick()", 1)[1].split("bool ReinforcementsSettled", 1)[0]
+        tick = CORE.split("protected INF_BlockPresence StepCapture()", 1)[1].split("bool ReinforcementsSettled", 1)[0]
         self.assertIn("CheckCapture(state, presence", tick)
         self.assertNotIn("m_bEnabled", tick)
-        self.assertIn("CallLater(CaptureTick, INF_BlockRules.CAPTURE_TICK_MS, false)", CORE)
-        self.assertIn("Remove(CaptureTick)", CORE)
+        self.assertNotIn("m_bEnabled", CORE.split("protected void ZoneTick()", 1)[1].split("protected INF_BlockPresence StepCapture()", 1)[0])
+        self.assertIn("CallLater(ZoneTick, INF_BlockRules.ZONE_TICK_MS, false)", CORE)
+        self.assertIn("Remove(ZoneTick)", CORE)
         self.assertIn("presence.CanCapture(state.m_vCenter)", CORE)
         self.assertIn("INF_BlockRules.AdvanceCapture", CORE)
         self.assertIn("vector.DistanceSqXZ(player, state.m_vCenter) <= 40000", CORE)

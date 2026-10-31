@@ -143,7 +143,7 @@ class ProgressiveStartup(unittest.TestCase):
         self.assertNotIn("SaveMapIndex", stop)
 
     def test_partial_zones_playable_but_final_objectives_and_victory_wait(self):
-        tick = body(GRID, "override protected void TickProximityCheck()")
+        tick = body(GRID, "bool INF_StepProximity()")
         self.assertIn("!INF_AreZonesReady()", tick)
         self.assertNotIn("AreCachesReady()", tick)
         self.assertIn("INF_OnZoneActivated(state)", body(GRID, "override protected void ActivateZone("))
