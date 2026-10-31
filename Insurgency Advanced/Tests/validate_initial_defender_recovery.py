@@ -121,6 +121,42 @@ class InitialDefenderRecovery(unittest.TestCase):
         manual = (ROOT / "Configs/FieldManual/FieldManualConfigRoot.conf").read_text()
         self.assertIn("The more players holding the ground, the faster it is secured", manual)
 
+    def test_capture_progress_fills_by_capturer_rate_and_drains_at_single_player_rate(self):
+        hold = lambda n: max(2000, 10000 * (1 - 0.2 * (max(1, n) - 1)))
+
+        def advance(eligible, now, state, capturers):
+            progress, updated = state
+            step = 2000 if updated < 0 else min(now - updated, 5000)
+            updated = now
+            progress += step / hold(capturers) if eligible else -step / 10000
+            if progress <= 0:
+                progress = 0
+                if not eligible:
+                    updated = -1
+            state[:] = [min(progress, 1), updated]
+            return state[0] >= 1
+
+        solo = [0, -1]
+        results = [advance(True, t, solo, 1) for t in range(0, 12000, 2000)]
+        self.assertEqual(results.index(True), 4)
+        joined = [0, -1]
+        steps = [advance(True, t, joined, 1 if t < 4000 else 3) for t in range(0, 12000, 2000)]
+        self.assertEqual(steps.index(True), 3)
+        drain = [0.5, 0]
+        advance(False, 2000, drain, 0)
+        self.assertAlmostEqual(drain[0], 0.3)
+        for t in (4000, 6000, 8000):
+            advance(False, t, drain, 0)
+        self.assertEqual(drain, [0, -1])
+        stalled = [0, 0]
+        advance(True, 60000, stalled, 1)
+        self.assertAlmostEqual(stalled[0], 0.5)
+        progress = method_body(RULES, "static bool AdvanceCaptureProgress(")
+        for text in ("step / CaptureHold(capturers)", "step / CAPTURE_HOLD_MS",
+                     "Math.Min(now - updatedAt, CAPTURE_MAX_STEP_MS)"):
+            self.assertIn(text, progress)
+        self.assertIn("static const float CAPTURE_TICK_MS = 2000;", RULES)
+
     def test_multiple_evictions_preserve_farthest_first_order(self):
         possible = [(900, 1), (800, 0), (700, 1), (600, 0)]
         evicted = []
@@ -287,7 +323,7 @@ class InitialDefenderRecovery(unittest.TestCase):
         self.assertEqual(marker(attack=True, permanent=True, inbound=True), "attack")
         self.assertIn("CAPTURING,\n\tINBOUND", MARKERS)
         update = method_body(MARKERS, "protected void INF_UpdateZoneAreas(")
-        self.assertLess(update.index("state.m_fINFCaptureSince"), update.index("state.m_bINFInboundWaiting"))
+        self.assertLess(update.index("state.INF_IsCapturing()"), update.index("state.m_bINFInboundWaiting"))
         self.assertLess(update.index("state.m_bINFInboundWaiting"), update.index("else if (state.m_bActive)"))
         self.assertNotIn("GroupPositions", update)
         self.assertIn("Color.FromRGBA(155, 90, 180, ACTIVE_ALPHA)", MARKERS)
@@ -303,7 +339,7 @@ class InitialDefenderRecovery(unittest.TestCase):
         body = method_body(GRID, "bool INF_MakeRoomForBudget(")
         self.assertIn("INF_BlockRules.CapturerOccupied(center, presence)", body)
         self.assertIn("!presence.Occupied(existing.m_vCenter)", body)
-        self.assertIn("existing.m_bINFMarkedCleared || existing.m_fINFCaptureSince < 0", body)
+        self.assertIn("existing.m_bINFMarkedCleared || !existing.INF_IsCapturing()", body)
         self.assertIn("reserved + required <= INF_BuildingGrid.ACTIVE_BUDGET", body)
         self.assertIn("localActive < localLimit", body)
         final = body.split("presence = m_INFZoneStates.GetPresence(false, true)", 1)[1]
@@ -329,7 +365,7 @@ class InitialDefenderRecovery(unittest.TestCase):
         final = policy.split("presence = m_INFZoneStates.GetPresence(false, true)", 1)[1]
         self.assertLess(final.index("presence.Occupied(check.m_vCenter)"),
                         final.index("DeactivateZone(eviction)"))
-        self.assertIn("!check.m_bINFMarkedCleared && check.m_fINFCaptureSince >= 0", final)
+        self.assertIn("!check.m_bINFMarkedCleared && check.INF_IsCapturing()", final)
 
 
 if __name__ == "__main__":

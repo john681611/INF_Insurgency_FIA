@@ -397,10 +397,22 @@ modded class INS_AmbientPatrolZoneState
 	float m_fINFSpawnReadyAt;
 	float m_fINFDistantSince = -1;
 	int m_iINFActivationGeneration;
-	float m_fINFCaptureSince = -1;
+	float m_fINFCaptureProgress;
+	float m_fINFCaptureUpdatedAt = -1;
 
 	bool m_bINFMarkedCleared;
 	bool m_bINFCaptureCandidate;
+
+	bool INF_IsCapturing()
+	{
+		return m_fINFCaptureProgress > 0;
+	}
+
+	void INF_ResetCapture()
+	{
+		m_fINFCaptureProgress = 0;
+		m_fINFCaptureUpdatedAt = -1;
+	}
 }
 
 modded class INS_AmbientPatrolManager
@@ -927,7 +939,7 @@ modded class INS_AmbientPatrolManager
 				return;
 			}
 			state.m_fINFDistantSince = -1;
-			state.m_fINFCaptureSince = -1;
+			state.INF_ResetCapture();
 			state.m_iINFRememberedAI = -1;
 			state.m_fINFSpawnReadyAt = GetGame().GetWorld().GetWorldTime() + Math.Max(5000, state.m_iGroupCount * INF_StaggerGate.GAP_MS + 2000 + m_INFSpawnGate.Backlog());
 			state.m_iINFActivationGeneration++;
@@ -1117,7 +1129,7 @@ modded class INS_AmbientPatrolManager
 				&& policy.m_Groups[stateGroup].Allows(state.m_vCenter, m_fActivationRadius)))
 				continue;
 			if (state.m_bActive && !presence.Occupied(state.m_vCenter)
-				&& (state.m_bINFMarkedCleared || state.m_fINFCaptureSince < 0)
+				&& (state.m_bINFMarkedCleared || !state.INF_IsCapturing())
 				&& INF_BlockRules.SoldiersDistant(state.m_aAgents, presence.m_Players, INF_BlockRules.EVICTION_PROTECTION_RADIUS, presence))
 				possible.Insert(state);
 		}
@@ -1310,7 +1322,7 @@ modded class INS_AmbientPatrolManager
 		foreach (INS_AmbientPatrolZoneState existing : m_INFZoneStates.GetActiveZones())
 		{
 			if (existing.m_bActive && !presence.Occupied(existing.m_vCenter)
-				&& (existing.m_bINFMarkedCleared || existing.m_fINFCaptureSince < 0)
+				&& (existing.m_bINFMarkedCleared || !existing.INF_IsCapturing())
 				&& (INF_BlockRules.CapturerOccupied(center, presence) || INF_BlockRules.Nearest(existing.m_vCenter, presence.m_Players) > candidateDistance)
 				&& INF_BlockRules.SoldiersDistant(existing.m_aAgents, presence.m_Players, INF_BlockRules.EVICTION_PROTECTION_RADIUS, presence))
 				possible.Insert(existing);
@@ -1344,7 +1356,7 @@ modded class INS_AmbientPatrolManager
 		foreach (INS_AmbientPatrolZoneState check : evictions)
 		{
 			if (presence.Occupied(check.m_vCenter)
-				|| (!check.m_bINFMarkedCleared && check.m_fINFCaptureSince >= 0)
+				|| (!check.m_bINFMarkedCleared && check.INF_IsCapturing())
 				|| (!INF_BlockRules.CapturerOccupied(center, presence)
 					&& INF_BlockRules.Nearest(check.m_vCenter, presence.m_Players) <= INF_BlockRules.Nearest(center, presence.m_Players))
 				|| !INF_BlockRules.SoldiersDistant(check.m_aAgents, presence.m_Players, INF_BlockRules.EVICTION_PROTECTION_RADIUS))
@@ -1397,7 +1409,7 @@ modded class INS_AmbientPatrolManager
 		state.m_iINFActivationGeneration++;
 		state.m_iINFPendingGroups = 0;
 		state.m_iINFReservedAI = 0;
-		state.m_fINFCaptureSince = -1;
+		state.INF_ResetCapture();
 		state.m_bINFInboundWaiting = false;
 		state.m_bINFAttemptCountable = false;
 		array<ref INS_PatrolAgent> staggered = {};

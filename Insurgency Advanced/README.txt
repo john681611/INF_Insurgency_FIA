@@ -205,6 +205,10 @@ spawn safety and destructive cleanup refresh decision inputs before committing.
 All controlled-player positions remain separate from living capture-eligible
 players so vehicle/prisoner cleanup retains its original protection rules.
 Capture checks query player-near cells plus running holds, not all territory.
+Capture is a 0-1 progress value advanced every two seconds: each eligible step adds
+elapsed time divided by the current hold (10 s, 20% shorter per extra player in
+the area, 2 s minimum), and any failed condition drains it at the single-player
+rate. Steps are clamped to five seconds so a stalled tick cannot complete a hold.
 Unresolved cells remain eligible after AI deactivation; permanent cells leave
 the work set. Checks run at one second near potential captures and two seconds
 otherwise, sleeping without connected players and waking on connection/activity.

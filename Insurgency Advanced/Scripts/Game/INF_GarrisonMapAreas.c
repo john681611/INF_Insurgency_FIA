@@ -413,7 +413,7 @@ modded class INS_GarrisonManager
 				appearance = INF_EGarrisonMapState.COUNTERATTACK;
 			else if (state.m_bINFPermanent)
 				appearance = INF_EGarrisonMapState.CLEARED;
-			else if (state.m_fINFCaptureSince >= 0)
+			else if (state.INF_IsCapturing())
 				appearance = INF_EGarrisonMapState.CAPTURING;
 			else if (state.m_bINFInboundWaiting)
 				appearance = INF_EGarrisonMapState.INBOUND;

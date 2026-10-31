@@ -245,11 +245,11 @@ class RuntimeEfficiency(unittest.TestCase):
     def test_five_visual_states_preserve_attack_priority_and_cancelled_holds(self):
         update = method_body(MAP, "protected void INF_UpdateZoneAreas(")
         labels = ["state.m_bINFAttackPending || state.m_bINFAttackActive",
-                  "state.m_bINFPermanent", "state.m_fINFCaptureSince >= 0", "state.m_bActive"]
+                  "state.m_bINFPermanent", "state.INF_IsCapturing()", "state.m_bActive"]
         offsets = [update.index(label) for label in labels]
         self.assertEqual(offsets, sorted(offsets))
         capture = method_body(CORE, "void CheckCapture(")
-        self.assertIn("(since >= 0) != (previousSince >= 0)", capture)
+        self.assertIn("state.INF_IsCapturing() != (previousProgress > 0)", capture)
         self.assertIn("NotifyChanged(state)", capture)
 
     def test_spatial_queries_match_full_scan_across_boundaries(self):
@@ -306,7 +306,7 @@ class RuntimeEfficiency(unittest.TestCase):
         samples.get(1, enemies=True, fresh=True)
         self.assertEqual((samples.players, samples.enemies), (3, 3))
         capture = method_body(CORE, "void CheckCapture(")
-        self.assertIn("INF_BlockRules.CaptureHold", capture)
+        self.assertIn("INF_BlockRules.AdvanceCaptureProgress", capture)
         self.assertIn("GetPresence(true, true)", capture)
         self.assertIn("GetPresence(false, true).m_AllPlayers",
                       method_body(GRID, "override protected vector FindSafeSpawnPosition("))
@@ -370,8 +370,8 @@ class RuntimeEfficiency(unittest.TestCase):
     def test_idle_timers_sleep_and_player_connections_wake_capture(self):
         capture = method_body(CORE, "protected void CaptureTick(")
         self.assertIn("!presence.m_PlayerIDs.IsEmpty()", capture)
-        self.assertIn("interval = 2000", capture)
-        self.assertIn("interval = 1000", capture)
+        self.assertNotIn("interval = 1000", capture)
+        self.assertIn("CallLater(CaptureTick, INF_BlockRules.CAPTURE_TICK_MS, false)", capture)
         self.assertIn("WakeCapture()", method_body(GRID, "override void OnPlayerConnected("))
         self.assertNotIn("CallLater(INF_ZoneVehicleTick", VEHICLES)
 

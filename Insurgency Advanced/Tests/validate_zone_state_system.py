@@ -135,7 +135,7 @@ class ZoneArchitecture(unittest.TestCase):
         tick = CORE.split("protected void CaptureTick()", 1)[1].split("bool ReinforcementsSettled", 1)[0]
         self.assertIn("CheckCapture(state, presence", tick)
         self.assertNotIn("m_bEnabled", tick)
-        self.assertIn("CallLater(CaptureTick, 1000, false)", CORE)
+        self.assertIn("CallLater(CaptureTick, INF_BlockRules.CAPTURE_TICK_MS, false)", CORE)
         self.assertIn("Remove(CaptureTick)", CORE)
         self.assertIn("presence.CanCapture(state.m_vCenter)", CORE)
         self.assertIn("INF_BlockRules.AdvanceCapture", CORE)
@@ -182,7 +182,7 @@ class ZoneArchitecture(unittest.TestCase):
         self.assertIn("zones.GetOnChanged().Insert(INF_QueueZoneArea)", markers)
         self.assertNotIn("INF_IsViableCell", markers)
         self.assertNotIn("IsViableMarkerCell", AI)
-        self.assertIn("else if (state.m_fINFCaptureSince >= 0)", markers)
+        self.assertIn("else if (state.INF_IsCapturing())", markers)
 
     def test_grid_bootstrap_does_not_depend_on_legacy_location_discovery(self):
         for name in ("INS_AmbientPatrolManager", "INS_CounterAttackManager"):

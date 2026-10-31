@@ -154,7 +154,7 @@ class INF_ZoneStateSystem
 		if (!m_Stopped && !m_Candidates.IsEmpty() && !m_CaptureQueued)
 		{
 			m_CaptureQueued = true;
-			GetGame().GetCallqueue().CallLater(CaptureTick, 2000, false);
+			GetGame().GetCallqueue().CallLater(CaptureTick, INF_BlockRules.CAPTURE_TICK_MS, false);
 		}
 	}
 
@@ -188,12 +188,12 @@ class INF_ZoneStateSystem
 		if (state.m_bINFCaptureCandidate)
 			m_Candidates.Insert(state);
 		m_Holds.RemoveItem(state);
-		if (state.m_bINFCaptureCandidate && state.m_fINFCaptureSince >= 0)
+		if (state.m_bINFCaptureCandidate && state.INF_IsCapturing())
 			m_Holds.Insert(state);
 		if (!m_Candidates.IsEmpty() && !m_CaptureQueued)
 		{
 			m_CaptureQueued = true;
-			GetGame().GetCallqueue().CallLater(CaptureTick, 1000, false);
+			GetGame().GetCallqueue().CallLater(CaptureTick, INF_BlockRules.CAPTURE_TICK_MS, false);
 		}
 		m_OnChanged.Invoke(state);
 		if (objective)
@@ -276,25 +276,20 @@ class INF_ZoneStateSystem
 			if (!candidates.Contains(holding))
 				candidates.Insert(holding);
 		}
-		bool sensitive;
 		foreach (INS_AmbientPatrolZoneState state : candidates)
 		{
 			if (state.m_bINFPermanent || state.m_bINFMarkedCleared)
 				continue;
 			bool capturerNearby = INF_BlockRules.Nearest(state.m_vCenter, presence.m_Capturers) <= 200;
-			if (!capturerNearby && state.m_fINFCaptureSince < 0)
+			if (!capturerNearby && !state.INF_IsCapturing())
 				continue;
-			sensitive = true;
 			presence = GetPresence(true, false, 1000);
 			CheckCapture(state, presence, !state.m_bINFInboundWaiting);
 		}
 		if (!m_Candidates.IsEmpty() && !m_CaptureQueued && !presence.m_PlayerIDs.IsEmpty())
 		{
-			int interval = 2000;
-			if (sensitive)
-				interval = 1000;
 			m_CaptureQueued = true;
-			GetGame().GetCallqueue().CallLater(CaptureTick, interval, false);
+			GetGame().GetCallqueue().CallLater(CaptureTick, INF_BlockRules.CAPTURE_TICK_MS, false);
 		}
 	}
 
@@ -490,18 +485,16 @@ class INF_ZoneStateSystem
 			return;
 		bool eligible = (state.m_bEverHadLiving || state.m_bINFSpawnExhausted) && state.m_iINFPendingGroups == 0
 			&& settled && presence.CanCapture(state.m_vCenter);
-		float since = state.m_fINFCaptureSince;
-		float previousSince = since;
-		float hold = INF_BlockRules.CaptureHold(presence.CapturersInArea(state.m_vCenter));
-		if (eligible && since >= 0 && GetGame().GetWorld().GetWorldTime() - since >= hold)
+		float previousProgress = state.m_fINFCaptureProgress;
+		bool captured = INF_BlockRules.AdvanceCaptureProgress(eligible, GetGame().GetWorld().GetWorldTime(),
+			state.m_fINFCaptureProgress, state.m_fINFCaptureUpdatedAt, presence.CapturersInArea(state.m_vCenter));
+		if (captured)
 		{
+			// Confirm against fresh positions before committing the capture.
 			presence = GetPresence(true, true);
-			eligible = presence.CanCapture(state.m_vCenter);
-			hold = INF_BlockRules.CaptureHold(presence.CapturersInArea(state.m_vCenter));
+			captured = presence.CanCapture(state.m_vCenter);
 		}
-		bool captured = INF_BlockRules.AdvanceCapture(eligible, GetGame().GetWorld().GetWorldTime(), since, hold);
-		state.m_fINFCaptureSince = since;
-		if ((since >= 0) != (previousSince >= 0))
+		if (state.INF_IsCapturing() != (previousProgress > 0))
 			NotifyChanged(state);
 		if (!captured)
 			return;
@@ -532,7 +525,7 @@ class INF_ZoneStateSystem
 	{
 		state.m_bINFAttackPending = false;
 		state.m_bINFAttackActive = false;
-		state.m_fINFCaptureSince = -1;
+		state.INF_ResetCapture();
 		if (playersNearby)
 		{
 			state.m_bINFMarkedCleared = true;
@@ -575,7 +568,7 @@ class INF_ZoneStateSystem
 			return;
 		state.m_bINFMarkedCleared = false;
 		state.m_bEverHadLiving = true;
-		state.m_fINFCaptureSince = -1;
+		state.INF_ResetCapture();
 		NotifyChanged(state);
 	}
 

@@ -527,6 +527,8 @@ class INF_BlockRules
 	static const float COUNTERATTACK_DESPAWN_RADIUS = 800;
 	static const float CAPTURE_HOLD_MS = 10000;
 	static const float MIN_CAPTURE_HOLD_MS = 2000;
+	static const float CAPTURE_TICK_MS = 2000;
+	static const float CAPTURE_MAX_STEP_MS = 5000;
 	static const float PLAYER_CAPTURE_RADIUS = 100;
 
 	static bool IsConcealed(vector position, array<vector> players, float height)
@@ -553,6 +555,28 @@ class INF_BlockRules
 	static float CaptureHold(int players)
 	{
 		return Math.Max(MIN_CAPTURE_HOLD_MS, CAPTURE_HOLD_MS * (1 - 0.2 * (Math.Max(1, players) - 1)));
+	}
+
+	// Progress runs 0..1. Eligible ticks fill it at the current capturer rate; any failed condition drains it
+	// at the slowest (single capturer) rate. Returns true once it is full.
+	static bool AdvanceCaptureProgress(bool eligible, float now, inout float progress, inout float updatedAt, int capturers)
+	{
+		float step = CAPTURE_TICK_MS;
+		if (updatedAt >= 0)
+			step = Math.Min(now - updatedAt, CAPTURE_MAX_STEP_MS);
+		updatedAt = now;
+		if (eligible)
+			progress += step / CaptureHold(capturers);
+		else
+			progress -= step / CAPTURE_HOLD_MS;
+		if (progress <= 0)
+		{
+			progress = 0;
+			if (!eligible)
+				updatedAt = -1;
+		}
+		progress = Math.Min(progress, 1);
+		return progress >= 1;
 	}
 
 	static bool AdvanceCapture(bool eligible, float now, inout float since, float hold = CAPTURE_HOLD_MS)
