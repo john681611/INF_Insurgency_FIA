@@ -496,17 +496,15 @@ modded class INS_AmbientVehicleManager
 		for (int i = 0; i < points.Count(); i++)
 		{
 			vector point = points[i];
-			float nearest = INF_BlockRules.Nearest(point, players);
 			if (vector.DistanceSqXZ(point, center) > 10000
-				|| nearest < minimumDistance || nearest > m_fActivationRadius)
+				|| !INF_BuildingGrid.PositionAllowed(point, players, minimumDistance, m_fActivationRadius))
 			{
 				continue;
 			}
 			int next = i + 1;
 			if (next >= points.Count())
 				next = i - 1;
-			if (vector.DistanceSqXZ(points[i], points[next]) < 1
-				|| INF_BuildingGrid.IsSpawnBlocked(point) || INF_VehiclePositionOccupied(point))
+			if (vector.DistanceSqXZ(points[i], points[next]) < 1 || INF_VehiclePositionOccupied(point))
 			{
 				continue;
 			}
@@ -521,9 +519,8 @@ modded class INS_AmbientVehicleManager
 				continue;
 			}
 			point = empty;
-			nearest = INF_BlockRules.Nearest(point, players);
 			if (vector.DistanceSqXZ(point, center) > 10000
-				|| nearest < minimumDistance || nearest > m_fActivationRadius)
+				|| !INF_BuildingGrid.PositionAllowed(point, players, minimumDistance, m_fActivationRadius))
 			{
 				continue;
 			}
@@ -573,13 +570,12 @@ modded class INS_AmbientVehicleManager
 		{
 			vector point = center + Vector(Math.RandomFloat(-extent, extent), 0, Math.RandomFloat(-extent, extent));
 			point[1] = GetGame().GetWorld().GetSurfaceY(point[0], point[2]);
-			float nearest = INF_BlockRules.Nearest(point, players);
 			if (!INF_BuildingGrid.Contains(center, point)
-				|| nearest < minimumDistance || nearest > m_fActivationRadius)
+				|| !INF_BuildingGrid.PositionAllowed(point, players, minimumDistance, m_fActivationRadius))
 			{
 				continue;
 			}
-			if (point[1] <= 0.5 || INF_BuildingGrid.IsSpawnBlocked(point)
+			if (point[1] <= 0.5
 				|| INF_VehiclePositionOccupied(point) || !INF_ZoneHidden(point, players)
 				|| !INF_ForestCamps.ClearVolume(point, 5, 4))
 			{

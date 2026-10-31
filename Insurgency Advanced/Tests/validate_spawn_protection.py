@@ -24,9 +24,12 @@ class SpawnProtection(unittest.TestCase):
         self.assertIn("INF_SpawnProtection.Contains(pos)", blocked)
         self.assertIn("IsExcluded(pos)", blocked)
         self.assertIn("INF_SpawnProtection.Contains(empty)", method_body(GRID, "override protected vector FindSafeSpawnPosition("))
-        self.assertIn("IsSpawnBlocked(empty)", method_body(GRID, "protected vector INF_FindReinforcementPosition("))
+        allowed = method_body(GRID, "static bool PositionAllowed(")
+        self.assertIn("IsSpawnBlocked(pos)", allowed)
+        self.assertIn("PositionAllowed(empty", method_body(GRID, "protected vector INF_FindReinforcementPosition("))
         self.assertIn("IsSpawnBlocked(pos)", method_body(GRID, "protected bool INF_GridAttackPositionSafe("))
-        self.assertIn("IsSpawnBlocked(point)", method_body(VEHICLES, "protected bool INF_ZoneOpenPosition("))
+        self.assertIn("PositionAllowed(point", method_body(VEHICLES, "protected bool INF_ZoneOpenPosition("))
+        self.assertIn("PositionAllowed(point", method_body(VEHICLES, "protected bool INF_ZoneRoadPosition("))
 
 
 if __name__ == "__main__":

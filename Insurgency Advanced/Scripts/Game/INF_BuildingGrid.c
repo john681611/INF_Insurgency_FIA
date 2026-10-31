@@ -219,6 +219,15 @@ class INF_BuildingGrid
 		return IsExcluded(pos) || INF_SpawnProtection.Contains(pos);
 	}
 
+	// Position-only spawn gate shared by vehicle and infantry placement; run before any traces.
+	static bool PositionAllowed(vector pos, array<vector> players, float minDistance, float maxDistance = float.MAX)
+	{
+		if (IsSpawnBlocked(pos))
+			return false;
+		float nearest = INF_BlockRules.Nearest(pos, players);
+		return nearest >= minDistance && nearest <= maxDistance;
+	}
+
 	static bool Overlaps(vector center, vector circle, float radius)
 	{
 		float dx = Math.Max(Math.AbsFloat(center[0] - circle[0]) - HALF, 0);
@@ -999,8 +1008,7 @@ modded class INS_AmbientPatrolManager
 			vector candidate = center + Vector(Math.Cos(angle) * distance, 0, Math.Sin(angle) * distance);
 			vector empty;
 			if (!SCR_WorldTools.FindEmptyTerrainPosition(empty, candidate, 10, 2, 2)
-				|| empty[1] <= 0.5 || INF_BuildingGrid.IsSpawnBlocked(empty)
-				|| INF_BlockRules.Nearest(empty, players) < minDistance)
+				|| empty[1] <= 0.5 || !INF_BuildingGrid.PositionAllowed(empty, players, minDistance))
 				continue;
 			if (INF_IsConcealedSpawn(empty, players))
 				return empty;

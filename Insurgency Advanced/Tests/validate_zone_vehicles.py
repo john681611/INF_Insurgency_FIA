@@ -120,13 +120,13 @@ class ZoneVehicles(unittest.TestCase):
 
     def test_safe_road_spawns_use_ambient_distance_and_full_vehicle_clearance(self):
         road = body("protected bool INF_ZoneRoadPosition(")
-        for condition in ("GetClosestRoad", "distance > 100", "INF_BuildingGrid.IsSpawnBlocked(point)",
-                          "< minimumDistance", "INF_ZoneHidden(point, players)",
-                          "> m_fActivationRadius",
+        for condition in ("GetClosestRoad", "distance > 100",
+                          "INF_BuildingGrid.PositionAllowed(point, players, minimumDistance, m_fActivationRadius)",
+                          "INF_ZoneHidden(point, players)",
                           "FindEmptyTerrainPosition(empty, point, 5.1, 5, 4)",
                           "INF_ForestCamps.ClearVolume(point, 5, 4)", "INF_VehiclePositionOccupied(point)"):
             self.assertIn(condition, road)
-        self.assertLess(road.index("nearest > m_fActivationRadius"), road.index("FindEmptyTerrainPosition"))
+        self.assertLess(road.index("PositionAllowed("), road.index("FindEmptyTerrainPosition"))
         hidden = body("protected bool INF_ZoneHidden(")
         self.assertIn("INF_BlockRules.IsConcealed(pos, players, 3)", hidden)
         conceal = method_body(BLOCK, "static bool IsConcealed(")
@@ -291,8 +291,8 @@ class ZoneVehicles(unittest.TestCase):
         self.assertLess(spawn.index("INF_ZoneRoadPosition("), spawn.index("INF_ZoneOpenPosition("))
         ground = body("protected bool INF_ZoneOpenPosition(")
         for check in ("attempt < 32", "heading < 4", "INF_BuildingGrid.Contains(center, point)",
-                      "nearest < minimumDistance", "nearest > m_fActivationRadius",
-                      "INF_BuildingGrid.IsSpawnBlocked(point)", "INF_VehiclePositionOccupied(point)",
+                      "INF_BuildingGrid.PositionAllowed(point, players, minimumDistance, m_fActivationRadius)",
+                      "INF_VehiclePositionOccupied(point)",
                       "INF_ZoneHidden(point, players)", "INF_ForestCamps.ClearVolume(point, 5, 4)",
                       "INF_VehiclePositionClear(point, direction, null, true)"):
             self.assertIn(check, ground)
@@ -309,7 +309,7 @@ class ZoneVehicles(unittest.TestCase):
         self.assertIn("i < points.Count(); i++", road)
         self.assertIn("points.Count() < 2", road)
         self.assertIn("next = i - 1", road)
-        self.assertIn("|| INF_BuildingGrid.IsSpawnBlocked(point) || INF_VehiclePositionOccupied(point)", road)
+        self.assertIn("|| INF_VehiclePositionOccupied(point)", road)
         self.assertLess(road.index("INF_VehiclePositionOccupied(point)"), road.index("FindEmptyTerrainPosition"))
         points = [0, 200]
         self.assertEqual([point for point in points if abs(point - 190) <= 100], [200])
