@@ -141,8 +141,10 @@ class ZoneVehicles(unittest.TestCase):
         self.assertIn("!INF_VehiclePositionClear(point", road)
         clearance = body("protected bool INF_ZoneVehicleFootprintClear(")
         self.assertIn("Math.AbsFloat(ground - pos[1]) > 0.65", clearance)
-        self.assertIn("offset <= 5", clearance)
-        self.assertIn("level < 4", clearance)
+        self.assertIn("offset <= 4", clearance)
+        self.assertIn("level < 2", clearance)
+        self.assertIn("SCR_WorldTools.FindEmptyTerrainPosition(empty, pos, 4.1, 4, 3)", clearance)
+        self.assertIn("vector.DistanceSqXZ(empty, pos) <= 0.0625", clearance)
         self.assertIn("world.TraceMove(across, null) < 1", clearance)
         self.assertIn("world.TraceMove(along, null) < 1", clearance)
         self.assertNotIn("CallLater", clearance)
@@ -169,11 +171,10 @@ class ZoneVehicles(unittest.TestCase):
         self.assertIn("!INF_VehicleExitClear(pos, forward, exclusions, 2)", deployment)
         self.assertIn("!INF_VehicleExitClear(pos, -forward, exclusions, 2)", deployment)
         self.assertIn("step * 5", exit_check)
-        self.assertIn("lane = -2; lane <= 2", exit_check)
-        self.assertIn("float laneOffset = lane;", exit_check)
-        self.assertIn("vector lateralOffset = side * laneOffset;", exit_check)
-        self.assertIn("direction * distance", exit_check)
-        self.assertNotIn("side * lane ", exit_check)
+        self.assertIn("lane = -2; lane <= 2; lane += 2", exit_check)
+        self.assertIn("vector lateralOffset = side * lane;", exit_check)
+        self.assertIn("direction * (steps * 5.0)", exit_check)
+        self.assertIn("level < 2", exit_check)
         self.assertIn("trace.ExcludeArray = exclusions", exit_check)
         self.assertIn("world.TraceMove(trace, null) < 1", exit_check)
         self.assertNotIn("CallLater", deployment + exit_check)
@@ -195,7 +196,7 @@ class ZoneVehicles(unittest.TestCase):
         self.assertIn("spawnPos = replacement", spawn)
         self.assertIn("blocked || !INF_VehiclePositionClear", spawn)
         self.assertIn("now < retryAt", spawn)
-        self.assertIn("m_INFVehicleSearchRetry.Set(key, now + 60000)", spawn)
+        self.assertIn("m_INFVehicleSearchRetry.Set(key, now + 20000)", spawn)
         self.assertNotIn("SpawnEntityPrefab", spawn)
         crew = body("override protected void SpawnCrew(")
         self.assertLess(crew.index("m_INFRejectedVehiclePositions.Insert"),
@@ -209,17 +210,17 @@ class ZoneVehicles(unittest.TestCase):
         search = body("protected bool INF_FindAmbientRoadPosition(")
         self.assertIn("GetPlayerControlledEntity(playerId)", search)
         self.assertIn("players.IsEmpty()", search)
-        self.assertIn("sample < 9", search)
+        self.assertIn("sample < 25", search)
         self.assertIn("INF_ZoneRoadPosition(center, players, candidate, yaw)", search)
-        self.assertIn("vector.DistanceSqXZ(candidate, origin) > 40000", search)
+        self.assertIn("vector.DistanceSqXZ(candidate, origin) > 360000", search)
         self.assertIn("INF_VehiclePositionClear(candidate, destination - candidate, null)", search)
         self.assertNotIn("SpawnEntityPrefab", search)
-        candidates = [(15, False), (201, True), (150, True), (80, True)]
+        candidates = [(15, False), (601, True), (450, True), (80, True)]
         chosen = next((distance for distance, clear in candidates
-                       if distance * distance <= 40000 and clear), None)
-        self.assertEqual(chosen, 150)
-        for now, allowed in ((59999, False), (60000, True), (60001, True)):
-            self.assertEqual(now >= 60000, allowed)
+                       if distance * distance <= 360000 and clear), None)
+        self.assertEqual(chosen, 450)
+        for now, allowed in ((19999, False), (20000, True), (20001, True)):
+            self.assertEqual(now >= 20000, allowed)
 
     def test_native_crew_groups_contribute_to_capture_without_duplicate_activation(self):
         resolve = body("protected bool INF_ResolveZoneCrew(")
@@ -308,7 +309,8 @@ class ZoneVehicles(unittest.TestCase):
         self.assertIn("i < points.Count(); i++", road)
         self.assertIn("points.Count() < 2", road)
         self.assertIn("next = i - 1", road)
-        self.assertIn("if (INF_VehiclePositionOccupied(point))", road)
+        self.assertIn("|| INF_BuildingGrid.IsSpawnBlocked(point) || INF_VehiclePositionOccupied(point)", road)
+        self.assertLess(road.index("INF_VehiclePositionOccupied(point)"), road.index("FindEmptyTerrainPosition"))
         points = [0, 200]
         self.assertEqual([point for point in points if abs(point - 190) <= 100], [200])
         occupied = {0}
@@ -418,7 +420,7 @@ class ZoneVehicles(unittest.TestCase):
         self.assertIn("persistence.StopTracking(group, true)", SOURCE)
 
     def test_two_settings_are_replicated_and_exposed_to_gms(self):
-        for name, default in (("Chance", 15), ("Limit", 2)):
+        for name, default in (("Chance", 30), ("Limit", 6)):
             field = {"Chance": "m_iINFZoneVehicleChance", "Limit": "m_iINFZoneVehicleLimit"}[name]
             self.assertRegex(SOURCE, rf'RplProp\(\)\]\s+protected int {field} = {default};')
         for guid in ("610", "612"):

@@ -455,8 +455,8 @@ Native crew and successful passengers are recorded immediately, so early
 dismounts, deaths and captures cannot turn a valid vehicle into a polling timeout.
 Passenger spawning is server-only and uses native character/compartment replication.
 Zone vehicles have their own two replicated GM/Workbench controls:
-  Zone Vehicles: Chance (%)       default 15, range 0-100
-  Zone Vehicles: Maximum Active   default 2, range 0-32
+  Zone Vehicles: Chance (%)         default 30, range 0-100
+    Zone Vehicles: Maximum Active   default 6, range 0-32
 Vehicle numbers, not occupant AI, limit these systems. The zone crew-AI budget
 has been removed. Crew and passengers do not consume the 128-AI infantry/
 counterattack budget. Pending zone vehicles count against their vehicle cap;
@@ -492,19 +492,21 @@ drive waypoint to send the crew there. This shares the existing zone vehicle
 chance and cap; it is not an additional counterattack or ambient patrol.
 Road connectivity and successful AI arrival still require live validation.
 Zone vehicle placement rejects terrain-search displacement over 0.25m from its
-road point, rather than accepting nearby courtyard positions. A conservative
-10m-wide footprint checks terrain support and crossed obstacle traces at four
-heights before spawning. Blocked locations are skipped; these checks run only
+road point, rather than accepting nearby courtyard positions. The footprint is
+a 4m-radius clear cylinder from the native FindEmptyTerrainPosition query plus
+nine terrain-support samples. Once a vehicle exists, where the native query
+cannot exclude it, two-height obstacle traces over an 8m square are used
+instead. Blocked locations are skipped; these checks run only
 during placement, not in a recurring physics monitor.
 Both inherited ambient vehicles and zone vehicles check footprint and a clear
 15m forward or reverse corridor before vehicle creation, sampled across a 4m
-width at three heights, plus corridors extending 10m from the centre in both
+width (three lanes) at two heights, plus corridors extending 10m from the centre in both
 forward and reverse directions (5m beyond the reserved half-length).
 Unsafe ambient positions (within 5m) are remembered for
 the mission. Instead of dropping the patrol, a bounded search samples roads
-around the original endpoint and accepts a clear site within 200m, preserving
+around the original endpoint and accepts a clear site within 600m, preserving
 player-distance, concealment, vehicle separation and original destination checks.
-If no eligible site is found, that endpoint's search pauses for 60 seconds before
+If no eligible site is found, that endpoint's search pauses for 20 seconds before
 trying again; it does not spawn/delete vehicles while searching. Native route
 selection and vehicle limits remain unchanged.
 A second check before native crew creation excludes the vehicle and its children

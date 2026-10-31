@@ -48,10 +48,10 @@ class INF_ZoneVehicle
 
 modded class INS_AmbientVehicleManager
 {
-	[Attribute("15", UIWidgets.Slider, "Chance per eligible zone per mission. Zero prevents new zone vehicles.", "0 100 1", category: "Zone Vehicles"), RplProp()]
-	protected int m_iINFZoneVehicleChance = 15;
-	[Attribute("2", UIWidgets.Slider, "Zone vehicle cap, independent of ambient route vehicles. Lowering affects future admissions.", "0 32 1", category: "Zone Vehicles"), RplProp()]
-	protected int m_iINFZoneVehicleLimit = 2;
+	[Attribute("30", UIWidgets.Slider, "Chance per eligible zone per mission. Zero prevents new zone vehicles.", "0 100 1", category: "Zone Vehicles"), RplProp()]
+	protected int m_iINFZoneVehicleChance = 30;
+	[Attribute("6", UIWidgets.Slider, "Zone vehicle cap, independent of ambient route vehicles. Lowering affects future admissions.", "0 32 1", category: "Zone Vehicles"), RplProp()]
+	protected int m_iINFZoneVehicleLimit = 6;
 	protected ref array<ref INF_ZoneVehicle> m_INFZoneVehicles = {};
 	protected INF_StaggerGate m_INFSpawnGate = INF_StaggerGate.Spawns();
 	protected INF_StaggerGate m_INFDespawnGate = INF_StaggerGate.Despawns();
@@ -202,7 +202,7 @@ modded class INS_AmbientVehicleManager
 				vector replacement;
 				if (!INF_FindAmbientRoadPosition(spawnPos, destPos, replacement))
 				{
-					m_INFVehicleSearchRetry.Set(key, now + 60000);
+					m_INFVehicleSearchRetry.Set(key, now + 20000);
 					return;
 				}
 				spawnPos = replacement;
@@ -224,19 +224,20 @@ modded class INS_AmbientVehicleManager
 		}
 		if (players.IsEmpty())
 			return false;
-		for (int sample = 0; sample < 9; sample++)
+		for (int sample = 0; sample < 25; sample++)
 		{
 			vector center = origin;
 			if (sample > 0)
 			{
-				float angle = (sample - 1) * Math.PI / 4;
-				center += Vector(Math.Sin(angle) * 100, 0, Math.Cos(angle) * 100);
+				float angle = ((sample - 1) % 8) * Math.PI / 4;
+				float radius = 100 + ((sample - 1) / 8) * 200;
+				center += Vector(Math.Sin(angle) * radius, 0, Math.Cos(angle) * radius);
 			}
 			float yaw;
 			vector candidate;
 			if (!INF_ZoneRoadPosition(center, players, candidate, yaw))
 				continue;
-			if (vector.DistanceSqXZ(candidate, origin) > 40000
+			if (vector.DistanceSqXZ(candidate, origin) > 360000
 				|| !INF_VehiclePositionClear(candidate, destination - candidate, null))
 				continue;
 			position = candidate;
@@ -318,27 +319,27 @@ modded class INS_AmbientVehicleManager
 		vector side = Vector(direction[2], 0, -direction[0]);
 		for (int step = firstStep; step <= steps; step++)
 		{
-			float distance = step * 5.0;
-			vector point = pos + direction * distance;
-			float ground = world.GetSurfaceY(point[0], point[2]);
-			if (Math.AbsFloat(ground - pos[1]) > step * 1.5)
+			vector stepPoint = pos + direction * (step * 5.0);
+			if (Math.AbsFloat(world.GetSurfaceY(stepPoint[0], stepPoint[2]) - pos[1]) > step * 1.5)
 				return false;
-			for (int lane = -2; lane <= 2; lane++)
+		}
+		// One trace per lane and height to the farthest step covers the nearer steps.
+		vector point = pos + direction * (steps * 5.0);
+		float ground = world.GetSurfaceY(point[0], point[2]);
+		for (int lane = -2; lane <= 2; lane += 2)
+		{
+			vector lateralOffset = side * lane;
+			for (int level = 0; level < 2; level++)
 			{
-				float laneOffset = lane;
-				vector lateralOffset = side * laneOffset;
-				for (int level = 0; level < 3; level++)
-				{
-					TraceParam trace = new TraceParam();
-					trace.Start = pos + lateralOffset + Vector(0, 0.5 + level, 0);
-					vector end = point + lateralOffset;
-					end[1] = ground + 0.5 + level;
-					trace.End = end;
-					trace.Flags = TraceFlags.ENTS | TraceFlags.WORLD | TraceFlags.OCEAN;
-					trace.ExcludeArray = exclusions;
-					if (world.TraceMove(trace, null) < 1)
-						return false;
-				}
+				TraceParam trace = new TraceParam();
+				trace.Start = pos + lateralOffset + Vector(0, 0.5 + level, 0);
+				vector end = point + lateralOffset;
+				end[1] = ground + 0.5 + level;
+				trace.End = end;
+				trace.Flags = TraceFlags.ENTS | TraceFlags.WORLD | TraceFlags.OCEAN;
+				trace.ExcludeArray = exclusions;
+				if (world.TraceMove(trace, null) < 1)
+					return false;
 			}
 		}
 		return true;
@@ -501,6 +502,14 @@ modded class INS_AmbientVehicleManager
 			{
 				continue;
 			}
+			int next = i + 1;
+			if (next >= points.Count())
+				next = i - 1;
+			if (vector.DistanceSqXZ(points[i], points[next]) < 1
+				|| INF_BuildingGrid.IsSpawnBlocked(point) || INF_VehiclePositionOccupied(point))
+			{
+				continue;
+			}
 			point[1] = GetGame().GetWorld().GetSurfaceY(point[0], point[2]);
 			vector empty;
 			if (!SCR_WorldTools.FindEmptyTerrainPosition(empty, point, 5.1, 5, 4))
@@ -518,26 +527,11 @@ modded class INS_AmbientVehicleManager
 			{
 				continue;
 			}
-			if (INF_BuildingGrid.IsSpawnBlocked(point))
-			{
-				continue;
-			}
 			if (!INF_ZoneHidden(point, players))
 			{
 				continue;
 			}
 			if (!INF_ForestCamps.ClearVolume(point, 5, 4))
-			{
-				continue;
-			}
-			if (INF_VehiclePositionOccupied(point))
-			{
-				continue;
-			}
-			int next = i + 1;
-			if (next >= points.Count())
-				next = i - 1;
-			if (vector.DistanceSqXZ(points[i], points[next]) < 1)
 			{
 				continue;
 			}
@@ -612,30 +606,37 @@ modded class INS_AmbientVehicleManager
 	protected bool INF_ZoneVehicleFootprintClear(vector pos, array<IEntity> exclusions = null)
 	{
 		BaseWorld world = GetGame().GetWorld();
-		for (int x = -5; x <= 5; x++)
+		for (int x = -4; x <= 4; x += 4)
 		{
-			for (int z = -5; z <= 5; z++)
+			for (int z = -4; z <= 4; z += 4)
 			{
 				float ground = world.GetSurfaceY(pos[0] + x, pos[2] + z);
 				if (Math.AbsFloat(ground - pos[1]) > 0.65)
 					return false;
 			}
 		}
-		for (int level = 0; level < 4; level++)
+		if (!exclusions || exclusions.IsEmpty())
 		{
-			float height = 0.25 + level;
-			for (int offset = -5; offset <= 5; offset++)
+			// The native query cannot exclude entities, so it only runs before a vehicle exists.
+			vector empty;
+			return SCR_WorldTools.FindEmptyTerrainPosition(empty, pos, 4.1, 4, 3)
+				&& vector.DistanceSqXZ(empty, pos) <= 0.0625;
+		}
+		for (int level = 0; level < 2; level++)
+		{
+			float height = 0.5 + level;
+			for (int offset = -4; offset <= 4; offset += 4)
 			{
 				TraceParam across = new TraceParam();
-				across.Start = pos + Vector(-5, height, offset);
-				across.End = pos + Vector(5, height, offset);
+				across.Start = pos + Vector(-4, height, offset);
+				across.End = pos + Vector(4, height, offset);
 				across.Flags = TraceFlags.ENTS | TraceFlags.WORLD;
 				across.ExcludeArray = exclusions;
 				if (world.TraceMove(across, null) < 1)
 					return false;
 				TraceParam along = new TraceParam();
-				along.Start = pos + Vector(offset, height, -5);
-				along.End = pos + Vector(offset, height, 5);
+				along.Start = pos + Vector(offset, height, -4);
+				along.End = pos + Vector(offset, height, 4);
 				along.Flags = TraceFlags.ENTS | TraceFlags.WORLD;
 				along.ExcludeArray = exclusions;
 				if (world.TraceMove(along, null) < 1)

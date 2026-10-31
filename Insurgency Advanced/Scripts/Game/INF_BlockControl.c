@@ -220,8 +220,10 @@ class INF_ActivationGroup
 	{
 		float nearest = float.MAX;
 		foreach (INF_ActivationPlayer player : m_Players)
-			nearest = Math.Min(nearest, vector.DistanceXZ(center, player.m_Position));
-		return nearest;
+			nearest = Math.Min(nearest, vector.DistanceSqXZ(center, player.m_Position));
+		if (nearest == float.MAX)
+			return nearest;
+		return Math.Sqrt(nearest);
 	}
 
 	bool Allows(vector center, float radius)
@@ -624,8 +626,10 @@ class INF_BlockRules
 	{
 		float nearest = float.MAX;
 		foreach (vector player : players)
-			nearest = Math.Min(nearest, vector.DistanceXZ(center, player));
-		return nearest;
+			nearest = Math.Min(nearest, vector.DistanceSqXZ(center, player));
+		if (nearest == float.MAX)
+			return nearest;
+		return Math.Sqrt(nearest);
 	}
 
 	static bool CapturerOccupied(vector center, INF_BlockPresence presence)

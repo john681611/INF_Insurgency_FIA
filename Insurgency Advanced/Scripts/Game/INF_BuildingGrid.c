@@ -749,11 +749,15 @@ modded class INS_AmbientPatrolManager
 			players.Insert(GetOwner().GetOrigin());
 		int nearest;
 		vector offset = Vector(INF_SCAN_TILE_SIZE * 0.5, 0, INF_SCAN_TILE_SIZE * 0.5);
+		float nearestDistance = INF_BlockRules.Nearest(m_aINFScanTiles[0] + offset, players);
 		for (int i = 1; i < m_aINFScanTiles.Count(); i++)
 		{
-			if (INF_BlockRules.Nearest(m_aINFScanTiles[i] + offset, players)
-				< INF_BlockRules.Nearest(m_aINFScanTiles[nearest] + offset, players))
+			float tileDistance = INF_BlockRules.Nearest(m_aINFScanTiles[i] + offset, players);
+			if (tileDistance < nearestDistance)
+			{
 				nearest = i;
+				nearestDistance = tileDistance;
+			}
 		}
 		m_vINFScanTile = m_aINFScanTiles[nearest];
 		vector minimum = Vector(m_vINFScanTile[0], m_vINFScanMin[1], m_vINFScanTile[2]);
