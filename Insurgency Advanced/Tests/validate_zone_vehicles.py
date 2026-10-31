@@ -172,7 +172,7 @@ class ZoneVehicles(unittest.TestCase):
         self.assertIn("!INF_VehicleExitClear(pos, -forward, exclusions, 2)", deployment)
         self.assertIn("step * 5", exit_check)
         self.assertIn("lane = -2; lane <= 2; lane += 2", exit_check)
-        self.assertIn("vector lateralOffset = side * lane;", exit_check)
+        self.assertIn("vector lateralOffset = side * laneOffset;", exit_check)
         self.assertIn("direction * (steps * 5.0)", exit_check)
         self.assertIn("level < 2", exit_check)
         self.assertIn("trace.ExcludeArray = exclusions", exit_check)

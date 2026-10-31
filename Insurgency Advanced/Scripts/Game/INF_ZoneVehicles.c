@@ -229,8 +229,9 @@ modded class INS_AmbientVehicleManager
 			vector center = origin;
 			if (sample > 0)
 			{
-				float angle = ((sample - 1) % 8) * Math.PI / 4;
-				float radius = 100 + ((sample - 1) / 8) * 200;
+				int ring = (sample - 1) / 8;
+				float angle = (sample - 1 - ring * 8) * Math.PI / 4;
+				float radius = 100 + ring * 200;
 				center += Vector(Math.Sin(angle) * radius, 0, Math.Cos(angle) * radius);
 			}
 			float yaw;
@@ -328,7 +329,8 @@ modded class INS_AmbientVehicleManager
 		float ground = world.GetSurfaceY(point[0], point[2]);
 		for (int lane = -2; lane <= 2; lane += 2)
 		{
-			vector lateralOffset = side * lane;
+			float laneOffset = lane;
+			vector lateralOffset = side * laneOffset;
 			for (int level = 0; level < 2; level++)
 			{
 				TraceParam trace = new TraceParam();
