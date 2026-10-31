@@ -216,7 +216,7 @@ class Prisoners(unittest.TestCase):
         self.assertIn("control.GetControlAIAgent()", capture)
         self.assertIn("agent.GetParentGroup()", capture)
         self.assertIn("Replication.BumpMe()", capture)
-        self.assertIn("CallLater(MaintainRestraints, 1000, true)", capture)
+        self.assertIn("CallLater(MaintainRestraints, 1000, false)", capture)
         collector = method(RULES, "static void CollectLiving(", "static bool HasMembers(")
         self.assertIn("prisoner && prisoner.IsCaptured()", collector)
         self.assertIn("continue;", collector.split("prisoner.IsCaptured()", 1)[1])
@@ -328,9 +328,11 @@ class Prisoners(unittest.TestCase):
         init = method(SOURCE, "override void EOnInit(", "override void OnDelete(")
         self.assertIn("if (m_bCaptured)", init)
         self.assertIn("ApplyRestraints()", init)
-        self.assertEqual(SOURCE.count("Remove(MaintainRestraints)"), 2)
+        self.assertEqual(SOURCE.count("Remove(MaintainRestraints)"), 1)
         maintenance = method(SOURCE, "void MaintainRestraints(", "void OnCapturedChanged(")
         self.assertIn("ECharacterLifeState.DEAD", maintenance)
+        self.assertNotIn("ApplyRestraints()", method(SOURCE, "void MaintainRestraints(", "void WarnHandling("))
+        self.assertIn("CallLater(MaintainRestraints, interval, false)", maintenance)
 
     def test_reliable_dialogue_only_goes_to_questioning_player(self):
         response = method(CONTROLLER, "void INF_SendPrisonerResponse(", "protected int m_iINFDebugMarkerLayers")

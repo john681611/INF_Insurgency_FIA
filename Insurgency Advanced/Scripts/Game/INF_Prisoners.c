@@ -232,7 +232,7 @@ class INF_PrisonerComponent : ScriptComponent
 		if (group)
 			group.RemoveAgent(agent);
 		Replication.BumpMe();
-		GetGame().GetCallqueue().CallLater(MaintainRestraints, 1000, true);
+		GetGame().GetCallqueue().CallLater(MaintainRestraints, 1000, false);
 		Respond(user, "Prisoner secured. Stop their bleeding and treat their wounds; they must be conscious before questioning.");
 		Print(string.Format("[INF_Prisoners] Player %1 secured hostile AI.", GetGame().GetPlayerManager().GetPlayerIdFromControlledEntity(user)));
 	}
@@ -367,19 +367,26 @@ class INF_PrisonerComponent : ScriptComponent
 		if (!controller || controller.GetLifeState() == ECharacterLifeState.DEAD)
 		{
 			StopPrisonerLoiter(controller);
-			GetGame().GetCallqueue().Remove(MaintainRestraints);
 			return;
 		}
 		DropCarriedWeapons();
-		ApplyRestraints();
 		UpdatePrisonerLoiter(controller);
 		float now = GetGame().GetWorld().GetWorldTime();
 		if (now >= m_fNextCleanupCheck)
 		{
 			m_fNextCleanupCheck = now + 10000;
 			if (INF_CanCleanup())
+			{
 				SCR_EntityHelper.DeleteEntityAndChildren(GetOwner());
+				return;
+			}
 		}
+		// Restraints are applied once at capture; poll quickly only until the loiter pose holds.
+		SCR_CharacterControllerComponent character = SCR_CharacterControllerComponent.Cast(controller);
+		int interval = 1000;
+		if (m_bWeaponsDropped && character && character.IsLoitering())
+			interval = 10000;
+		GetGame().GetCallqueue().CallLater(MaintainRestraints, interval, false);
 	}
 
 	protected void WarnHandling(string message)
