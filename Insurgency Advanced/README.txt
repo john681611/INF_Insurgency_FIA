@@ -464,7 +464,8 @@ failed initialization releases that vehicle slot. Zone and ambient caps remain
 separate. Lowered limits affect future admissions rather than deleting existing
 vehicles in front of players.
 Only active hostile zones are eligible, once per zone per mission, with at
-most one vehicle. Placement requires a nearby clear, dry, flat road position,
+most one vehicle. A zone that wins its roll but finds no placement retries every
+30 seconds without rerolling. Placement requires a nearby clear, dry, flat road position,
 ambient activation/minimum player distances and concealment from all players.
 The crew holds that road position with the native vehicle move order rather
 than receiving infantry Defend orders that could dismount it. This is not

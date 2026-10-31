@@ -423,8 +423,8 @@ class ZoneVehicles(unittest.TestCase):
         for name, default in (("Chance", 30), ("Limit", 6)):
             field = {"Chance": "m_iINFZoneVehicleChance", "Limit": "m_iINFZoneVehicleLimit"}[name]
             self.assertRegex(SOURCE, rf'RplProp\(\)\]\s+protected int {field} = {default};')
-        for guid in ("610", "612"):
-            self.assertIn('INF_ZoneVehicleSettingEditorAttribute "{6AA19CB200000' + guid + '}"', CONFIG)
+        for name, guid in (("Setting", "610"), ("Limit", "612")):
+            self.assertIn(f'INF_ZoneVehicle{name}EditorAttribute "{{6AA19CB200000{guid}}}"', CONFIG)
         self.assertNotIn("Crew AI Budget", CONFIG)
         self.assertIn("INF_SetZoneVehicleSetting(m_iSetting", EDITOR)
         self.assertIn("INF_GetZoneVehicleSetting(m_iSetting)", EDITOR)

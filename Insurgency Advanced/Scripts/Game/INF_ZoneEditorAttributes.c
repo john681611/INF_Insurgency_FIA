@@ -34,6 +34,12 @@ class INF_ZoneVehicleSettingEditorAttribute : SCR_BaseValueListEditorAttribute
 	}
 }
 
+// The editor accepts only one attribute per class, so each extra setting needs its own subclass.
+[BaseContainerProps(), SCR_BaseEditorAttributeCustomTitle()]
+class INF_ZoneVehicleLimitEditorAttribute : INF_ZoneVehicleSettingEditorAttribute
+{
+}
+
 class INF_ZoneEditorContext
 {
 	static INS_AmbientPatrolManager Grid(IEntity mode)
@@ -117,6 +123,21 @@ class INF_TravelSettingEditorAttribute : SCR_BaseValueListEditorAttribute
 		outEntries.Insert(new SCR_BaseEditorAttributeEntrySlider(new INS_SliderValues(minimum, maximum, 1)));
 		return outEntries.Count();
 	}
+}
+
+[BaseContainerProps(), SCR_BaseEditorAttributeCustomTitle()]
+class INF_TravelExitSpeedEditorAttribute : INF_TravelSettingEditorAttribute
+{
+}
+
+[BaseContainerProps(), SCR_BaseEditorAttributeCustomTitle()]
+class INF_TravelEntryDurationEditorAttribute : INF_TravelSettingEditorAttribute
+{
+}
+
+[BaseContainerProps(), SCR_BaseEditorAttributeCustomTitle()]
+class INF_TravelExitDurationEditorAttribute : INF_TravelSettingEditorAttribute
+{
 }
 
 modded class INS_MaxConcurrentCounterAttacksEditorAttribute

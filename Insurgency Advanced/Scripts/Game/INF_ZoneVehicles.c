@@ -56,6 +56,7 @@ modded class INS_AmbientVehicleManager
 	protected INF_StaggerGate m_INFSpawnGate = INF_StaggerGate.Spawns();
 	protected INF_StaggerGate m_INFDespawnGate = INF_StaggerGate.Despawns();
 	protected ref map<string, bool> m_INFZoneVehicleRolls = new map<string, bool>();
+	protected ref map<string, float> m_INFZoneVehicleRetryAt = new map<string, float>();
 	protected bool m_INFZoneVehiclesStopped;
 	protected float m_fINFZonePauseUntil;
 	protected bool m_bINFZoneVehicleTickQueued;
@@ -696,7 +697,11 @@ modded class INS_AmbientVehicleManager
 			&& !INF_ZoneOpenPosition(zone.m_vCenter, players, pos, yaw, minimumDistance))
 		{
 			if (!INF_ZoneVehicleReinforcement(zone.m_vCenter, players, minimumDistance, pos, yaw, destination))
+			{
+				Print("[INF_ZoneVehicles] No placement found for zone " + INF_BuildingGrid.Key(zone.m_vCenter) + "; retrying in 30s.", LogLevel.WARNING);
+				m_INFZoneVehicleRetryAt.Set(INF_BuildingGrid.Key(zone.m_vCenter), GetGame().GetWorld().GetWorldTime() + 30000);
 				return;
+			}
 		}
 		else
 			destination = pos;
@@ -708,7 +713,10 @@ modded class INS_AmbientVehicleManager
 			return;
 		}
 		if (!m_INFSpawnGate.TryReserve())
+		{
+			m_INFZoneVehicleRetryAt.Set(INF_BuildingGrid.Key(zone.m_vCenter), GetGame().GetWorld().GetWorldTime() + 30000);
 			return;
+		}
 		EntitySpawnParams params = new EntitySpawnParams();
 		params.TransformMode = ETransformMode.WORLD;
 		Math3D.AnglesToMatrix(Vector(yaw, 0, 0), params.Transform);
@@ -1022,10 +1030,23 @@ modded class INS_AmbientVehicleManager
 			if (!zone.m_bActive || zone.m_bINFMarkedCleared || zone.m_bINFPermanent || zone.m_bINFAttackActive)
 				continue;
 			string key = INF_BuildingGrid.Key(zone.m_vCenter);
-			if (m_INFZoneVehicleRolls.Contains(key))
-				continue;
-			m_INFZoneVehicleRolls.Set(key, true);
-			if (Math.RandomInt(0, 100) < m_iINFZoneVehicleChance)
+			float retryAt;
+			bool attempt = m_INFZoneVehicleRetryAt.Find(key, retryAt);
+			if (attempt)
+			{
+				// A zone that won its roll but found no site keeps trying; it does not reroll.
+				if (now < retryAt)
+					continue;
+				m_INFZoneVehicleRetryAt.Remove(key);
+			}
+			else
+			{
+				if (m_INFZoneVehicleRolls.Contains(key))
+					continue;
+				m_INFZoneVehicleRolls.Set(key, true);
+				attempt = Math.RandomInt(0, 100) < m_iINFZoneVehicleChance;
+			}
+			if (attempt)
 			{
 				players = patrols.INF_GetZoneStates().GetPresence(false, true).m_AllPlayers;
 				INF_TryZoneVehicle(zone, players);

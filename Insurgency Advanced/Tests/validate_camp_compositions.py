@@ -94,11 +94,13 @@ class CampCompositions(unittest.TestCase):
             "INF_MissionEndModeEditorAttribute": "{6AA19CB200000301}",
             "INS_DebugCacheMarkersEditorAttribute": "{494E53000000001C}",
         }
-        travel = {("INF_TravelSettingEditorAttribute", guid) for guid in (
-            "{6AA19CB200000309}", "{6AA19CB20000030B}",
-            "{6AA19CB20000030D}", "{6AA19CB20000030F}")}
-        vehicles = {("INF_ZoneVehicleSettingEditorAttribute", guid) for guid in (
-            "{6AA19CB200000610}", "{6AA19CB200000612}")}
+        travel = {(name, guid) for name, guid in (
+            ("INF_TravelSettingEditorAttribute", "{6AA19CB200000309}"),
+            ("INF_TravelExitSpeedEditorAttribute", "{6AA19CB20000030B}"),
+            ("INF_TravelEntryDurationEditorAttribute", "{6AA19CB20000030D}"),
+            ("INF_TravelExitDurationEditorAttribute", "{6AA19CB20000030F}"))}
+        vehicles = {("INF_ZoneVehicleSettingEditorAttribute", "{6AA19CB200000610}"),
+                    ("INF_ZoneVehicleLimitEditorAttribute", "{6AA19CB200000612}")}
         self.assertEqual(set(attributes), set(expected.items()) | travel | vehicles)
 
     def test_custom_runtime_settings_also_have_workbench_attributes(self):

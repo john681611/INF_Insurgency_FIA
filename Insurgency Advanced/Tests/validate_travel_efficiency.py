@@ -95,7 +95,7 @@ class TravelEfficiency(unittest.TestCase):
         self.assertIn("s_FastPlayers.Remove(s_FastPlayers.GetKey(stale))", RULES)
 
     def test_all_four_settings_are_wired_and_reset_only_travel_state(self):
-        entries = re.findall(r'INF_TravelSettingEditorAttribute\s+"[^"]+"\s*\{\s*m_iSetting (\d)', CONFIG)
+        entries = re.findall(r'INF_Travel\w*EditorAttribute\s+"[^"]+"\s*\{\s*m_iSetting (\d)', CONFIG)
         self.assertEqual(entries, ["0", "1", "2", "3"])
         self.assertIn("patrols.INF_GetTravelSetting(m_iSetting)", EDITOR)
         self.assertIn("patrols.INF_SetTravelSetting(m_iSetting, var.GetFloat())", EDITOR)
