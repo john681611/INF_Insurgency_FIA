@@ -15,6 +15,9 @@ CONFIG = (ROOT / "Configs" / "Editor" / "AttributeLists" / "Edit.conf").read_tex
 
 
 def body(signature):
+    # Zone vehicle creation is split across placement and a queued spawn step.
+    if signature == "protected void INF_TryZoneVehicle(":
+        return method_body(SOURCE, signature) + method_body(SOURCE, "protected void INF_SpawnZoneVehicle(")
     return method_body(SOURCE, signature)
 
 

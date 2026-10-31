@@ -48,6 +48,7 @@ class INF_ZoneVehicle
 
 modded class INS_AmbientVehicleManager
 {
+	static const int INF_ZONE_VEHICLE_MAX_ATTEMPTS = 5;
 	[Attribute("30", UIWidgets.Slider, "Chance per eligible zone per mission. Zero prevents new zone vehicles.", "0 100 1", category: "Zone Vehicles"), RplProp()]
 	protected int m_iINFZoneVehicleChance = 30;
 	[Attribute("6", UIWidgets.Slider, "Zone vehicle cap, independent of ambient route vehicles. Lowering affects future admissions.", "0 32 1", category: "Zone Vehicles"), RplProp()]
@@ -57,6 +58,8 @@ modded class INS_AmbientVehicleManager
 	protected INF_StaggerGate m_INFDespawnGate = INF_StaggerGate.Despawns();
 	protected ref map<string, bool> m_INFZoneVehicleRolls = new map<string, bool>();
 	protected ref map<string, float> m_INFZoneVehicleRetryAt = new map<string, float>();
+	protected ref map<string, int> m_INFZoneVehicleAttempts = new map<string, int>();
+	protected int m_iINFZonePending;
 	protected bool m_INFZoneVehiclesStopped;
 	protected float m_fINFZonePauseUntil;
 	protected bool m_bINFZoneVehicleTickQueued;
@@ -155,6 +158,8 @@ modded class INS_AmbientVehicleManager
 		m_INFZoneVehiclesStopped = true;
 		GetGame().GetCallqueue().Remove(INF_ZoneVehicleTick);
 		GetGame().GetCallqueue().Remove(INF_ZoneSpawnCrew);
+		GetGame().GetCallqueue().Remove(INF_SpawnZoneVehicle);
+		m_iINFZonePending = 0;
 		GetGame().GetCallqueue().Remove(INF_ZoneWreckCheck);
 		GetGame().GetCallqueue().Remove(WreckPlayerExitPoll);
 		m_CallQueue.Remove(WreckCleanupCheck);
@@ -698,24 +703,54 @@ modded class INS_AmbientVehicleManager
 		{
 			if (!INF_ZoneVehicleReinforcement(zone.m_vCenter, players, minimumDistance, pos, yaw, destination))
 			{
-				Print("[INF_ZoneVehicles] No placement found for zone " + INF_BuildingGrid.Key(zone.m_vCenter) + "; retrying in 30s.", LogLevel.WARNING);
-				m_INFZoneVehicleRetryAt.Set(INF_BuildingGrid.Key(zone.m_vCenter), GetGame().GetWorld().GetWorldTime() + 30000);
+				INF_ZoneVehicleRetry(zone, "No placement found");
 				return;
 			}
 		}
 		else
 			destination = pos;
 		ResourceName prefab = m_aVehiclePrefabs[Math.RandomInt(0, m_aVehiclePrefabs.Count())];
+		m_iINFZonePending++;
+		GetGame().GetCallqueue().CallLater(INF_SpawnZoneVehicle, m_INFSpawnGate.Reserve(), false,
+			zone, prefab, pos, yaw, destination, minimumDistance);
+	}
+
+	protected void INF_ZoneVehicleRetry(INS_AmbientPatrolZoneState zone, string reason)
+	{
+		string key = INF_BuildingGrid.Key(zone.m_vCenter);
+		int attempts;
+		m_INFZoneVehicleAttempts.Find(key, attempts);
+		attempts++;
+		m_INFZoneVehicleAttempts.Set(key, attempts);
+		if (attempts >= INF_ZONE_VEHICLE_MAX_ATTEMPTS)
+		{
+			Print("[INF_ZoneVehicles] " + reason + " for zone " + key + "; giving up after " + attempts + " attempts.", LogLevel.WARNING);
+			return;
+		}
+		Print("[INF_ZoneVehicles] " + reason + " for zone " + key + "; retrying in 30s.", LogLevel.WARNING);
+		m_INFZoneVehicleRetryAt.Set(key, GetGame().GetWorld().GetWorldTime() + 30000);
+	}
+
+	// Runs after the queued spawn slot; placement was chosen earlier, so re-check the cheap conditions.
+	protected void INF_SpawnZoneVehicle(INS_AmbientPatrolZoneState zone, ResourceName prefab, vector pos, float yaw,
+		vector destination, float minimumDistance)
+	{
+		m_iINFZonePending = Math.Max(0, m_iINFZonePending - 1);
+		INS_AmbientPatrolManager patrols = INF_ZoneEditorContext.Grid(GetOwner());
+		if (!Replication.IsServer() || m_INFZoneVehiclesStopped || !patrols || !patrols.INF_GetZoneStates())
+			return;
+		array<vector> players = patrols.INF_GetZoneStates().GetPresence(false, true).m_AllPlayers;
+		if (!zone.m_bActive || zone.m_bINFMarkedCleared || players.IsEmpty()
+			|| !INF_BuildingGrid.PositionAllowed(pos, players, minimumDistance, m_fActivationRadius)
+			|| !INF_ZoneHidden(pos, players) || INF_VehiclePositionOccupied(pos))
+		{
+			INF_ZoneVehicleRetry(zone, "Queued placement no longer valid");
+			return;
+		}
 		Resource resource = Resource.Load(prefab);
 		if (!resource || !resource.IsValid())
 		{
 			Print("[INF_ZoneVehicles] Cannot load configured vehicle: " + prefab, LogLevel.ERROR);
-			return;
-		}
-		if (!m_INFSpawnGate.TryReserve())
-		{
-			Print("[INF_ZoneVehicles] Spawn gate busy for zone " + INF_BuildingGrid.Key(zone.m_vCenter) + "; retrying in 30s.", LogLevel.WARNING);
-			m_INFZoneVehicleRetryAt.Set(INF_BuildingGrid.Key(zone.m_vCenter), GetGame().GetWorld().GetWorldTime() + 30000);
 			return;
 		}
 		EntitySpawnParams params = new EntitySpawnParams();
@@ -756,9 +791,7 @@ modded class INS_AmbientVehicleManager
 		m_INFZoneVehicles.Insert(unit);
 		Print(string.Format("[INF_ZoneVehicles] Spawned %1 in zone %2 at %3.", prefab, INF_BuildingGrid.Key(zone.m_vCenter), pos));
 		GetGame().GetCallqueue().CallLater(INF_ZoneSpawnCrew, 500, false, unit);
-		INS_AmbientPatrolManager patrols = INF_ZoneEditorContext.Grid(GetOwner());
-		if (patrols && patrols.INF_GetZoneStates())
-			patrols.INF_GetZoneStates().InvalidatePresence();
+		patrols.INF_GetZoneStates().InvalidatePresence();
 	}
 
 	protected void INF_ZoneSpawnCrew(INF_ZoneVehicle unit)
@@ -1025,7 +1058,7 @@ modded class INS_AmbientVehicleManager
 		}
 		if (!patrols || !patrols.INF_AreZonesReady() || now < m_fINFZonePauseUntil || players.IsEmpty()
 			|| m_iINFZoneVehicleChance == 0
-			|| m_INFZoneVehicles.Count() >= m_iINFZoneVehicleLimit || m_aVehiclePrefabs.IsEmpty())
+			|| m_INFZoneVehicles.Count() + m_iINFZonePending >= m_iINFZoneVehicleLimit || m_aVehiclePrefabs.IsEmpty())
 			return;
 		foreach (INS_AmbientPatrolZoneState zone : patrols.INF_GetZoneStates().GetActiveZones())
 		{
