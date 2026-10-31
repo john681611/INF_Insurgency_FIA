@@ -714,6 +714,7 @@ modded class INS_AmbientVehicleManager
 		}
 		if (!m_INFSpawnGate.TryReserve())
 		{
+			Print("[INF_ZoneVehicles] Spawn gate busy for zone " + INF_BuildingGrid.Key(zone.m_vCenter) + "; retrying in 30s.", LogLevel.WARNING);
 			m_INFZoneVehicleRetryAt.Set(INF_BuildingGrid.Key(zone.m_vCenter), GetGame().GetWorld().GetWorldTime() + 30000);
 			return;
 		}
@@ -753,6 +754,7 @@ modded class INS_AmbientVehicleManager
 		unit.m_Deadline = GetGame().GetWorld().GetWorldTime() + 15000;
 		zone.m_fINFSpawnReadyAt = Math.Max(zone.m_fINFSpawnReadyAt, unit.m_Deadline);
 		m_INFZoneVehicles.Insert(unit);
+		Print(string.Format("[INF_ZoneVehicles] Spawned %1 in zone %2 at %3.", prefab, INF_BuildingGrid.Key(zone.m_vCenter), pos));
 		GetGame().GetCallqueue().CallLater(INF_ZoneSpawnCrew, 500, false, unit);
 		INS_AmbientPatrolManager patrols = INF_ZoneEditorContext.Grid(GetOwner());
 		if (patrols && patrols.INF_GetZoneStates())
