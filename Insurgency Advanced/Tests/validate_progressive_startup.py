@@ -146,7 +146,7 @@ class ProgressiveStartup(unittest.TestCase):
         tick = body(GRID, "override protected void TickProximityCheck()")
         self.assertIn("!INF_AreZonesReady()", tick)
         self.assertNotIn("AreCachesReady()", tick)
-        self.assertIn("!patrols.INF_AreZonesReady()", VEHICLES)
+        self.assertIn("INF_OnZoneActivated(state)", body(GRID, "override protected void ActivateZone("))
         objectives = body(INTEL, "protected void INF_UpdateCampaignObjectives()")
         self.assertIn('!patrols || patrols.INF_AreCampsReady()', objectives)
         self.assertIn("if (!discoveryReady)", objectives)

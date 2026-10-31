@@ -101,15 +101,28 @@ class ZoneVehicles(unittest.TestCase):
     def test_sparse_chance_thresholds_and_single_roll_per_zone(self):
         for chance in (0, 15, 100):
             self.assertEqual(sum(roll < chance for roll in range(100)), chance)
-        tick = body("protected void INF_ZoneVehicleTick()")
-        self.assertIn("Math.RandomInt(0, 100) < m_iINFZoneVehicleChance", tick)
-        self.assertLess(tick.index("m_INFZoneVehicleRolls.Contains(key)"),
-                        tick.index("m_INFZoneVehicleRolls.Set(key, true)"))
-        self.assertLess(tick.index("m_INFZoneVehicleRolls.Set(key, true)"),
-                        tick.index("INF_TryZoneVehicle(zone, players)"))
-        for guard in ("!zone.m_bActive", "zone.m_bINFMarkedCleared",
-                      "zone.m_bINFPermanent", "zone.m_bINFAttackActive"):
-            self.assertIn(guard, tick)
+        activated = body("void INF_OnZoneActivated(")
+        self.assertIn("Math.RandomInt(0, 100) < m_iINFZoneVehicleChance", activated)
+        self.assertIn("m_bINFZoneVehicleWinCarried ||", activated)
+        self.assertLess(activated.index("m_INFZoneVehicleRolls.Contains(key)"),
+                        activated.index("m_INFZoneVehicleRolls.Set(key, true)"))
+        self.assertLess(activated.index("m_INFZoneVehicleRolls.Set(key, true)"),
+                        activated.index("INF_TryZoneVehicle(zone, players)"))
+        self.assertIn("m_INFZoneVehicles.Count() + m_iINFZonePending >= m_iINFZoneVehicleLimit", activated)
+        activate = method_body(GRID, "override protected void ActivateZone(")
+        self.assertLess(activate.index("INF_OnZoneActivated(state)"), activate.index("CallLater(INF_SpawnQueued"))
+        for guard in ("state.m_bINFMarkedCleared", "state.m_bINFPermanent", "state.m_bINFAttackActive"):
+            self.assertIn(guard, activate)
+
+    def test_failed_placement_passes_the_win_to_the_next_activating_zone(self):
+        carry = body("protected void INF_CarryZoneVehicleWin(")
+        self.assertIn("m_bINFZoneVehicleWinCarried = true", carry)
+        spawn = body("protected void INF_TryZoneVehicle(")
+        self.assertIn('INF_CarryZoneVehicleWin(zone, "No placement found")', spawn)
+        self.assertLess(spawn.index("INF_CarryZoneVehicleWin("), spawn.index("m_bINFZoneVehicleWinCarried = false"))
+        self.assertIn("INF_CarryZoneVehicleWin(zone,", body("protected void INF_SpawnZoneVehicle("))
+        self.assertNotIn("INF_ZoneVehicleTick", SOURCE)
+        self.assertNotIn("INF_ScheduleZoneVehicles", SOURCE + GRID + BLOCK)
 
     def test_reuses_current_vehicle_list_and_native_crew_not_a_duplicate_pool(self):
         spawn = body("protected void INF_TryZoneVehicle(")
@@ -231,7 +244,7 @@ class ZoneVehicles(unittest.TestCase):
         self.assertNotIn("control.ActivateAI()", resolve)
         self.assertIn("unit.m_Groups.Insert(group)", resolve)
         self.assertIn("unit.m_Zone.m_bEverHadLiving = true", resolve)
-        tick = body("protected void INF_ZoneVehicleTick()")
+        tick = body("void INF_MaintainZoneVehicles(")
         self.assertIn("unit.m_Zone.m_bEverHadLiving = true", tick)
         self.assertLess(tick.index("INF_ZoneCrewCount(unit) == 0"),
                         tick.index("unit.m_Zone.m_bEverHadLiving = true"))
@@ -329,7 +342,7 @@ class ZoneVehicles(unittest.TestCase):
         self.assertIn("unit.m_Agent.m_bINFPassengersReady", resolve)
         self.assertLess(resolve.index("if (!resolved"), resolve.index("AssignDriveWaypoint"))
         self.assertLess(resolve.index("INF_ZoneCrewCount(unit) == 0"), resolve.index("if (!resolved"))
-        tick = body("protected void INF_ZoneVehicleTick()")
+        tick = body("void INF_MaintainZoneVehicles(")
         self.assertIn("now >= unit.m_Deadline", tick)
         self.assertIn("LogLevel.ERROR", tick)
 
@@ -347,24 +360,22 @@ class ZoneVehicles(unittest.TestCase):
         self.assertNotIn("unit.m_Crew.Clear()", resolve)
         self.assertIn("if (!member)", resolve)
 
-    def test_queue_is_server_owned_and_works_without_ambient_routes(self):
-        start = body("override void OnGameModeStart()")
-        self.assertIn("super.OnGameModeStart()", start)
-        self.assertIn("Replication.IsServer()", start)
-        self.assertIn("INF_ScheduleZoneVehicles()", start)
-        schedule = body("void INF_ScheduleZoneVehicles()")
-        self.assertIn("!Replication.IsServer()", schedule)
-        self.assertIn("CallLater(INF_ZoneVehicleTick, 5000, false)", schedule)
-        tick = body("protected void INF_ZoneVehicleTick()")
-        self.assertIn("!Replication.IsServer()", tick)
-        self.assertIn("now < m_fINFZonePauseUntil", tick)
-        self.assertNotIn("m_bJIPPause", tick)
-        self.assertNotIn("m_aRoutes", tick)
-        self.assertNotIn("m_CallQueue", tick)
+    def test_vehicles_are_driven_by_zone_activation_and_the_proximity_check_not_their_own_tick(self):
+        self.assertNotIn("OnGameModeStart", SOURCE)
+        self.assertNotIn("OnPlayerConnected", SOURCE)
+        self.assertNotIn("m_fINFZonePauseUntil", SOURCE)
+        maintain = body("void INF_MaintainZoneVehicles(")
+        self.assertIn("!Replication.IsServer()", maintain)
+        self.assertNotIn("m_bJIPPause", maintain)
+        self.assertNotIn("m_aRoutes", maintain)
+        self.assertNotIn("m_CallQueue", maintain)
+        tick = method_body(GRID, "override protected void TickProximityCheck()")
+        self.assertIn("INF_MaintainZoneVehicles(presence)", tick)
+        self.assertIn("INF_HasZoneVehicles()", tick)
 
     def test_shutdown_cancels_every_custom_callback(self):
         end = body("override void OnGameModeEnd(")
-        for method in ("INF_ZoneVehicleTick", "INF_ZoneSpawnCrew", "INF_ZoneWreckCheck"):
+        for method in ("INF_ZoneSpawnCrew", "INF_SpawnZoneVehicle", "INF_ZoneWreckCheck"):
             self.assertIn(f"Remove({method})", end)
         self.assertLess(end.index("m_INFZoneVehiclesStopped = true"), end.index("super.OnGameModeEnd"))
         self.assertIn("INF_RemoveZoneVehicle", end)
@@ -399,7 +410,7 @@ class ZoneVehicles(unittest.TestCase):
         self.assertIn("m_fWreckLifetime * 1000", poll)
 
     def test_distant_cleanup_also_checks_dismounted_crew_visibility(self):
-        tick = body("protected void INF_ZoneVehicleTick()")
+        tick = body("void INF_MaintainZoneVehicles(")
         self.assertIn("INF_ZoneHidden(member.GetOrigin(), players)", tick)
         self.assertIn("INF_ZoneHidden(position, players)", tick)
         self.assertIn("!HasPlayerOccupant(vehicle)", tick)

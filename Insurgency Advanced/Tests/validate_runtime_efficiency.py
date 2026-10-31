@@ -367,21 +367,20 @@ class RuntimeEfficiency(unittest.TestCase):
         self.assertIn("intel.INF_QueueCampaignObjectives()", ready)
         self.assertIn("intel.INF_DebugContentChanged()", ready)
 
-    def test_idle_timers_sleep_and_player_connections_wake_capture_and_vehicles(self):
+    def test_idle_timers_sleep_and_player_connections_wake_capture(self):
         capture = method_body(CORE, "protected void CaptureTick(")
         self.assertIn("!presence.m_PlayerIDs.IsEmpty()", capture)
         self.assertIn("interval = 2000", capture)
         self.assertIn("interval = 1000", capture)
         self.assertIn("WakeCapture()", method_body(GRID, "override void OnPlayerConnected("))
-        self.assertIn("INF_ScheduleZoneVehicles()", method_body(VEHICLES, "override void OnPlayerConnected("))
-        self.assertNotIn("CallLater(INF_ZoneVehicleTick, 1000, true)", VEHICLES)
+        self.assertNotIn("CallLater(INF_ZoneVehicleTick", VEHICLES)
 
     def test_slow_maintenance_keeps_fresh_cleanup_inputs_and_elapsed_thresholds(self):
         tick = method_body(GRID, "override protected void TickProximityCheck(")
         self.assertIn("Math.Max(5000, m_fCheckInterval * 1000)", tick)
         self.assertIn("now - state.m_fINFDistantSince >= INF_BlockRules.DESPAWN_DELAY_MS", tick)
         self.assertIn("GetPresence(false, true)", tick)
-        self.assertIn("CallLater(INF_ZoneVehicleTick, 5000, false)", VEHICLES)
+        self.assertNotIn("CallLater(INF_ZoneVehicleTick", VEHICLES)
         self.assertIn("unit.m_NextCleanupAt = now + 10000", VEHICLES)
         self.assertIn("m_fNextCleanupCheck = now + 10000", PRISONERS)
 

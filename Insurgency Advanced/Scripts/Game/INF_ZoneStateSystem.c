@@ -172,9 +172,6 @@ class INF_ZoneStateSystem
 			INS_AmbientPatrolManager patrols = INS_AmbientPatrolManager.Cast(m_Owner.FindComponent(INS_AmbientPatrolManager));
 			if (patrols)
 				patrols.INF_ScheduleProximity();
-			INS_AmbientVehicleManager vehicles = INS_AmbientVehicleManager.Cast(m_Owner.FindComponent(INS_AmbientVehicleManager));
-			if (vehicles)
-				vehicles.INF_ScheduleZoneVehicles();
 		}
 		m_Attacks.RemoveItem(state);
 		if (state.m_bINFAttackPending || state.m_bINFAttackActive)

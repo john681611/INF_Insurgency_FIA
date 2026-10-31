@@ -218,8 +218,8 @@ ordering calculate distances once per list and use stable O(n log n) sorting.
 Player activation policy/grouping is reused within the current player sample;
 world changes invalidate it and mutable allocation counts are recounted separately.
 These optimizations target 32-player servers, with 128 players as a stretch target.
-Zone vehicle maintenance/eligibility runs every five seconds only while players
-or tracked vehicles require it. Distant vehicle cleanup candidates and prisoner
+Zone vehicle maintenance runs from the patrol manager's proximity check, with no
+tick of its own, while players, active zones or tracked vehicles require it. Distant vehicle cleanup candidates and prisoner
 maintenance cleanup checks use ten seconds, with fresh safety/occupancy checks.
 These intervals can delay activation/cleanup detection by one evaluation interval;
 capture holds, wave monitoring, attack retry limits and cooldowns are unchanged.
@@ -463,10 +463,9 @@ counterattack budget. Pending zone vehicles count against their vehicle cap;
 failed initialization releases that vehicle slot. Zone and ambient caps remain
 separate. Lowered limits affect future admissions rather than deleting existing
 vehicles in front of players.
-Only active hostile zones are eligible, once per zone per mission, with at
-most one vehicle. A zone that wins its roll but finds no placement retries on the
-next tick, up to 3 attempts, without rerolling; each attempt samples new random
-sites. Placement requires a nearby clear, dry, flat road position,
+Zones roll for a vehicle as they activate, before their infantry is queued, once
+per zone per mission, with at most one vehicle. A won roll that finds no placement
+passes the win to the next zone that activates. Placement requires a nearby clear, dry, flat road position,
 ambient activation/minimum player distances and concealment from all players.
 The crew holds that road position with the native vehicle move order rather
 than receiving infantry Defend orders that could dismount it. This is not
@@ -476,8 +475,8 @@ Initialization has a 15-second guarded window and explicit failure logging.
 Cleanup preserves players and nearby secured prisoners, including seated
 prisoners. Abandoned prisoners follow their recorded cleanup rules rather than
 permanently blocking vehicle/wreck cleanup; blocked wreck checks retry.
-New zone admissions pause during joining without depending on ambient routes
-or their private queue. Mission end cancels all custom lifecycle callbacks.
+Zone activation, which the existing join pause already gates, is the only admission
+path, so vehicles need no ambient routes or private queue. Mission end cancels all custom lifecycle callbacks.
 Runtime vehicles/crews are not written into terrain indexes or mission saves.
 Zone vehicles prefer road placement, then try up to 32 open-ground positions
 inside the zone with up to four headings per position. Open-ground placement

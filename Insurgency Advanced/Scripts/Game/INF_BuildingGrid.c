@@ -937,6 +937,10 @@ modded class INS_AmbientPatrolManager
 			state.m_iINFPendingGroups = state.m_iGroupCount;
 			state.m_iINFReservedAI = state.m_iINFPlannedAI;
 			m_INFZoneStates.NotifyChanged(state);
+			// Vehicle first so it takes an earlier spawn slot than the zone's infantry.
+			INS_AmbientVehicleManager zoneVehicles = INS_AmbientVehicleManager.Cast(GetOwner().FindComponent(INS_AmbientVehicleManager));
+			if (zoneVehicles)
+				zoneVehicles.INF_OnZoneActivated(state);
 			for (int i = 0; i < state.m_iGroupCount; i++)
 			{
 				vector pos = INS_ZoneHelpers.RandomPositionInRadius(state.m_vCenter, state.m_fRadius);
@@ -1156,8 +1160,12 @@ modded class INS_AmbientPatrolManager
 		}
 		m_fINFNextProximityAt = now + Math.Max(5000, m_fCheckInterval * 1000);
 		INF_BlockPresence presence = m_INFZoneStates.GetPresence();
-		if (!presence.m_PlayerIDs.IsEmpty() || !m_INFZoneStates.GetActiveZones().IsEmpty())
+		INS_AmbientVehicleManager zoneVehicles = INS_AmbientVehicleManager.Cast(GetOwner().FindComponent(INS_AmbientVehicleManager));
+		if (!presence.m_PlayerIDs.IsEmpty() || !m_INFZoneStates.GetActiveZones().IsEmpty()
+			|| (zoneVehicles && zoneVehicles.INF_HasZoneVehicles()))
 			INF_ScheduleProximity();
+		if (zoneVehicles)
+			zoneVehicles.INF_MaintainZoneVehicles(presence);
 		array<INS_AmbientPatrolZoneState> activeZones = {};
 		activeZones.Copy(m_INFZoneStates.GetActiveZones());
 		foreach (INS_AmbientPatrolZoneState state : activeZones)
