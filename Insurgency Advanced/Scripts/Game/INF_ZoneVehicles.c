@@ -58,6 +58,7 @@ modded class INS_AmbientVehicleManager
 	protected ref map<string, bool> m_INFZoneVehicleRolls = new map<string, bool>();
 	protected bool m_bINFZoneVehicleWinCarried;
 	protected int m_iINFZonePending;
+	protected ref array<vector> m_aINFZonePendingPositions = {};
 	protected bool m_INFZoneVehiclesStopped;
 	protected ref array<vector> m_INFRejectedVehiclePositions = {};
 	protected ref map<string, float> m_INFVehicleSearchRetry = new map<string, float>();
@@ -138,6 +139,7 @@ modded class INS_AmbientVehicleManager
 		GetGame().GetCallqueue().Remove(INF_ZoneSpawnCrew);
 		GetGame().GetCallqueue().Remove(INF_SpawnZoneVehicle);
 		m_iINFZonePending = 0;
+		m_aINFZonePendingPositions.Clear();
 		GetGame().GetCallqueue().Remove(INF_ZoneWreckCheck);
 		GetGame().GetCallqueue().Remove(WreckPlayerExitPoll);
 		m_CallQueue.Remove(WreckCleanupCheck);
@@ -521,6 +523,11 @@ modded class INS_AmbientVehicleManager
 
 	protected bool INF_VehiclePositionOccupied(vector point)
 	{
+		foreach (vector queued : m_aINFZonePendingPositions)
+		{
+			if (vector.DistanceSqXZ(point, queued) < 2500)
+				return true;
+		}
 		foreach (vector rejected : m_INFRejectedVehiclePositions)
 		{
 			if (vector.DistanceSqXZ(point, rejected) <= 25)
@@ -700,6 +707,7 @@ modded class INS_AmbientVehicleManager
 		ResourceName prefab = m_aVehiclePrefabs[Math.RandomInt(0, m_aVehiclePrefabs.Count())];
 		m_bINFZoneVehicleWinCarried = false;
 		m_iINFZonePending++;
+		m_aINFZonePendingPositions.Insert(pos);
 		GetGame().GetCallqueue().CallLater(INF_SpawnZoneVehicle, m_INFSpawnGate.Reserve(), false,
 			zone, prefab, pos, yaw, destination, minimumDistance);
 	}
@@ -716,15 +724,27 @@ modded class INS_AmbientVehicleManager
 		vector destination, float minimumDistance)
 	{
 		m_iINFZonePending = Math.Max(0, m_iINFZonePending - 1);
+		int pendingIndex = m_aINFZonePendingPositions.Find(pos);
+		if (pendingIndex >= 0)
+			m_aINFZonePendingPositions.Remove(pendingIndex);
 		INS_AmbientPatrolManager patrols = INF_ZoneEditorContext.Grid(GetOwner());
 		if (!Replication.IsServer() || m_INFZoneVehiclesStopped || !patrols || !patrols.INF_GetZoneStates())
 			return;
 		array<vector> players = patrols.INF_GetZoneStates().GetPresence(false, true).m_AllPlayers;
-		if (!zone.m_bActive || zone.m_bINFMarkedCleared || players.IsEmpty()
-			|| !INF_BuildingGrid.PositionAllowed(pos, players, minimumDistance, m_fActivationRadius)
-			|| !INF_ZoneHidden(pos, players) || INF_VehiclePositionOccupied(pos))
+		string invalid;
+		if (!zone.m_bActive || zone.m_bINFMarkedCleared)
+			invalid = "zone no longer active";
+		else if (players.IsEmpty())
+			invalid = "no players";
+		else if (!INF_BuildingGrid.PositionAllowed(pos, players, minimumDistance, m_fActivationRadius))
+			invalid = "player distance or spawn protection";
+		else if (!INF_ZoneHidden(pos, players))
+			invalid = "visible to a player";
+		else if (INF_VehiclePositionOccupied(pos))
+			invalid = "another vehicle is within 50m";
+		if (invalid != "")
 		{
-			INF_CarryZoneVehicleWin(zone, "Queued placement no longer valid");
+			INF_CarryZoneVehicleWin(zone, "Queued placement no longer valid (" + invalid + ")");
 			return;
 		}
 		Resource resource = Resource.Load(prefab);
