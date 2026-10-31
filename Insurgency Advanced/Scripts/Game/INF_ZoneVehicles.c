@@ -48,7 +48,8 @@ class INF_ZoneVehicle
 
 modded class INS_AmbientVehicleManager
 {
-	static const int INF_ZONE_VEHICLE_MAX_ATTEMPTS = 5;
+	static const int INF_ZONE_VEHICLE_MAX_ATTEMPTS = 3;
+	static const int INF_ZONE_VEHICLE_RETRY_MS = 5000;
 	[Attribute("30", UIWidgets.Slider, "Chance per eligible zone per mission. Zero prevents new zone vehicles.", "0 100 1", category: "Zone Vehicles"), RplProp()]
 	protected int m_iINFZoneVehicleChance = 30;
 	[Attribute("6", UIWidgets.Slider, "Zone vehicle cap, independent of ambient route vehicles. Lowering affects future admissions.", "0 32 1", category: "Zone Vehicles"), RplProp()]
@@ -727,8 +728,8 @@ modded class INS_AmbientVehicleManager
 			Print("[INF_ZoneVehicles] " + reason + " for zone " + key + "; giving up after " + attempts + " attempts.", LogLevel.WARNING);
 			return;
 		}
-		Print("[INF_ZoneVehicles] " + reason + " for zone " + key + "; retrying in 30s.", LogLevel.WARNING);
-		m_INFZoneVehicleRetryAt.Set(key, GetGame().GetWorld().GetWorldTime() + 30000);
+		Print("[INF_ZoneVehicles] " + reason + " for zone " + key + "; retrying next tick.", LogLevel.WARNING);
+		m_INFZoneVehicleRetryAt.Set(key, GetGame().GetWorld().GetWorldTime() + INF_ZONE_VEHICLE_RETRY_MS);
 	}
 
 	// Runs after the queued spawn slot; placement was chosen earlier, so re-check the cheap conditions.
