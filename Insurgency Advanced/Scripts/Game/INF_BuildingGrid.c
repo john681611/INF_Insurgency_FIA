@@ -62,13 +62,14 @@ class INF_SpawnProtection
 		Faction faction = patrols.INF_GetPlayerFaction();
 		if (!faction)
 			return false;
-		array<SCR_SpawnPoint> points = SCR_SpawnPoint.GetSpawnPointsForFaction(faction.GetFactionKey());
+		array<SCR_SpawnPoint> points = SCR_SpawnPoint.GetSpawnPoints();
 		if (!points)
 			return false;
+		string factionKey = faction.GetFactionKey();
 		foreach (SCR_SpawnPoint point : points)
 		{
 			// Personal spawn points follow a player and are not a base.
-			if (!point || !point.IsSpawnPointEnabled() || SCR_PlayerSpawnPoint.Cast(point))
+			if (!point || !point.IsSpawnPointEnabled() || point.GetFactionKey() != factionKey || SCR_PlayerSpawnPoint.Cast(point))
 				continue;
 			if (vector.DistanceSqXZ(pos, point.GetOrigin()) <= RADIUS * RADIUS)
 				return true;

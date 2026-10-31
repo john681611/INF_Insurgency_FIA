@@ -13,7 +13,8 @@ VEHICLES = (SCRIPTS / "INF_ZoneVehicles.c").read_text()
 class SpawnProtection(unittest.TestCase):
     def test_only_enabled_friendly_non_personal_points_protect(self):
         body = method_body(GRID, "static bool Contains(vector pos)")
-        self.assertIn("GetSpawnPointsForFaction(faction.GetFactionKey())", body)
+        self.assertIn("SCR_SpawnPoint.GetSpawnPoints()", body)
+        self.assertIn("point.GetFactionKey() != factionKey", body)
         self.assertIn("IsSpawnPointEnabled()", body)
         self.assertIn("SCR_PlayerSpawnPoint.Cast(point)", body)
         self.assertIn("RADIUS * RADIUS", body)
