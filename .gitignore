@@ -2,3 +2,7 @@
 !/.gitignore
 !/Insurgency*/
 !/AGENTS.md
+
+__pycache__/
+*.pyc
+*.rdb
