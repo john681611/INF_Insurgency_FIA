@@ -1573,16 +1573,19 @@ modded class INS_CounterAttackZone
 modded class INS_CounterAttackManager
 {
 	protected ref array<int> m_aINFSquadBuckets = {};
-	protected bool m_bINFGridAttackQueued;
+	protected float m_fINFNextAttackStepAt;
+	protected float m_fINFNextMonitorAt;
+	protected float m_fINFLastMonitorAt = -1;
 	protected bool m_bINFGridStopped;
 	protected ref map<string, ref INS_CounterAttackZone> m_INFGridTargets = new map<string, ref INS_CounterAttackZone>();
 
+	// Wakes the shared zone loop; the attack work itself runs from INF_StepAttacks.
 	void INF_ScheduleGridAttacks()
 	{
-		if (!Replication.IsServer() || m_bINFGridAttackQueued || m_bINFGridStopped)
+		INS_AmbientPatrolManager patrols = INS_AmbientPatrolManager.Cast(GetOwner().FindComponent(INS_AmbientPatrolManager));
+		if (!Replication.IsServer() || m_bINFGridStopped || !patrols || !patrols.INF_GetZoneStates())
 			return;
-		m_bINFGridAttackQueued = true;
-		m_CallQueue.CallLater(CounterAttackTick, 5000, false);
+		patrols.INF_GetZoneStates().WakeLoop();
 	}
 
 	protected INS_CounterAttackZone INF_GetGridTarget(INS_AmbientPatrolZoneState cell)
@@ -1630,16 +1633,11 @@ modded class INS_CounterAttackManager
 			return;
 		ApplyMissionHeader();
 		GetGame().GetCallqueue().CallLater(TickCallQueue, 100, true);
-		if (m_bEnabled)
-		{
-			m_CallQueue.CallLater(MonitorTick, (int)(m_fCheckInterval * 1000), true);
-		}
 	}
 
 	override void OnGameModeEnd(SCR_GameModeEndData data)
 	{
 		m_bINFGridStopped = true;
-		m_CallQueue.Remove(CounterAttackTick);
 		m_INFGridTargets.Clear();
 		super.OnGameModeEnd(data);
 	}
@@ -1678,8 +1676,6 @@ modded class INS_CounterAttackManager
 		super.SetCounterAttackInterval(seconds);
 		if (!Replication.IsServer() || !patrols || !patrols.INF_UsesBuildingGrid() || !m_bEnabled)
 			return;
-		m_CallQueue.Remove(CounterAttackTick);
-		m_bINFGridAttackQueued = false;
 		if (patrols.INF_GetZoneStates() && !patrols.INF_GetZoneStates().GetAttackZones().IsEmpty())
 			INF_ScheduleGridAttacks();
 	}
@@ -1703,20 +1699,42 @@ modded class INS_CounterAttackManager
 			super.CounterAttackTick();
 			return;
 		}
-		m_CallQueue.Remove(CounterAttackTick);
-		if (!Replication.IsServer() || m_bJIPPause)
+		INF_ScheduleGridAttacks();
+	}
+
+	// Attack work for the shared zone loop. Pending launches and squad monitoring each keep their own due time.
+	// Returns true while the loop is still needed.
+	bool INF_StepAttacks()
+	{
+		INS_AmbientPatrolManager patrols = INS_AmbientPatrolManager.Cast(GetOwner().FindComponent(INS_AmbientPatrolManager));
+		if (!Replication.IsServer() || m_bINFGridStopped || !patrols || !patrols.INF_UsesBuildingGrid()
+			|| !patrols.INF_GetZoneStates())
+			return false;
+		float now = GetGame().GetWorld().GetWorldTime();
+		if (now >= m_fINFNextAttackStepAt)
 		{
-			m_bINFGridAttackQueued = false;
-			if (Replication.IsServer())
-				INF_ScheduleGridAttacks();
-			return;
+			m_fINFNextAttackStepAt = now + 5000;
+			INF_StepPendingAttacks(patrols, now);
 		}
-		m_bINFGridAttackQueued = false;
-		if (!patrols.INF_AreCampsReady())
+		if (now >= m_fINFNextMonitorAt)
 		{
-			INF_ScheduleGridAttacks();
-			return;
+			m_fINFNextMonitorAt = now + m_fCheckInterval * 1000;
+			INF_StepMonitor(patrols, now);
 		}
+		if (!m_aActiveSquads.IsEmpty())
+			return true;
+		foreach (INS_AmbientPatrolZoneState pending : patrols.INF_GetZoneStates().GetAttackZones())
+		{
+			if (pending.m_bINFAttackPending)
+				return true;
+		}
+		return false;
+	}
+
+	protected void INF_StepPendingAttacks(INS_AmbientPatrolManager patrols, float now)
+	{
+		if (m_bJIPPause || !patrols.INF_AreCampsReady())
+			return;
 		array<INS_AmbientPatrolZoneState> attackCells = {};
 		attackCells.Copy(patrols.INF_GetZoneStates().GetAttackZones());
 		int activeAttacks;
@@ -1726,7 +1744,6 @@ modded class INS_CounterAttackManager
 				activeAttacks++;
 		}
 		array<vector> players = patrols.INF_GetZoneStates().GetPresence(false, true).m_Players;
-		float now = GetGame().GetWorld().GetWorldTime();
 		foreach (INS_AmbientPatrolZoneState cell : attackCells)
 		{
 			if (!cell.m_bINFAttackPending || cell.m_fINFAttackRetryAt > now)
@@ -1759,14 +1776,6 @@ modded class INS_CounterAttackManager
 				patrols.INF_GetZoneStates().ResolvePendingAttack(cell, nearby);
 				if (!nearby)
 					patrols.INF_ResetAbandonedZone(cell);
-			}
-		}
-		foreach (INS_AmbientPatrolZoneState pending : patrols.INF_GetZoneStates().GetAttackZones())
-		{
-			if (pending.m_bINFAttackPending)
-			{
-				INF_ScheduleGridAttacks();
-				break;
 			}
 		}
 	}
@@ -1941,13 +1950,23 @@ modded class INS_CounterAttackManager
 			super.MonitorTick();
 			return;
 		}
-		if (!Replication.IsServer() || !patrols.INF_GetZoneStates())
-			return;
+		INF_ScheduleGridAttacks();
+	}
+
+	protected void INF_StepMonitor(INS_AmbientPatrolManager patrols, float now)
+	{
 		if (m_aActiveSquads.IsEmpty())
+		{
+			m_fINFLastMonitorAt = -1;
 			return;
+		}
+		// Abandon timers advance by real elapsed time, so the loop beat does not change their length.
+		float elapsed = m_fCheckInterval;
+		if (m_fINFLastMonitorAt >= 0)
+			elapsed = Math.Min((now - m_fINFLastMonitorAt) / 1000, m_fCheckInterval * 2);
+		m_fINFLastMonitorAt = now;
 		INF_BlockPresence presence = patrols.INF_GetZoneStates().GetPresence(false, true);
 		array<vector> players = presence.m_Players;
-		float now = GetGame().GetWorld().GetWorldTime();
 		array<INS_AmbientPatrolZoneState> attackCells = {};
 		attackCells.Copy(patrols.INF_GetZoneStates().GetAttackZones());
 		foreach (INS_AmbientPatrolZoneState cell : attackCells)
@@ -1980,7 +1999,7 @@ modded class INS_CounterAttackManager
 				bool distant = INF_BlockRules.Nearest(zone.m_vCenter, players) > INF_BlockRules.COUNTERATTACK_DESPAWN_RADIUS
 					&& INF_BlockRules.Nearest(member.m_GroupEntity.GetOrigin(), players) > INF_BlockRules.COUNTERATTACK_DESPAWN_RADIUS;
 				if (distant)
-					member.m_fNoPlayerTimer += m_fCheckInterval;
+					member.m_fNoPlayerTimer += elapsed;
 				else
 					member.m_fNoPlayerTimer = 0;
 				if ((failed || member.m_fNoPlayerTimer >= m_fAbandonDelay) && m_aINFDespawning.Find(member) < 0)

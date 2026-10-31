@@ -73,7 +73,7 @@ class CounterattackCaptureFlow(unittest.TestCase):
         self.assertFalse(zone.pending)
         self.assertIn("cell.m_fINFAttackRetryAt = now + 5000", GRID)
         self.assertIn("cell.m_iINFAttackAttempts >= 3", GRID)
-        self.assertIn("CallLater(CounterAttackTick, 5000, false)", GRID)
+        self.assertIn("m_fINFNextAttackStepAt = now + 5000", GRID)
 
     def test_presence_boundary_and_absence_count(self):
         for distance, secure in ((0, True), (300, True), (300.01, False), (1000, False)):

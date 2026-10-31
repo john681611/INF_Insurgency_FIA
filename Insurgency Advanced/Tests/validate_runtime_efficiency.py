@@ -395,8 +395,13 @@ class RuntimeEfficiency(unittest.TestCase):
         target = method_body(GRID, "protected INS_CounterAttackZone INF_GetGridTarget(")
         self.assertIn("previous.m_fINFLastLaunchAt >= 0", target)
         self.assertIn("previous.m_fINFLastLaunchAt + m_fZoneCooldown * 1000", target)
-        self.assertIn("CallLater(CounterAttackTick, 5000, false)", GRID)
-        self.assertNotIn("CallLater(CounterAttackTick, 5000, true)", GRID)
+        self.assertIn("m_fINFNextAttackStepAt = now + 5000", GRID)
+        self.assertNotIn("CallLater(CounterAttackTick", GRID)
+        self.assertNotIn("CallLater(MonitorTick", GRID)
+        self.assertIn("member.m_fNoPlayerTimer += elapsed", GRID)
+        self.assertIn("Math.Min((now - m_fINFLastMonitorAt) / 1000, m_fCheckInterval * 2)", GRID)
+        zone_loop = method_body(CORE, "protected void ZoneTick(")
+        self.assertIn("INF_StepAttacks()", zone_loop)
 
     def test_debug_checks_only_subscribers_and_skips_unchanged_snapshot_building(self):
         send = method_body(INTEL, "protected void INF_SendDebugMarkerSnapshot(")

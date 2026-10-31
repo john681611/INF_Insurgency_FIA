@@ -185,7 +185,7 @@ class INF_ZoneStateSystem
 		m_Holds.RemoveItem(state);
 		if (state.m_bINFCaptureCandidate && state.INF_IsCapturing())
 			m_Holds.Insert(state);
-		if (state.m_bActive || !m_Candidates.IsEmpty())
+		if (state.m_bActive || state.m_bINFAttackPending || state.m_bINFAttackActive || !m_Candidates.IsEmpty())
 			WakeLoop();
 		m_OnChanged.Invoke(state);
 		if (objective)
@@ -252,6 +252,9 @@ class INF_ZoneStateSystem
 		bool keepAlive = !m_Candidates.IsEmpty() && !presence.m_PlayerIDs.IsEmpty();
 		INS_AmbientPatrolManager patrols = INS_AmbientPatrolManager.Cast(m_Owner.FindComponent(INS_AmbientPatrolManager));
 		if (patrols && patrols.INF_StepProximity())
+			keepAlive = true;
+		INS_CounterAttackManager attacks = INS_CounterAttackManager.Cast(m_Owner.FindComponent(INS_CounterAttackManager));
+		if (attacks && attacks.INF_StepAttacks())
 			keepAlive = true;
 		if (keepAlive)
 			WakeLoop();
