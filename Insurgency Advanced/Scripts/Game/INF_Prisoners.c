@@ -370,6 +370,7 @@ class INF_PrisonerComponent : ScriptComponent
 			return;
 		}
 		DropCarriedWeapons();
+		ApplyRestraints();
 		UpdatePrisonerLoiter(controller);
 		float now = GetGame().GetWorld().GetWorldTime();
 		if (now >= m_fNextCleanupCheck)
@@ -381,7 +382,7 @@ class INF_PrisonerComponent : ScriptComponent
 				return;
 			}
 		}
-		// Restraints are applied once at capture; poll quickly only until the loiter pose holds.
+		// Restraints are re-applied each tick; poll quickly only until the loiter pose holds.
 		SCR_CharacterControllerComponent character = SCR_CharacterControllerComponent.Cast(controller);
 		int interval = 1000;
 		if (m_bWeaponsDropped && character && character.IsLoitering())
@@ -422,7 +423,8 @@ class INF_PrisonerComponent : ScriptComponent
 			if (type != EWeaponType.WT_RIFLE && type != EWeaponType.WT_SNIPERRIFLE
 				&& type != EWeaponType.WT_MACHINEGUN && type != EWeaponType.WT_HANDGUN
 				&& type != EWeaponType.WT_ROCKETLAUNCHER && type != EWeaponType.WT_GRENADELAUNCHER
-				&& type != EWeaponType.WT_AUTOCANNON)
+				&& type != EWeaponType.WT_AUTOCANNON
+				&& type != EWeaponType.WT_FRAGGRENADE && type != EWeaponType.WT_SMOKEGRENADE)
 				continue;
 			foundWeapon = true;
 			if (!inventory.TryRemoveItemFromInventory(item))

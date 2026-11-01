@@ -124,10 +124,9 @@ class Prisoners(unittest.TestCase):
                      "inventory.TryRemoveItemFromInventory(item)", "WarnHandling"):
             self.assertIn(text, drop)
         for kind in ("RIFLE", "SNIPERRIFLE", "MACHINEGUN", "HANDGUN",
-                     "ROCKETLAUNCHER", "GRENADELAUNCHER", "AUTOCANNON"):
-            self.assertIn("EWeaponType.WT_" + kind, drop)
-        for kind in ("FRAGGRENADE", "SMOKEGRENADE"):
-            self.assertNotIn("EWeaponType.WT_" + kind, drop)
+                     "ROCKETLAUNCHER",                      "GRENADELAUNCHER", "AUTOCANNON",
+                                          "FRAGGRENADE", "SMOKEGRENADE"):
+                                 self.assertIn("EWeaponType.WT_" + kind, drop)
         self.assertNotIn("DeleteEntity", drop)
         self.assertIn("if (!foundWeapon)", drop)
         capture = method(SOURCE, "void Capture(", "void Question(")
@@ -331,7 +330,7 @@ class Prisoners(unittest.TestCase):
         self.assertEqual(SOURCE.count("Remove(MaintainRestraints)"), 1)
         maintenance = method(SOURCE, "void MaintainRestraints(", "void OnCapturedChanged(")
         self.assertIn("ECharacterLifeState.DEAD", maintenance)
-        self.assertNotIn("ApplyRestraints()", method(SOURCE, "void MaintainRestraints(", "void WarnHandling("))
+        self.assertIn("ApplyRestraints()", method(SOURCE, "void MaintainRestraints(", "void WarnHandling("))
         self.assertIn("CallLater(MaintainRestraints, interval, false)", maintenance)
 
     def test_reliable_dialogue_only_goes_to_questioning_player(self):
