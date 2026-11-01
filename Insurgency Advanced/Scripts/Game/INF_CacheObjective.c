@@ -111,6 +111,25 @@ modded class INS_IntelManager
 	protected bool m_bINFDebugCachesEnabled;
 	protected ref array<SCR_MapMarkerBase> m_aINFCampDebugMarkers = {};
 	protected bool m_bINFDebugClearWarning;
+	protected ref array<SCR_MapMarkerBase> m_aINFBaseMarkers = {};
+	protected ref array<vector> m_aINFBasePositions = {};
+	protected ref array<string> m_aINFBaseNames = {};
+	protected ref array<int> m_aINFBaseKinds = {};
+
+	// 0 = player-built base, 1 = captured camp, 2 = command post (a campaign military base).
+	protected int INF_GetBaseKind(IEntity entity)
+	{
+		int kind;
+		while (entity)
+		{
+			if (entity.FindComponent(SCR_CampaignMilitaryBaseComponent))
+				return 2;
+			if (entity.FindComponent(INF_CampOwnershipComponent))
+				kind = 1;
+			entity = entity.GetParent();
+		}
+		return kind;
+	}
 	protected bool m_bINFObjectiveUpdateQueued;
 	protected int m_iINFDebugRevision;
 	protected bool m_bINFDebugRefreshQueued;
@@ -177,6 +196,7 @@ modded class INS_IntelManager
 				INF_SetQuestioningChance(m_fINFQuestioningChance);
 			INF_QueueCampaignObjectives();
 		}
+		GetGame().GetCallqueue().CallLater(INF_RefreshBaseMarkers, 3000, false);
 	}
 
 	int INF_GetMissionEndMode()
@@ -597,6 +617,105 @@ modded class INS_IntelManager
 		INF_PlaceDebugMarker(worldX, worldZ, string.Format("[DBG CACHE %1]", cacheIndex + 1), m_aDebugMarkers, "objective-marker");
 	}
 
+	protected void INF_RefreshBaseMarkers()
+	{
+		GetGame().GetCallqueue().Remove(INF_RefreshBaseMarkers);
+		if (m_bINFMissionEnded)
+			return;
+		GetGame().GetCallqueue().CallLater(INF_RefreshBaseMarkers, 3000, false);
+		if (SCR_PlayerController.GetLocalPlayerId() <= 0 || !SCR_MapMarkerManagerComponent.GetInstance())
+			return;
+		Faction faction = SCR_FactionManager.SGetLocalPlayerFaction();
+		array<SCR_SpawnPoint> points = SCR_SpawnPoint.GetSpawnPoints();
+		array<vector> positions = {};
+		array<string> names = {};
+		array<int> kinds = {};
+		if (faction && points)
+		{
+			string factionKey = faction.GetFactionKey();
+			foreach (SCR_SpawnPoint point : points)
+			{
+				// Personal spawn points follow a player and are not a base.
+				if (!point || !point.IsSpawnPointEnabled() || point.GetFactionKey() != factionKey || SCR_PlayerSpawnPoint.Cast(point))
+					continue;
+				vector pos = point.GetOrigin();
+				int kind = INF_GetBaseKind(point);
+				bool duplicate;
+				foreach (int knownIndex, vector known : positions)
+				{
+					// A command post beside a camp is a separate base, so only merge spawn points of the same kind.
+					if (kinds[knownIndex] == kind && vector.DistanceSqXZ(pos, known) < 400)
+						duplicate = true;
+				}
+				if (duplicate)
+				{
+					duplicate = false;
+					continue;
+				}
+				positions.Insert(pos);
+				string name = point.GetSpawnPointName();
+				if (name.IsEmpty())
+					name = "Base";
+				names.Insert(name);
+				kinds.Insert(kind);
+			}
+		}
+		bool changed = positions.Count() != m_aINFBasePositions.Count() || m_aINFBaseMarkers.Count() != positions.Count();
+		if (!changed)
+		{
+			foreach (int index, vector current : positions)
+			{
+				if (vector.DistanceSqXZ(current, m_aINFBasePositions[index]) > 1 || names[index] != m_aINFBaseNames[index] || kinds[index] != m_aINFBaseKinds[index])
+					changed = true;
+			}
+		}
+		if (!changed)
+			return;
+		INF_ClearLocalDebugMarkers(m_aINFBaseMarkers);
+		if (!m_aINFBaseMarkers.IsEmpty())
+			return;
+		m_aINFBasePositions.Copy(positions);
+		m_aINFBaseNames.Copy(names);
+		m_aINFBaseKinds.Copy(kinds);
+		foreach (int placeIndex, vector placePos : positions)
+			INF_PlaceBaseMarker((int)placePos[0], (int)placePos[2], names[placeIndex], kinds[placeIndex]);
+		if (m_aINFBaseMarkers.Count() != positions.Count())
+		{
+			// Retry next tick if any marker failed to place.
+			INF_ClearLocalDebugMarkers(m_aINFBaseMarkers);
+			m_aINFBasePositions.Clear();
+			m_aINFBaseNames.Clear();
+			m_aINFBaseKinds.Clear();
+		}
+	}
+
+	protected void INF_PlaceBaseMarker(int worldX, 	int worldZ, string label, int kind)
+	{
+		SCR_MapMarkerManagerComponent markerMgr = SCR_MapMarkerManagerComponent.GetInstance();
+		if (!markerMgr)
+			return;
+			// Camps carry an arsenal (supply symbol); command posts add the signal symbol.
+			EMilitarySymbolIcon icons = EMilitarySymbolIcon.RESPAWN;
+			if (kind == 1)
+				icons = icons | EMilitarySymbolIcon.SUPPLY;
+			else if (kind == 2)
+				icons = icons | EMilitarySymbolIcon.SIGNAL;
+			SCR_MapMarkerBase marker = markerMgr.PrepareMilitaryMarker(EMilitarySymbolIdentity.BLUFOR, EMilitarySymbolDimension.INSTALLATION, icons);
+		if (!marker)
+		{
+			Print("[INF_BaseMarkers] NATO installation symbol unavailable in the marker config.", LogLevel.ERROR);
+			return;
+		}
+		marker.SetWorldPos(worldX, worldZ);
+		marker.SetCustomText(label);
+		marker.SetMarkerOwnerID(-1);
+		marker.SetCanBeRemovedByOwner(false);
+		markerMgr.InsertStaticMarker(marker, true, false);
+		// A local insert assigns the local player as owner, which would make the marker editable and removable.
+		marker.SetMarkerOwnerID(-1);
+		m_aINFBaseMarkers.Insert(marker);
+	}
+
 	protected void INF_PlaceDebugMarker(int worldX, int worldZ, string label, array<SCR_MapMarkerBase> markers, string icon)
 	{
 		if (!INF_CanSeeDebugMarkers())
@@ -639,6 +758,8 @@ modded class INS_IntelManager
 		marker.SetMarkerOwnerID(-1);
 		marker.SetCanBeRemovedByOwner(false);
 		markerMgr.InsertStaticMarker(marker, true, false);
+		// A local insert assigns the local player as owner, which would make the marker editable and removable.
+		marker.SetMarkerOwnerID(-1);
 		markers.Insert(marker);
 	}
 
@@ -848,6 +969,8 @@ modded class INS_IntelManager
 		GetGame().GetCallqueue().Remove(LoadIntelState);
 		GetGame().GetCallqueue().Remove(INF_OnDebugVisibilityChanged);
 		GetGame().GetCallqueue().Remove(INF_RefreshDebugMarkers);
+		GetGame().GetCallqueue().Remove(INF_RefreshBaseMarkers);
+		INF_ClearLocalDebugMarkers(m_aINFBaseMarkers);
 		GetGame().GetCallqueue().Remove(BroadcastDebugMarkers);
 		GetGame().GetCallqueue().Remove(INF_UpdateCampaignObjectives);
 		m_aINFDebugSubscribers.Clear();

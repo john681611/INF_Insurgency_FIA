@@ -412,8 +412,8 @@ class INF_ForestCampRewards
 		else if (FileIO.FileExists(SITE_SAVE) && !FileIO.DeleteFile(SITE_SAVE))
 			Print("[INF_ForestCampRewards] Cannot delete camp manifest on clean mission end: " + SITE_SAVE, LogLevel.ERROR);
 		INF_TerritoryPersistence.DeleteSaves();
-		if (FileIO.FileExists(INF_Roadblocks.SAVE_FILE) && !FileIO.DeleteFile(INF_Roadblocks.SAVE_FILE))
-			Print("[INF_ForestCampRewards] Cannot delete roadblock roster on clean mission end: " + INF_Roadblocks.SAVE_FILE, LogLevel.ERROR);
+		if (FileIO.FileExists(INF_Defences.SAVE_FILE) && !FileIO.DeleteFile(INF_Defences.SAVE_FILE))
+			Print("[INF_ForestCampRewards] Cannot delete defence roster on clean mission end: " + INF_Defences.SAVE_FILE, LogLevel.ERROR);
 		s_aSites.Clear();
 		s_aLayouts.Clear();
 		s_aCachePositions.Clear();

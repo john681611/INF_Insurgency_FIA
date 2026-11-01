@@ -1,21 +1,21 @@
-// Persistent static sites placed into the world's own composition slots (SCR_SiteSlotEntity): roadblocks in road slots and
-// defences (sandbags, machine-gun nests, bunkers) in small flat slots the world labels as fortifications. Placement is
-// recorded in a saved roster and respawned from it. Each site's guards belong to the nearest zone, so they activate,
-// count towards the shared AI budget, respawn and block capture like that zone's other defenders.
-class INF_Roadblock
+// Persistent defences placed into the world's own composition slots (SCR_SiteSlotEntity): barricades and checkpoints in
+// road slots, and sandbag positions, machine-gun nests, bunkers and towers in small flat slots. Placement is recorded in a
+// saved roster and respawned from it. Each defence's guards belong to the nearest zone, so they activate, count towards
+// the shared AI budget, respawn and block capture like that zone's other defenders.
+class INF_Defence
 {
 	string m_sKey;
 	ResourceName m_Composition;
 	vector m_vPosition;
 	float m_fYaw;
 	string m_sOwnerKey;
-	bool m_bDefence;
+	bool m_bFlat;
 	int m_iActiveSize;
 	int m_iRememberedAI = -1;
 	float m_fRememberedAt = -1;
 }
 
-class INF_RoadblockConfig
+class INF_DefenceConfig
 {
 	int m_iPercent = 25;
 	float m_fSpacing = 800;
@@ -24,9 +24,9 @@ class INF_RoadblockConfig
 	ref array<ResourceName> m_aComposition = {};
 }
 
-class INF_Roadblocks
+class INF_Defences
 {
-	static const string SAVE_FILE = "$profile:INS_Saves/roadblock_sites.dat";
+	static const string SAVE_FILE = "$profile:INS_Saves/defence_sites.dat";
 	static const int SAVE_VERSION = 1;
 	static const int MAX_SITES = 256;
 	static const int TILE_SIZE = 400;
@@ -34,36 +34,41 @@ class INF_Roadblocks
 	static const float MIN_FROM_STATIC_SITE = 250;
 	static const float GUARD_RADIUS = 15;
 	static const float DEFEND_RADIUS = 25;
-	static const int DEFENCE_MIN_GUARDS = 2;
-	static const int DEFENCE_MAX_GUARDS = 4;
-	// Defences go in small flat slots (the larger flat slots hold base content such as helipads and hospitals).
-	static const string DEFENCE_SLOT = "slotflatsmall";
+	static const int FLAT_MIN_GUARDS = 2;
+	static const int FLAT_MAX_GUARDS = 4;
+	// Minimum distance between small flat defences, so they don't cluster.
+	static const float FLAT_SPACING = 100;
+	// Small flat slots hold the sandbag, nest and bunker defences (the larger flat slots hold base content such as helipads).
+	static const string FLAT_SLOT = "slotflatsmall";
 	static const ResourceName WAYPOINT_DEFEND = "{93291E72AC23930F}Prefabs/AI/Waypoints/AIWaypoint_Defend.et";
 
 	protected INF_ZoneStateSystem m_Zones;
-	protected ref INF_RoadblockConfig m_Config;
-	protected ref array<ref INF_Roadblock> m_Sites = {};
+	protected ref INF_DefenceConfig m_Config;
+	protected ref array<ref INF_Defence> m_Sites = {};
 	protected ref array<ResourceName> m_Compositions = {};
 	protected ref array<string> m_CompositionTypes = {};
 	protected ref array<string> m_SlotTypes = {};
 	protected ref array<SCR_SiteSlotEntity> m_Slots = {};
 	protected ref array<string> m_SeenSlotNames = {};
+	protected ref array<int> m_SeenSlotCounts = {};
 	protected ref array<vector> m_Tiles = {};
 	protected ref array<vector> m_Avoid = {};
 	protected vector m_vMin;
 	protected vector m_vMax;
 	protected int m_iOwnerRejects;
 	protected int m_iSpacingRejects;
+	protected int m_iFlatSeen;
+	protected int m_iFlatOccupied;
 	protected bool m_bReady;
 
 	static void Log(string message)
 	{
-		Print("[INF_Roadblocks] " + message);
+		Print("[INF_Defences] " + message);
 	}
 
 	static void Fail(string message)
 	{
-		Print("[INF_Roadblocks] " + message, LogLevel.WARNING);
+		Print("[INF_Defences] " + message, LogLevel.WARNING);
 	}
 
 	bool IsReady()
@@ -101,7 +106,7 @@ class INF_Roadblocks
 		return true;
 	}
 
-	void Begin(INF_ZoneStateSystem zones, INF_RoadblockConfig config, array<vector> avoid)
+	void Begin(INF_ZoneStateSystem zones, INF_DefenceConfig config, array<vector> avoid)
 	{
 		m_Zones = zones;
 		m_Config = config;
@@ -119,7 +124,7 @@ class INF_Roadblocks
 		}
 		if (config.m_iPercent <= 0)
 		{
-			Log("Disabled: roadblock percentage is 0.");
+			Log("Disabled: defence percentage is 0.");
 			m_bReady = true;
 			return;
 		}
@@ -151,7 +156,7 @@ class INF_Roadblocks
 			string slotType = SlotType(candidate);
 			if (!resource || !resource.IsValid() || slotType.IsEmpty())
 			{
-				Fail("Ignoring roadblock composition that cannot load or is not under a Slotted/<slot type> folder: " + candidate);
+				Fail("Ignoring defence composition that cannot load or is not under a Slotted/<slot type> folder: " + candidate);
 				continue;
 			}
 			m_Compositions.Insert(candidate);
@@ -160,7 +165,7 @@ class INF_Roadblocks
 				m_SlotTypes.Insert(slotType);
 		}
 		if (m_Compositions.IsEmpty())
-			Fail("No usable roadblock compositions; set Roadblocks: Compositions on the game mode. Roadblocks and defences are disabled.");
+			Fail("No usable defence compositions; set Defences: Compositions on the game mode. Defences are disabled.");
 	}
 
 	protected void ScanTick()
@@ -182,14 +187,41 @@ class INF_Roadblocks
 		m_bReady = true;
 	}
 
+	// Slots written as $grp instances in a layer carry no prefab data, so their prefab name is empty; the slot's own
+	// editor mesh (e.g. SlotFlatSmall_01.xob) names the type instead.
+	protected string SlotName(SCR_SiteSlotEntity slot)
+	{
+		string name = INF_BuildingGrid.PrefabNameLower(slot);
+		if (!name.IsEmpty())
+			return name;
+		IEntity child = slot.GetChildren();
+		if (!child || !child.GetVObject())
+			return name;
+		name = child.GetVObject().GetResourceName();
+		name.ToLower();
+		return name;
+	}
+
 	protected bool CollectSlot(IEntity entity)
 	{
 		SCR_SiteSlotEntity slot = SCR_SiteSlotEntity.Cast(entity);
 		if (!slot)
 			return true;
-		string name = INF_BuildingGrid.PrefabNameLower(slot);
-		if (m_SeenSlotNames.Count() < 12 && m_SeenSlotNames.Find(name) < 0)
+		string name = SlotName(slot);
+		int seenIndex = m_SeenSlotNames.Find(name);
+		if (seenIndex < 0 && m_SeenSlotNames.Count() < 16)
+		{
 			m_SeenSlotNames.Insert(name);
+			m_SeenSlotCounts.Insert(1);
+		}
+		else if (seenIndex >= 0)
+			m_SeenSlotCounts.Set(seenIndex, m_SeenSlotCounts[seenIndex] + 1);
+		if (name.IndexOf(FLAT_SLOT) != -1)
+		{
+			m_iFlatSeen++;
+			if (slot.IsOccupied())
+				m_iFlatOccupied++;
+		}
 		foreach (string wanted : m_SlotTypes)
 		{
 			if (name.IndexOf(wanted) == -1)
@@ -203,15 +235,16 @@ class INF_Roadblocks
 
 	protected void Select()
 	{
+		string seen;
+		foreach (int seenIndex, string seenName : m_SeenSlotNames)
+			seen += string.Format(" %1 x%2", seenName, m_SeenSlotCounts[seenIndex]);
+		Log(string.Format("Slots in the world by prefab:%1. Small flat slots: %2, already occupied: %3. Slot types wanted: %4.", seen, m_iFlatSeen, m_iFlatOccupied, m_SlotTypes.Count()));
 		if (m_Slots.IsEmpty())
 		{
-			string seen;
-			foreach (string seenName : m_SeenSlotNames)
-				seen += " " + seenName;
-			if (seen.IsEmpty())
-				Fail("The world contains no composition slots (SCR_SiteSlotEntity); its layers must include the slot layer. No sites placed.");
+			if (m_SeenSlotNames.IsEmpty())
+				Fail("The world contains no composition slots (SCR_SiteSlotEntity); its layers must include the slot layer. No defences placed.");
 			else
-				Fail("No free matching slots (road slots or small flat slots); no sites placed. Slot prefab types seen:" + seen);
+				Fail("No free matching slots (road slots or small flat slots); no defences placed.");
 			return;
 		}
 		array<SCR_SiteSlotEntity> candidates = {};
@@ -227,7 +260,7 @@ class INF_Roadblocks
 			candidates.Set(index, candidates[swap]);
 			candidates.Set(swap, held);
 		}
-		// One percentage of every viable road and defence slot together.
+		// One percentage of every viable road and small flat slot together.
 		int quota = Math.Ceil(candidates.Count() * m_Config.m_iPercent / 100.0);
 		foreach (SCR_SiteSlotEntity candidate : candidates)
 		{
@@ -235,25 +268,25 @@ class INF_Roadblocks
 				break;
 			TryPlace(candidate);
 		}
-		// An empty roster is not saved, so a later start with a fixed config or map can still place sites.
+		// An empty roster is not saved, so a later start with a fixed config or map can still place defences.
 		if (!m_Sites.IsEmpty() && !Save())
-			Print("[INF_Roadblocks] Cannot save the roadblock roster; the next start will pick new slots.", LogLevel.ERROR);
-		int defences;
-		foreach (INF_Roadblock site : m_Sites)
+			Print("[INF_Defences] Cannot save the defence roster; the next start will pick new slots.", LogLevel.ERROR);
+		int flat;
+		foreach (INF_Defence site : m_Sites)
 		{
-			if (site.m_bDefence)
-				defences++;
+			if (site.m_bFlat)
+				flat++;
 		}
-		Log(string.Format("Placed %1 roadblocks and %2 defences from %3 viable of %4 free slots, target %5 percent (%6 rejected for spacing, %7 with no zone in range).",
-			m_Sites.Count() - defences, defences, candidates.Count(), m_Slots.Count(), m_Config.m_iPercent, m_iSpacingRejects, m_iOwnerRejects));
+		Log(string.Format("Placed %1 defences (%2 on road slots, %3 on small flat slots) from %4 viable of %5 free slots, target %6 percent (%7 rejected for spacing, %8 with no zone in range).",
+			m_Sites.Count(), m_Sites.Count() - flat, flat, candidates.Count(), m_Slots.Count(), m_Config.m_iPercent, m_iSpacingRejects, m_iOwnerRejects));
 	}
 
 	protected bool TryPlace(SCR_SiteSlotEntity slot)
 	{
-		string slotName = INF_BuildingGrid.PrefabNameLower(slot);
+		string slotName = SlotName(slot);
 		vector position = slot.GetOrigin();
-		bool defence = slotName.IndexOf(DEFENCE_SLOT) != -1;
-		if (!defence && !SpacingClear(position))
+		bool flat = slotName.IndexOf(FLAT_SLOT) != -1;
+		if (!SpacingClear(position, flat))
 			return false;
 		ResourceName composition = PickComposition(slotName);
 		if (composition.IsEmpty())
@@ -264,12 +297,12 @@ class INF_Roadblocks
 			m_iOwnerRejects++;
 			return false;
 		}
-		INF_Roadblock block = PlaceInSlot(slot, composition);
-		if (!block)
+		INF_Defence defence = PlaceInSlot(slot, composition);
+		if (!defence)
 			return false;
-		block.m_bDefence = defence;
-		Attach(block, owner);
-		m_Sites.Insert(block);
+		defence.m_bFlat = flat;
+		Attach(defence, owner);
+		m_Sites.Insert(defence);
 		return true;
 	}
 
@@ -285,13 +318,15 @@ class INF_Roadblocks
 		return true;
 	}
 
-	// Spacing applies between roadblocks only; defences sit one to a location.
-	protected bool SpacingClear(vector position)
+	// Spacing applies between defences of the same kind: road ones by the configured distance, small flat ones by FLAT_SPACING.
+	protected bool SpacingClear(vector position, bool flat)
 	{
-		float spacingSq = m_Config.m_fSpacing * m_Config.m_fSpacing;
-		foreach (INF_Roadblock existing : m_Sites)
+		float spacing = m_Config.m_fSpacing;
+		if (flat)
+			spacing = FLAT_SPACING;
+		foreach (INF_Defence existing : m_Sites)
 		{
-			if (!existing.m_bDefence && vector.DistanceSqXZ(existing.m_vPosition, position) < spacingSq)
+			if (existing.m_bFlat == flat && vector.DistanceSqXZ(existing.m_vPosition, position) < spacing * spacing)
 			{
 				m_iSpacingRejects++;
 				return false;
@@ -313,7 +348,7 @@ class INF_Roadblocks
 		return fitting[Math.RandomInt(0, fitting.Count())];
 	}
 
-	// The nearest zone that can still activate within the configured range; unless ignoring the cap, it must have room for another roadblock.
+	// The nearest zone that can still activate within the configured range; unless ignoring the cap, it must have room for another defence.
 	protected INS_AmbientPatrolZoneState FindOwner(vector position, bool ignoreCap = false)
 	{
 		INS_AmbientPatrolZoneState best;
@@ -322,7 +357,7 @@ class INF_Roadblocks
 		{
 			if (!zone.m_bINFBuildingCell || zone.m_iGroupCount <= 0 || zone.m_bINFPermanent || zone.m_bINFMarkedCleared)
 				continue;
-			if (!ignoreCap && zone.m_aINFRoadblocks.Count() >= m_Config.m_iPerZone)
+			if (!ignoreCap && zone.m_aINFDefences.Count() >= m_Config.m_iPerZone)
 				continue;
 			float distanceSq = vector.DistanceSqXZ(zone.m_vCenter, position);
 			if (distanceSq > bestSq)
@@ -333,7 +368,7 @@ class INF_Roadblocks
 		return best;
 	}
 
-	protected INF_Roadblock PlaceInSlot(SCR_SiteSlotEntity slot, ResourceName composition)
+	protected INF_Defence PlaceInSlot(SCR_SiteSlotEntity slot, ResourceName composition)
 	{
 		Resource resource = Resource.Load(composition);
 		if (!resource || !resource.IsValid())
@@ -341,7 +376,7 @@ class INF_Roadblocks
 		IEntity entity = slot.SpawnEntityInSlot(resource);
 		if (!entity)
 		{
-			Fail("Road slot refused the composition: " + composition);
+			Fail("Slot refused the composition: " + composition);
 			return null;
 		}
 		if (!INF_ForestCamps.PrepareComposition(entity))
@@ -350,19 +385,19 @@ class INF_Roadblocks
 			SCR_EntityHelper.DeleteEntityAndChildren(entity);
 			return null;
 		}
-		INF_Roadblock block = new INF_Roadblock();
-		block.m_Composition = composition;
-		block.m_vPosition = entity.GetOrigin();
+		INF_Defence defence = new INF_Defence();
+		defence.m_Composition = composition;
+		defence.m_vPosition = entity.GetOrigin();
 		vector angles = entity.GetYawPitchRoll();
-		block.m_fYaw = angles[0];
-		block.m_sKey = INF_ForestCampRewards.SiteID(block.m_vPosition);
-		return block;
+		defence.m_fYaw = angles[0];
+		defence.m_sKey = INF_ForestCampRewards.SiteID(defence.m_vPosition);
+		return defence;
 	}
 
-	protected void Attach(INF_Roadblock block, INS_AmbientPatrolZoneState owner)
+	protected void Attach(INF_Defence defence, INS_AmbientPatrolZoneState owner)
 	{
-		block.m_sOwnerKey = INF_BuildingGrid.Key(owner.m_vCenter);
-		owner.m_aINFRoadblocks.Insert(block);
+		defence.m_sOwnerKey = INF_BuildingGrid.Key(owner.m_vCenter);
+		owner.m_aINFDefences.Insert(defence);
 	}
 
 	protected bool Save()
@@ -372,24 +407,24 @@ class INF_Roadblocks
 		if (!file.Open(SAVE_FILE, FileMode.WRITE))
 			return false;
 		bool success = file.Write(SAVE_VERSION) && file.Write(m_Sites.Count());
-		foreach (INF_Roadblock block : m_Sites)
+		foreach (INF_Defence defence : m_Sites)
 		{
-			string composition = block.m_Composition;
-			if (!file.Write(block.m_sKey) || !file.Write(composition) || !file.Write(block.m_vPosition)
-				|| !file.Write(block.m_fYaw) || !file.Write(block.m_sOwnerKey))
+			string composition = defence.m_Composition;
+			if (!file.Write(defence.m_sKey) || !file.Write(composition) || !file.Write(defence.m_vPosition)
+				|| !file.Write(defence.m_fYaw) || !file.Write(defence.m_sOwnerKey))
 				success = false;
 		}
 		file.Close();
 		return success;
 	}
 
-	// Fails closed: an unreadable roster leaves the file untouched and places no roadblocks this session.
+	// Fails closed: an unreadable roster leaves the file untouched and places no defences this session.
 	protected void Recover()
 	{
 		FileSerializer file = new FileSerializer();
 		if (!file.Open(SAVE_FILE, FileMode.READ))
 		{
-			Print("[INF_Roadblocks] Cannot open the saved roadblock roster; no roadblocks this session.", LogLevel.ERROR);
+			Print("[INF_Defences] Cannot open the saved defence roster; no defences this session.", LogLevel.ERROR);
 			return;
 		}
 		int version;
@@ -397,55 +432,55 @@ class INF_Roadblocks
 		if (!file.Read(version) || version != SAVE_VERSION || !file.Read(count) || count < 0 || count > MAX_SITES)
 		{
 			file.Close();
-			Print("[INF_Roadblocks] Saved roadblock roster has an unknown version or count; preserving it, no roadblocks this session.", LogLevel.ERROR);
+			Print("[INF_Defences] Saved defence roster has an unknown version or count; preserving it, no defences this session.", LogLevel.ERROR);
 			return;
 		}
-		array<ref INF_Roadblock> loaded = {};
+		array<ref INF_Defence> loaded = {};
 		for (int entry = 0; entry < count; entry++)
 		{
-			INF_Roadblock block = new INF_Roadblock();
+			INF_Defence defence = new INF_Defence();
 			string composition;
-			if (!file.Read(block.m_sKey) || !file.Read(composition) || !file.Read(block.m_vPosition)
-				|| !file.Read(block.m_fYaw) || !file.Read(block.m_sOwnerKey))
+			if (!file.Read(defence.m_sKey) || !file.Read(composition) || !file.Read(defence.m_vPosition)
+				|| !file.Read(defence.m_fYaw) || !file.Read(defence.m_sOwnerKey))
 			{
 				file.Close();
-				Print(string.Format("[INF_Roadblocks] Cannot read roadblock roster entry %1; preserving it, no roadblocks this session.", entry), LogLevel.ERROR);
+				Print(string.Format("[INF_Defences] Cannot read defence roster entry %1; preserving it, no defences this session.", entry), LogLevel.ERROR);
 				return;
 			}
-			block.m_Composition = composition;
-			if (block.m_sKey.IsEmpty() || !ValidVector(block.m_vPosition) || !(block.m_fYaw >= -360 && block.m_fYaw <= 360))
+			defence.m_Composition = composition;
+			if (defence.m_sKey.IsEmpty() || !ValidVector(defence.m_vPosition) || !(defence.m_fYaw >= -360 && defence.m_fYaw <= 360))
 			{
 				file.Close();
-				Print(string.Format("[INF_Roadblocks] Invalid roadblock roster entry %1; preserving it, no roadblocks this session.", entry), LogLevel.ERROR);
+				Print(string.Format("[INF_Defences] Invalid defence roster entry %1; preserving it, no defences this session.", entry), LogLevel.ERROR);
 				return;
 			}
-			loaded.Insert(block);
+			loaded.Insert(defence);
 		}
 		file.Close();
-		foreach (INF_Roadblock saved : loaded)
+		foreach (INF_Defence saved : loaded)
 		{
 			if (Restore(saved))
 				m_Sites.Insert(saved);
 		}
-		Log(string.Format("Restored %1 of %2 saved roadblocks.", m_Sites.Count(), loaded.Count()));
+		Log(string.Format("Restored %1 of %2 saved defences.", m_Sites.Count(), loaded.Count()));
 	}
 
-	protected bool Restore(INF_Roadblock block)
+	protected bool Restore(INF_Defence defence)
 	{
-		Resource resource = Resource.Load(block.m_Composition);
+		Resource resource = Resource.Load(defence.m_Composition);
 		if (!resource || !resource.IsValid())
 		{
-			Fail("Saved roadblock composition cannot load, skipping: " + block.m_Composition);
+			Fail("Saved defence composition cannot load, skipping: " + defence.m_Composition);
 			return false;
 		}
 		EntitySpawnParams params = new EntitySpawnParams();
 		params.TransformMode = ETransformMode.WORLD;
-		Math3D.AnglesToMatrix(Vector(block.m_fYaw, 0, 0), params.Transform);
-		params.Transform[3] = block.m_vPosition;
+		Math3D.AnglesToMatrix(Vector(defence.m_fYaw, 0, 0), params.Transform);
+		params.Transform[3] = defence.m_vPosition;
 		IEntity entity = GetGame().SpawnEntityPrefab(resource, GetGame().GetWorld(), params);
 		if (!entity)
 		{
-			Fail("Saved roadblock could not be respawned: " + block.m_sKey);
+			Fail("Saved defence could not be respawned: " + defence.m_sKey);
 			return false;
 		}
 		if (!INF_ForestCamps.PrepareComposition(entity))
@@ -453,22 +488,22 @@ class INF_Roadblocks
 			SCR_EntityHelper.DeleteEntityAndChildren(entity);
 			return false;
 		}
-		block.m_bDefence = SlotType(block.m_Composition) == DEFENCE_SLOT;
+		defence.m_bFlat = SlotType(defence.m_Composition) == FLAT_SLOT;
 		// The slot is not re-resolved on restore, so tell the slot manager it is taken (GM placement would otherwise stack).
 		SCR_CompositionSlotManagerComponent slotManager = SCR_CompositionSlotManagerComponent.GetInstance();
 		if (slotManager)
-			slotManager.SetOccupant(block.m_vPosition, entity);
-		INS_AmbientPatrolZoneState owner = m_Zones.GetZone(block.m_sOwnerKey);
+			slotManager.SetOccupant(defence.m_vPosition, entity);
+		INS_AmbientPatrolZoneState owner = m_Zones.GetZone(defence.m_sOwnerKey);
 		if (!owner)
 		{
-			owner = FindOwner(block.m_vPosition, true);
+			owner = FindOwner(defence.m_vPosition, true);
 			if (owner)
-				Fail("Saved owner zone of roadblock " + block.m_sKey + " no longer exists; reassigned to the nearest zone.");
+				Fail("Saved owner zone of defence " + defence.m_sKey + " no longer exists; reassigned to the nearest zone.");
 		}
 		if (owner)
-			Attach(block, owner);
+			Attach(defence, owner);
 		else
-			Fail("Roadblock " + block.m_sKey + " has no zone in range and will stay unguarded.");
+			Fail("Defence " + defence.m_sKey + " has no zone in range and will stay unguarded.");
 		return true;
 	}
 
@@ -478,7 +513,7 @@ class INF_Roadblocks
 		Resource resource = Resource.Load(WAYPOINT_DEFEND);
 		if (!resource || !resource.IsValid())
 		{
-			Fail("Defend waypoint prefab cannot load; roadblock guards will idle.");
+			Fail("Defend waypoint prefab cannot load; defence guards will idle.");
 			return null;
 		}
 		EntitySpawnParams params = new EntitySpawnParams();
@@ -488,7 +523,7 @@ class INF_Roadblocks
 		AIWaypoint waypoint = AIWaypoint.Cast(GetGame().SpawnEntityPrefab(resource, GetGame().GetWorld(), params));
 		if (!waypoint)
 		{
-			Fail("Defend waypoint failed to spawn; roadblock guards will idle.");
+			Fail("Defend waypoint failed to spawn; defence guards will idle.");
 			return null;
 		}
 		waypoint.SetCompletionRadius(DEFEND_RADIUS);
@@ -498,37 +533,36 @@ class INF_Roadblocks
 			preset = defend.GetCurrentDefendPreset();
 		if (preset)
 			preset.SetUseTurrets(true);
-		Log(string.Format("Defend waypoint at %1: defend waypoint class %2, preset %3, use turrets %4.", position.ToString(), defend != null, preset != null, preset && preset.GetUseTurrets()));
 		return waypoint;
 	}
 
 	// Guard groups are appended to the zone's plan after its ordinary groups, so budget, reservation and
 	// pending-group accounting all include them. A remembered survivor count carries over like a zone's own.
-	// Roadblock guards use the configured size; defences get 2-4, rolled per activation.
+	// Road defences use the configured guard size; small flat ones get 2-4, rolled per activation.
 	static void AppendGuards(INS_AmbientPatrolZoneState state, int guards, float now)
 	{
-		state.m_aINFActiveRoadblocks.Clear();
-		foreach (INF_Roadblock block : state.m_aINFRoadblocks)
+		state.m_aINFActiveDefences.Clear();
+		foreach (INF_Defence defence : state.m_aINFDefences)
 		{
 			int full = guards;
-			if (block.m_bDefence)
-				full = Math.RandomInt(DEFENCE_MIN_GUARDS, DEFENCE_MAX_GUARDS + 1);
+			if (defence.m_bFlat)
+				full = Math.RandomInt(FLAT_MIN_GUARDS, FLAT_MAX_GUARDS + 1);
 			int size = full;
-			if (block.m_iRememberedAI >= 0 && now - block.m_fRememberedAt < INF_BuildingGrid.DEFENDER_MEMORY_MS)
-				size = Math.Min(full, block.m_iRememberedAI);
+			if (defence.m_iRememberedAI >= 0 && now - defence.m_fRememberedAt < INF_BuildingGrid.DEFENDER_MEMORY_MS)
+				size = Math.Min(full, defence.m_iRememberedAI);
 			if (size <= 0)
 				continue;
-			block.m_iActiveSize = size;
+			defence.m_iActiveSize = size;
 			state.m_aINFPlan.Insert(size);
-			state.m_aINFActiveRoadblocks.Insert(block);
+			state.m_aINFActiveDefences.Insert(defence);
 		}
 	}
 
 	static bool HasRememberedGuards(INS_AmbientPatrolZoneState state, float now)
 	{
-		foreach (INF_Roadblock block : state.m_aINFRoadblocks)
+		foreach (INF_Defence defence : state.m_aINFDefences)
 		{
-			if (block.m_iRememberedAI > 0 && now - block.m_fRememberedAt < INF_BuildingGrid.DEFENDER_MEMORY_MS)
+			if (defence.m_iRememberedAI > 0 && now - defence.m_fRememberedAt < INF_BuildingGrid.DEFENDER_MEMORY_MS)
 				return true;
 		}
 		return false;
@@ -537,13 +571,13 @@ class INF_Roadblocks
 	// Called once the activation is committed, so a refused activation keeps the memory.
 	static void ConsumeMemory(INS_AmbientPatrolZoneState state)
 	{
-		foreach (INF_Roadblock block : state.m_aINFActiveRoadblocks)
-			block.m_iRememberedAI = -1;
+		foreach (INF_Defence defence : state.m_aINFActiveDefences)
+			defence.m_iRememberedAI = -1;
 	}
 
 	static int OrdinaryGroups(INS_AmbientPatrolZoneState state)
 	{
-		return state.m_aINFPlan.Count() - state.m_aINFActiveRoadblocks.Count();
+		return state.m_aINFPlan.Count() - state.m_aINFActiveDefences.Count();
 	}
 
 	static int OrdinaryPlannedAI(INS_AmbientPatrolZoneState state)
@@ -554,20 +588,20 @@ class INF_Roadblocks
 		return total;
 	}
 
-	static INF_Roadblock PlannedGuard(INS_AmbientPatrolZoneState state, int planIndex)
+	static INF_Defence PlannedGuard(INS_AmbientPatrolZoneState state, int planIndex)
 	{
 		int offset = planIndex - OrdinaryGroups(state);
-		if (offset < 0 || offset >= state.m_aINFActiveRoadblocks.Count())
+		if (offset < 0 || offset >= state.m_aINFActiveDefences.Count())
 			return null;
-		return state.m_aINFActiveRoadblocks[offset];
+		return state.m_aINFActiveDefences[offset];
 	}
 
-	// A zone cannot be captured while any of its roadblock guards still live, wherever they stand.
+	// A zone cannot be captured while any of its defence guards still live, wherever they stand.
 	static bool GuardsAlive(INS_AmbientPatrolZoneState state, INF_BlockPresence presence)
 	{
 		foreach (INS_PatrolAgent agent : state.m_aAgents)
 		{
-			if (!agent.m_INFRoadblock || !agent.m_Group)
+			if (!agent.m_INFDefence || !agent.m_Group)
 				continue;
 			array<vector> living = presence.GroupPositions(agent.m_Group);
 			if (!living.IsEmpty())
@@ -581,23 +615,23 @@ class INF_Roadblocks
 	{
 		for (int index = state.m_aAgents.Count() - 1; index >= 0; index--)
 		{
-			if (!state.m_aAgents[index].m_INFRoadblock)
+			if (!state.m_aAgents[index].m_INFDefence)
 				continue;
 			guards.InsertAt(state.m_aAgents[index], 0);
 			state.m_aAgents.Remove(index);
 		}
 	}
 
-	// A roadblock whose group never spawned (e.g. a player stood on it) keeps its previous memory.
+	// A defence whose group never spawned (e.g. a player stood on it) keeps its previous memory.
 	static void RememberGuards(INS_AmbientPatrolZoneState state, array<ref INS_PatrolAgent> guards, bool membersMayBePending, float now)
 	{
-		foreach (INF_Roadblock block : state.m_aINFActiveRoadblocks)
+		foreach (INF_Defence defence : state.m_aINFActiveDefences)
 		{
 			bool spawned = false;
 			int living = 0;
 			foreach (INS_PatrolAgent guard : guards)
 			{
-				if (guard.m_INFRoadblock != block)
+				if (guard.m_INFDefence != defence)
 					continue;
 				spawned = true;
 				if (!guard.m_Group)
@@ -609,9 +643,9 @@ class INF_Roadblocks
 			if (!spawned)
 				continue;
 			if (membersMayBePending)
-				living = Math.Max(living, block.m_iActiveSize);
-			block.m_iRememberedAI = living;
-			block.m_fRememberedAt = now;
+				living = Math.Max(living, defence.m_iActiveSize);
+			defence.m_iRememberedAI = living;
+			defence.m_fRememberedAt = now;
 		}
 	}
 }

@@ -494,7 +494,7 @@ class INF_ZoneStateSystem
 		if (state.m_bINFMarkedCleared || GetGame().GetWorld().GetWorldTime() < state.m_fINFSpawnReadyAt)
 			return;
 		bool eligible = (state.m_bEverHadLiving || state.m_bINFSpawnExhausted) && state.m_iINFPendingGroups == 0
-			&& settled && presence.CanCapture(state.m_vCenter) && !INF_Roadblocks.GuardsAlive(state, presence);
+			&& settled && presence.CanCapture(state.m_vCenter) && !INF_Defences.GuardsAlive(state, presence);
 		float previousProgress = state.m_fINFCaptureProgress;
 		bool captured = INF_BlockRules.AdvanceCaptureProgress(eligible, GetGame().GetWorld().GetWorldTime(),
 			state.m_fINFCaptureProgress, state.m_fINFCaptureUpdatedAt, presence.CapturersInArea(state.m_vCenter));

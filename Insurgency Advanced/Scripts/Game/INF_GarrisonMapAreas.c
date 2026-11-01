@@ -82,12 +82,11 @@ modded class SCR_MapDotCircleHandler
 		m_INFZoneCommands.Clear();
 		m_INFZoneCommands.Insert(fill);
 
-		// Border: lightened state colour, fully opaque; the line is closed by repeating the first vertex.
+		// Border: darkened state colour, fully opaque; the line is closed by repeating the first vertex.
 		Color base = m_DotMarkerEnt.m_DotColor;
 		LineDrawCommand border = new LineDrawCommand();
-		border.m_iColor = Color.FromRGBA(
-			Math.Min(255, base.R() * 255 + 80), Math.Min(255, base.G() * 255 + 80), Math.Min(255, base.B() * 255 + 80), 255).PackToInt();
-		border.m_fWidth = 3;
+		border.m_iColor = Color.FromRGBA(base.R() * 255 * 0.7, base.G() * 255 * 0.7, base.B() * 255 * 0.7, 255).PackToInt();
+		border.m_fWidth = Math.Clamp(m_fActualRadius * 0.01, 0.75, 3);
 		border.m_Vertices = new array<float>();
 		border.m_Vertices.Copy(fill.m_Vertices);
 		border.m_Vertices.Insert(fill.m_Vertices[0]);

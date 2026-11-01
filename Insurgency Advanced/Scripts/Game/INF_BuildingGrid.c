@@ -22,16 +22,16 @@ modded class INS_MissionParams
 	int m_iINFMortarLimit;
 	[Attribute("", UIWidgets.ResourceNamePicker, "Mortar battery composition prefab.", "et", category: "Mortar Batteries")]
 	ResourceName m_sINFMortarComposition;
-	[Attribute("-1", UIWidgets.EditBox, "Percentage of viable roadblock and defence slots that receive a site (0 to 100). 0 disables roadblocks and defences.", category: "Roadblocks")]
-	int m_iINFRoadblockPercent;
-	[Attribute("-1", UIWidgets.EditBox, "Minimum roadblock spacing in metres (200 to 3000).", category: "Roadblocks")]
-	float m_fINFRoadblockSpacing;
-	[Attribute("-1", UIWidgets.EditBox, "Roadblock owner-zone distance in metres (200 to 3000).", category: "Roadblocks")]
-	float m_fINFRoadblockOwnerDistance;
-	[Attribute("-1", UIWidgets.EditBox, "Maximum roadblocks per zone (1 to 4).", category: "Roadblocks")]
-	int m_iINFRoadblocksPerZone;
-	[Attribute("-1", UIWidgets.EditBox, "Soldiers per roadblock guard group (2 to 8).", category: "Roadblocks")]
-	int m_iINFRoadblockGuards;
+	[Attribute("-1", UIWidgets.EditBox, "Percentage of viable road and small flat slots that receive a defence (0 to 100). 0 disables defences.", category: "Defences")]
+	int m_iINFDefencePercent;
+	[Attribute("-1", UIWidgets.EditBox, "Minimum spacing between road defences in metres (200 to 3000).", category: "Defences")]
+	float m_fINFDefenceSpacing;
+	[Attribute("-1", UIWidgets.EditBox, "Defence owner-zone distance in metres (200 to 3000).", category: "Defences")]
+	float m_fINFDefenceOwnerDistance;
+	[Attribute("-1", UIWidgets.EditBox, "Maximum defences per zone (1 to 4).", category: "Defences")]
+	int m_iINFDefencesPerZone;
+	[Attribute("-1", UIWidgets.EditBox, "Soldiers per road defence guard group (2 to 8).", category: "Defences")]
+	int m_iINFDefenceGuards;
 	[Attribute("-1", UIWidgets.EditBox, "Travel efficiency entry speed in km/h (1 to 200).", category: "Travel Efficiency")]
 	float m_fINFTravelEnterSpeed;
 	[Attribute("-1", UIWidgets.EditBox, "Travel efficiency exit speed in km/h (0 to 199).", category: "Travel Efficiency")]
@@ -473,10 +473,10 @@ modded class INS_AmbientPatrolZoneState
 
 	bool m_bINFMarkedCleared;
 	bool m_bINFCaptureCandidate;
-	// Roadblocks whose guards belong to this zone, and the ones planned into the current activation (the plan's tail).
-	ref array<INF_Roadblock> m_aINFRoadblocks = {};
-	ref array<INF_Roadblock> m_aINFActiveRoadblocks = {};
-	INF_Roadblock m_INFSpawnRoadblock;
+	// Defences whose guards belong to this zone, and the ones planned into the current activation (the plan's tail).
+	ref array<INF_Defence> m_aINFDefences = {};
+	ref array<INF_Defence> m_aINFActiveDefences = {};
+	INF_Defence m_INFSpawnDefence;
 
 	bool INF_IsCapturing()
 	{
@@ -558,44 +558,44 @@ modded class INS_AmbientPatrolManager
 	protected ref INF_MortarBatteries m_INFMortars;
 	protected ref INF_MortarConfig m_INFMortarConfig;
 
-	[Attribute("25", UIWidgets.Slider, "Percentage of viable roadblock (road slot) and defence (small flat slot) positions that receive a site at a fresh mission start, then saved and restored. Zero disables both.", "0 100 5", category: "Roadblocks")]
-	protected int m_iINFRoadblockPercent = 25;
-	[Attribute("800", UIWidgets.Slider, "Minimum distance in metres between roadblocks (defences are not spaced).", "200 3000 50", category: "Roadblocks")]
-	protected float m_fINFRoadblockSpacing = 800;
-	[Attribute("1000", UIWidgets.Slider, "A site's guards belong to the nearest zone within this many metres. Sites with no zone in range are not placed.", "200 3000 50", category: "Roadblocks")]
-	protected float m_fINFRoadblockOwnerDistance = 1000;
-	[Attribute("2", UIWidgets.Slider, "Maximum roadblocks and defences guarded by one zone.", "1 4 1", category: "Roadblocks")]
-	protected int m_iINFRoadblocksPerZone = 2;
-	[Attribute("4", UIWidgets.Slider, "Soldiers in each roadblock guard group (defences use 2 to 4). They count as defenders of the owning zone.", "2 8 1", category: "Roadblocks")]
-	protected int m_iINFRoadblockGuards = 4;
-	[Attribute("", UIWidgets.ResourceNamePicker, "Compositions to choose from, under Prefabs/Compositions/Slotted: SlotRoad* for roadblocks, SlotFlatSmall for defences (use the editable PrefabsEditable E_ variants so a Game Master can edit them). Empty disables roadblocks and defences.", "et", category: "Roadblocks")]
-	protected ref array<ResourceName> m_aINFRoadblockCompositions;
-	protected ref INF_Roadblocks m_INFRoadblocks;
+	[Attribute("15", UIWidgets.Slider, "Percentage of viable defence positions (road slots for barricades and checkpoints, small flat slots for sandbags, nests and bunkers) that receive a defence at a fresh mission start, then saved and restored. Zero disables defences.", "0 100 5", category: "Defences")]
+	protected int m_iINFDefencePercent = 15;
+	[Attribute("800", UIWidgets.Slider, "Minimum distance in metres between road defences (small flat ones keep 100 metres apart).", "200 3000 50", category: "Defences")]
+	protected float m_fINFDefenceSpacing = 800;
+	[Attribute("1000", UIWidgets.Slider, "A defence's guards belong to the nearest zone within this many metres. Defences with no zone in range are not placed.", "200 3000 50", category: "Defences")]
+	protected float m_fINFDefenceOwnerDistance = 1000;
+	[Attribute("2", UIWidgets.Slider, "Maximum defences guarded by one zone.", "1 4 1", category: "Defences")]
+	protected int m_iINFDefencesPerZone = 2;
+	[Attribute("4", UIWidgets.Slider, "Soldiers in each road defence guard group (small flat defences use 2 to 4). They count as defenders of the owning zone.", "2 8 1", category: "Defences")]
+	protected int m_iINFDefenceGuards = 4;
+	[Attribute("", UIWidgets.ResourceNamePicker, "Compositions to choose from, under Prefabs/Compositions/Slotted: SlotRoad* for road defences, SlotFlatSmall for small flat ones (use the editable PrefabsEditable E_ variants so a Game Master can edit them). Empty disables defences.", "et", category: "Defences")]
+	protected ref array<ResourceName> m_aINFDefenceCompositions;
+	protected ref INF_Defences m_INFDefences;
 
-	protected INF_RoadblockConfig INF_BuildRoadblockConfig()
+	protected INF_DefenceConfig INF_BuildDefenceConfig()
 	{
-		INF_RoadblockConfig config = new INF_RoadblockConfig();
-		config.m_iPercent = m_iINFRoadblockPercent;
-		config.m_fSpacing = m_fINFRoadblockSpacing;
-		config.m_fMaxOwnerDistance = m_fINFRoadblockOwnerDistance;
-		config.m_iPerZone = m_iINFRoadblocksPerZone;
-		if (m_aINFRoadblockCompositions)
-			config.m_aComposition.Copy(m_aINFRoadblockCompositions);
+		INF_DefenceConfig config = new INF_DefenceConfig();
+		config.m_iPercent = m_iINFDefencePercent;
+		config.m_fSpacing = m_fINFDefenceSpacing;
+		config.m_fMaxOwnerDistance = m_fINFDefenceOwnerDistance;
+		config.m_iPerZone = m_iINFDefencesPerZone;
+		if (m_aINFDefenceCompositions)
+			config.m_aComposition.Copy(m_aINFDefenceCompositions);
 		return config;
 	}
 
-	// Polled by the static-site startup until the roadblock roster is placed or restored.
-	protected bool INF_RoadblocksReady()
+	// Polled by the static-site startup until the defence roster is placed or restored.
+	protected bool INF_DefencesReady()
 	{
-		if (!m_INFRoadblocks)
+		if (!m_INFDefences)
 		{
-			m_INFRoadblocks = new INF_Roadblocks();
+			m_INFDefences = new INF_Defences();
 			array<vector> avoid = {};
 			foreach (INF_ForestCampSite campSite : m_INFCampSites)
 				avoid.Insert(campSite.m_Position);
-			m_INFRoadblocks.Begin(m_INFZoneStates, INF_BuildRoadblockConfig(), avoid);
+			m_INFDefences.Begin(m_INFZoneStates, INF_BuildDefenceConfig(), avoid);
 		}
-		return m_INFRoadblocks.IsReady();
+		return m_INFDefences.IsReady();
 	}
 
 	INF_MortarConfig INF_GetMortarConfig()
@@ -652,11 +652,11 @@ modded class INS_AmbientPatrolManager
 		INF_HeaderSettings.Int(params.m_iINFMortarLimit, 0, 4, "m_iINFMortarLimit", m_iINFMortarLimit);
 		if (!params.m_sINFMortarComposition.IsEmpty())
 			m_sINFMortarComposition = params.m_sINFMortarComposition;
-		INF_HeaderSettings.Int(params.m_iINFRoadblockPercent, 0, 100, "m_iINFRoadblockPercent", m_iINFRoadblockPercent);
-		INF_HeaderSettings.Float(params.m_fINFRoadblockSpacing, 200, 3000, "m_fINFRoadblockSpacing", m_fINFRoadblockSpacing);
-		INF_HeaderSettings.Float(params.m_fINFRoadblockOwnerDistance, 200, 3000, "m_fINFRoadblockOwnerDistance", m_fINFRoadblockOwnerDistance);
-		INF_HeaderSettings.Int(params.m_iINFRoadblocksPerZone, 1, 4, "m_iINFRoadblocksPerZone", m_iINFRoadblocksPerZone);
-		INF_HeaderSettings.Int(params.m_iINFRoadblockGuards, 2, 8, "m_iINFRoadblockGuards", m_iINFRoadblockGuards);
+		INF_HeaderSettings.Int(params.m_iINFDefencePercent, 0, 100, "m_iINFDefencePercent", m_iINFDefencePercent);
+		INF_HeaderSettings.Float(params.m_fINFDefenceSpacing, 200, 3000, "m_fINFDefenceSpacing", m_fINFDefenceSpacing);
+		INF_HeaderSettings.Float(params.m_fINFDefenceOwnerDistance, 200, 3000, "m_fINFDefenceOwnerDistance", m_fINFDefenceOwnerDistance);
+		INF_HeaderSettings.Int(params.m_iINFDefencesPerZone, 1, 4, "m_iINFDefencesPerZone", m_iINFDefencesPerZone);
+		INF_HeaderSettings.Int(params.m_iINFDefenceGuards, 2, 8, "m_iINFDefenceGuards", m_iINFDefenceGuards);
 
 		float enterSpeed = m_fINFTravelEnterSpeed;
 		float exitSpeed = m_fINFTravelExitSpeed;
@@ -998,7 +998,7 @@ modded class INS_AmbientPatrolManager
 		}
 		if (!intel.INF_IsIntelReady())
 			return;
-		if (!INF_RoadblocksReady())
+		if (!INF_DefencesReady())
 			return;
 		foreach (INF_ForestCampSite site : m_INFCampSites)
 			m_INFZoneStates.AddCamp(site);
@@ -1062,8 +1062,8 @@ modded class INS_AmbientPatrolManager
 			m_INFForestCamps.Stop();
 		if (m_INFMortars)
 			m_INFMortars.Stop();
-		if (m_INFRoadblocks)
-			m_INFRoadblocks.Stop();
+		if (m_INFDefences)
+			m_INFDefences.Stop();
 		super.OnGameModeEnd(data);
 	}
 
@@ -1109,8 +1109,8 @@ modded class INS_AmbientPatrolManager
 			if (state.m_iINFRememberedAI >= 0
 				&& activationTime - state.m_fINFRememberedAt < INF_BuildingGrid.DEFENDER_MEMORY_MS)
 			{
-				// A wiped-out zone stays empty (but capturable) until the memory expires, unless roadblock guards survive.
-				if (state.m_iINFRememberedAI == 0 && !INF_Roadblocks.HasRememberedGuards(state, activationTime))
+				// A wiped-out zone stays empty (but capturable) until the memory expires, unless defence guards survive.
+				if (state.m_iINFRememberedAI == 0 && !INF_Defences.HasRememberedGuards(state, activationTime))
 				{
 					if (!state.m_bEverHadLiving)
 					{
@@ -1123,7 +1123,7 @@ modded class INS_AmbientPatrolManager
 			}
 			INF_BuildingGrid.Plan(limitAI,
 				INF_BuildingGrid.Buckets(m_aGroupPrefabs, m_aINFGroupBuckets), state.m_aINFPlan);
-			INF_Roadblocks.AppendGuards(state, m_iINFRoadblockGuards, activationTime);
+			INF_Defences.AppendGuards(state, m_iINFDefenceGuards, activationTime);
 			state.m_iGroupCount = state.m_aINFPlan.Count();
 			state.m_iINFPlannedAI = 0;
 			foreach (int planned : state.m_aINFPlan)
@@ -1132,7 +1132,7 @@ modded class INS_AmbientPatrolManager
 			{
 				return;
 			}
-			INF_Roadblocks.ConsumeMemory(state);
+			INF_Defences.ConsumeMemory(state);
 			state.m_fINFDistantSince = -1;
 			state.INF_ResetCapture();
 			state.m_iINFRememberedAI = -1;
@@ -1149,13 +1149,13 @@ modded class INS_AmbientPatrolManager
 			if (zoneVehicles)
 				zoneVehicles.INF_OnZoneActivated(state);
 			INF_GetMortars().OnZoneActivated(this, state, INF_GetMortarConfig());
-			int guardGroups = state.m_aINFActiveRoadblocks.Count();
+			int guardGroups = state.m_aINFActiveDefences.Count();
 			for (int i = 0; i < state.m_iGroupCount; i++)
 			{
 				vector pos;
 				if (i >= state.m_iGroupCount - guardGroups)
 				{
-					pos = state.m_aINFActiveRoadblocks[i - (state.m_iGroupCount - guardGroups)].m_vPosition;
+					pos = state.m_aINFActiveDefences[i - (state.m_iGroupCount - guardGroups)].m_vPosition;
 				}
 				else
 				{
@@ -1237,14 +1237,14 @@ modded class INS_AmbientPatrolManager
 		return vector.Zero;
 	}
 
-	// Roadblock guards stand at their roadblock, which may be outside the zone cell; the cell-containment rule does not apply.
-	protected vector INF_FindRoadblockGuardPosition(INF_Roadblock roadblock)
+	// Defence guards stand at their defence, which may be outside the zone cell; the cell-containment rule does not apply.
+	protected vector INF_FindDefenceGuardPosition(INF_Defence defence)
 	{
 		float minDistance = INF_BlockRules.MIN_GRID_SPAWN_DISTANCE;
 		array<vector> players = m_INFZoneStates.GetPresence(false, true).m_AllPlayers;
 		for (int attempt = 0; attempt < 16; attempt++)
 		{
-			vector candidate = roadblock.m_vPosition + Vector(Math.RandomFloat(-8, 8), 0, Math.RandomFloat(-8, 8));
+			vector candidate = defence.m_vPosition + Vector(Math.RandomFloat(-8, 8), 0, Math.RandomFloat(-8, 8));
 			vector empty;
 			if (!SCR_WorldTools.FindEmptyTerrainPosition(empty, candidate, 5, 2, 2) || empty[1] <= 0.5 || INF_SpawnProtection.Contains(empty))
 				continue;
@@ -1267,10 +1267,10 @@ modded class INS_AmbientPatrolManager
 		}
 		if (!state.m_bActive)
 			return;
-		INF_Roadblock guardedRoadblock = state.m_INFSpawnRoadblock;
-		state.m_INFSpawnRoadblock = null;
-		if (guardedRoadblock)
-			pos = INF_FindRoadblockGuardPosition(guardedRoadblock);
+		INF_Defence guardedDefence = state.m_INFSpawnDefence;
+		state.m_INFSpawnDefence = null;
+		if (guardedDefence)
+			pos = INF_FindDefenceGuardPosition(guardedDefence);
 		else
 			pos = FindSafeSpawnPosition(pos, state);
 		IEntity entity;
@@ -1283,10 +1283,10 @@ modded class INS_AmbientPatrolManager
 			return;
 		}
 		INS_PatrolAgent agent;
-		if (guardedRoadblock)
+		if (guardedDefence)
 		{
-			agent = new INS_PatrolAgent(entity, guardedRoadblock.m_vPosition, INF_Roadblocks.GUARD_RADIUS);
-			agent.m_INFRoadblock = guardedRoadblock;
+			agent = new INS_PatrolAgent(entity, guardedDefence.m_vPosition, INF_Defences.GUARD_RADIUS);
+			agent.m_INFDefence = guardedDefence;
 		}
 		else
 		{
@@ -1296,25 +1296,20 @@ modded class INS_AmbientPatrolManager
 		state.m_aAgents.Insert(agent);
 		m_INFZoneStates.InvalidatePresence();
 		m_CallQueue.CallLater(INF_InitDefenderGroup, 500, false, agent);
-		// Guards hold the roadblock under a defend waypoint (which also mans turrets) instead of patrolling the cell.
-		if (guardedRoadblock)
-			m_CallQueue.CallLater(INF_DefendRoadblock, 1500, false, agent);
+		// Guards hold the defence under a defend waypoint (which also mans turrets) instead of patrolling the cell.
+		if (guardedDefence)
+			m_CallQueue.CallLater(INF_DefendPosition, 1500, false, agent);
 		else
 			m_CallQueue.CallLater(PatrolTick, 1500, false, agent);
 	}
 
-	protected void INF_DefendRoadblock(INS_PatrolAgent agent)
+	protected void INF_DefendPosition(INS_PatrolAgent agent)
 	{
-		if (!Replication.IsServer() || !agent.m_Group || !agent.m_INFRoadblock)
+		if (!Replication.IsServer() || !agent.m_Group || !agent.m_INFDefence)
 			return;
-		agent.m_INFDefend = INF_Roadblocks.SpawnDefendWaypoint(agent.m_INFRoadblock.m_vPosition);
-		if (!agent.m_INFDefend)
-			return;
-		// Waypoints already on the group (from group setup) would be walked first; the defend waypoint goes to the front.
-		array<AIWaypoint> existing = {};
-		agent.m_Group.GetWaypoints(existing);
-		agent.m_Group.AddWaypointAt(agent.m_INFDefend, 0);
-		INF_Roadblocks.Log(string.Format("Guard group at %1 had %2 waypoints before the defend waypoint was added.", agent.m_INFRoadblock.m_sKey, existing.Count()));
+		agent.m_INFDefendWaypoint = INF_Defences.SpawnDefendWaypoint(agent.m_INFDefence.m_vPosition);
+		if (agent.m_INFDefendWaypoint)
+			agent.m_Group.AddWaypoint(agent.m_INFDefendWaypoint);
 	}
 
 	protected void INF_InitDefenderGroup(INS_PatrolAgent agent)
@@ -1636,7 +1631,7 @@ modded class INS_AmbientPatrolManager
 		int total = 0;
 		foreach (INS_PatrolAgent agent : state.m_aAgents)
 		{
-			if (!agent.m_Group || agent.m_INFRoadblock)
+			if (!agent.m_Group || agent.m_INFDefence)
 				continue;
 			array<vector> living = {};
 			INF_BlockRules.CollectLiving(agent.m_Group, living);
@@ -1644,7 +1639,7 @@ modded class INS_AmbientPatrolManager
 		}
 		if (state.m_bActive)
 		{
-			int ordinaryGroups = INF_Roadblocks.OrdinaryGroups(state);
+			int ordinaryGroups = INF_Defences.OrdinaryGroups(state);
 			for (int i = state.m_aINFPlan.Count() - state.m_iINFPendingGroups; i >= 0 && i < ordinaryGroups; i++)
 				total += state.m_aINFPlan[i];
 		}
@@ -1656,16 +1651,16 @@ modded class INS_AmbientPatrolManager
 		if (m_INFZoneStates)
 			m_INFZoneStates.ObserveDefenders(state);
 		array<ref INS_PatrolAgent> guards = {};
-		INF_Roadblocks.ExtractGuards(state, guards);
+		INF_Defences.ExtractGuards(state, guards);
 		if (state.m_bINFBuildingCell && state.m_bActive && !state.m_bINFMarkedCleared && !state.m_bINFPermanent
 			&& !state.m_bINFAttackActive && !state.m_bINFAttackPending)
 		{
 			float deactivationTime = GetGame().GetWorld().GetWorldTime();
-			INF_Roadblocks.RememberGuards(state, guards, deactivationTime < state.m_fINFSpawnReadyAt, deactivationTime);
+			INF_Defences.RememberGuards(state, guards, deactivationTime < state.m_fINFSpawnReadyAt, deactivationTime);
 			int survivors = INF_CountDefenders(state);
 			// Members of freshly spawned groups may not exist yet; remember the planned strength instead.
 			if (GetGame().GetWorld().GetWorldTime() < state.m_fINFSpawnReadyAt)
-				survivors = Math.Max(survivors, INF_Roadblocks.OrdinaryPlannedAI(state));
+				survivors = Math.Max(survivors, INF_Defences.OrdinaryPlannedAI(state));
 			if (survivors > 0 || state.m_bEverHadLiving)
 			{
 				state.m_iINFRememberedAI = survivors;
@@ -1698,8 +1693,8 @@ modded class INS_AmbientPatrolManager
 		state.m_fINFDistantSince = -1;
 		foreach (INS_PatrolAgent guard : guards)
 			m_CallQueue.CallLater(INF_DespawnDefenderGroup, m_INFDespawnGate.Reserve(), false, guard);
-		state.m_aINFActiveRoadblocks.Clear();
-		state.m_INFSpawnRoadblock = null;
+		state.m_aINFActiveDefences.Clear();
+		state.m_INFSpawnDefence = null;
 		if (state.m_bINFBuildingCell && state.m_bINFMarkedCleared)
 			state.m_aSavedPositions.Clear();
 		if (m_INFZoneStates)
@@ -1711,8 +1706,8 @@ modded class INS_AmbientPatrolManager
 
 	protected void INF_DespawnDefenderGroup(INS_PatrolAgent agent)
 	{
-		if (agent.m_INFDefend)
-			SCR_EntityHelper.DeleteEntityAndChildren(agent.m_INFDefend);
+		if (agent.m_INFDefendWaypoint)
+			SCR_EntityHelper.DeleteEntityAndChildren(agent.m_INFDefendWaypoint);
 		SCR_AIGroup group = agent.m_Group;
 		if (!group)
 			return;
@@ -1753,11 +1748,11 @@ modded class INS_AmbientPatrolManager
 		state.m_iINFPendingGroups--;
 		int planIndex = state.m_aINFPlan.Count() - 1 - state.m_iINFPendingGroups;
 		state.m_iINFSpawnSize = 0;
-		state.m_INFSpawnRoadblock = null;
+		state.m_INFSpawnDefence = null;
 		if (planIndex >= 0 && planIndex < state.m_aINFPlan.Count())
 		{
 			state.m_iINFSpawnSize = state.m_aINFPlan[planIndex];
-			state.m_INFSpawnRoadblock = INF_Roadblocks.PlannedGuard(state, planIndex);
+			state.m_INFSpawnDefence = INF_Defences.PlannedGuard(state, planIndex);
 		}
 		int previousGroups = state.m_aAgents.Count();
 		INF_ActivationPolicy policy = m_INFZoneStates.GetPresence().ActivationPolicy(GetOwner());
