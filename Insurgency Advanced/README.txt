@@ -339,6 +339,66 @@ In a dedicated server's game.missionHeader configuration, add:
     }
   }
 Use any integer from 1 to 20. Restart into a fresh mission for a new selection.
+
+Mission header settings for server managers
+Every GM setting below can also be set in m_Insurgency. They are read once at
+mission start and are not live-editable from the header. Omit a field (or use
+-1, or an empty string for text) to keep the game mode value. Values outside
+the range log an error and keep the game mode value. Complete default header:
+  "missionHeader": {
+    "m_Insurgency": {
+      "m_iINFCampCount": 7,
+      "m_iINFTerrainIndexRevision": -1,
+      "m_sINFCampComposition": "",
+      "m_sINFPlayerFaction": "",
+      "m_fINFCampFootprintRadius": -1,
+      "m_iINFSiteStrengthMultiplier": -1,
+      "m_iINFCounterAttackChance": -1,
+      "m_iINFMortarChance": -1,
+      "m_iINFMortarLimit": -1,
+      "m_sINFMortarComposition": "",
+      "m_iINFRoadblockPercent": -1,
+      "m_fINFRoadblockSpacing": -1,
+      "m_fINFRoadblockOwnerDistance": -1,
+      "m_iINFRoadblocksPerZone": -1,
+      "m_iINFRoadblockGuards": -1,
+      "m_fINFTravelEnterSpeed": -1,
+      "m_fINFTravelExitSpeed": -1,
+      "m_fINFTravelEnterSeconds": -1,
+      "m_fINFTravelExitSeconds": -1,
+      "m_iINFZoneVehicleChance": -1,
+      "m_iINFZoneVehicleLimit": -1,
+      "m_fINFQuestioningChance": -1,
+      "m_iINFIntelSource": -1,
+      "m_iINFMissionEndMode": -1,
+      "m_iINFCacheObjective": -1
+    }
+  }
+Game mode defaults and ranges when left at -1:
+  m_iINFTerrainIndexRevision    1      1 or more
+  m_fINFCampFootprintRadius     9      3-24 metres
+  m_iINFSiteStrengthMultiplier  2      1-4
+  m_iINFCounterAttackChance     10     0-100 percent
+  m_iINFMortarChance            15     0-100 percent
+  m_iINFMortarLimit             2      0-4
+  m_iINFRoadblockPercent        25     0-100 percent (roadblocks and defences together; 0 disables both)
+  m_fINFRoadblockSpacing        800    200-3000 metres
+  m_fINFRoadblockOwnerDistance  1000   200-3000 metres
+  m_iINFRoadblocksPerZone       2      1-4
+  m_iINFRoadblockGuards         4      2-8
+  m_fINFTravelEnterSpeed        50     1-200 km/h, must exceed exit speed
+  m_fINFTravelExitSpeed         30     0-199 km/h
+  m_fINFTravelEnterSeconds      20     1-180
+  m_fINFTravelExitSeconds       15     1-180
+  m_iINFZoneVehicleChance       30     0-100 percent
+  m_iINFZoneVehicleLimit        6      0-32
+  m_fINFQuestioningChance       twice the body-search chance, capped at 1; 0-1
+  m_iINFIntelSource             0      0 = search and questioning, 1 = questioning only
+  m_iINFMissionEndMode          0      0 = caches, 1 = + camps, 2 = + camps and zones
+  m_iINFCacheObjective          0      0 = off, 1 = on
+  m_sINFPlayerFaction           US
+Compositions (camp, mortar) default to the game mode's USSR prefabs.
+Roadblock compositions and debug toggles remain game mode only.
 Recovered missions preserve their saved camp/cache roster, even if a new count
 is configured; a smaller number never silently removes saved cache objectives.
 Fresh selections prefer woodland interiors before falling back to forest edges.
@@ -520,6 +580,50 @@ battery count. Batteries run from the patrol manager's existing proximity step a
 activation hook with no tick of their own, use the shared spawn and despawn gates, are
 never written to mission saves, preserve secured prisoners under the zone cleanup rules
 and are removed when the mission ends. Every refusal to spawn logs its reason.
+
+Roadblocks and defences
+Persistent static sites placed into the world's own composition slots (SCR_SiteSlotEntity,
+the slots the editor and base building use): roadblocks (barricades and checkpoints) in
+road slots, and defences (sandbag positions, machine-gun nests, bunkers, guard towers) in
+the small flat slots. The world also labels some small flat slots TRAIT_FORTIFICATION
+and others TRAIT_SERVICE, but the label is not used: all small flat slots are defence
+candidates. The larger flat slots hold base content (helipads, hospitals) and are
+never used. At a fresh mission start the patrol
+manager searches the map in background tiles for free matching slots. Of all the viable
+ones together (outside safe zones, 250m from camps) it places a random Percentage, with
+roadblocks at least Spacing metres apart (defences are not spaced), and spawns one random
+fitting composition into each. The percentage is also a mission header setting
+(m_Insurgency.m_iINFRoadblockPercent, 0 turns both features off). The roster (slot
+position, yaw, composition, owner zone) is
+saved to $profile:INS_Saves/roadblock_sites.dat and restored with the camp and cache
+saves, so sites never move; an unreadable roster is left untouched and places none.
+Compositions: the game mode list (Roadblocks: Compositions on the patrol manager; folders
+under Prefabs/Compositions/Slotted, SlotRoad* for roadblocks and SlotFlatSmall for defences).
+There are no built-in sets: an empty list disables both features and logs why. Both game mode
+prefabs are pre-populated with the editable (E_) variants: the Insurgency Advanced mode
+with the USSR barricades, checkpoints, bunker, guard tower, machine-gun nests and sandbag
+positions, and the Insurgency Advanced FIA mode with the USSR road barricades and
+checkpoints (FIA has none) plus FIA bunker, machine-gun nests and sandbag position. Because the
+entries are the editable variants, a
+Game Master can select, move or delete them; such edits last for the session only and
+the saved roster respawns the original on the next start. Delete
+roadblock_sites.dat to re-roll sites after changing the composition list.
+Settings on the patrol manager (Roadblocks category):
+  Percentage           default 25, range 0-100 (0 disables; applies to a fresh selection only)
+  Spacing              default 800m
+  Owner Distance       default 1000m
+  Roadblocks Per Zone  default 2, range 1-4 (counts roadblocks and defences)
+  Guards               default 4, range 2-8 (roadblocks; defence groups are 2-4)
+Each site belongs to the nearest zone that can still activate and is within Owner
+Distance (a site with none is not placed). The composition is always present; its
+guard group spawns when that zone activates, holding the site under a defend waypoint
+(which also mans turrets) even outside the zone cell. Guards are ordinary defenders of the
+owner zone: they are added to its plan, so
+they count towards the zone's share of the 128-AI budget and its reservation, respawn
+at full strength or as survivors under the zone's defender-memory rules, despawn with the
+zone, and the zone cannot be captured while any guard is alive. Sites are not capture
+objectives, cache candidates or camp influence. A guard group that cannot find a spot away
+from players keeps the site's previous survivor count for the next activation.
 Zone vehicles prefer road placement, then try up to 32 open-ground positions
 inside the zone with up to four headings per position. Open-ground placement
 does not require a road; it retains player distance, concealment, exclusions,

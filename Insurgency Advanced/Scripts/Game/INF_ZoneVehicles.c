@@ -133,6 +133,12 @@ modded class INS_AmbientVehicleManager
 		Replication.BumpMe();
 	}
 
+	void INF_ApplyHeaderSettings(INS_MissionParams params)
+	{
+		INF_HeaderSettings.Int(params.m_iINFZoneVehicleChance, 0, 100, "m_iINFZoneVehicleChance", m_iINFZoneVehicleChance);
+		INF_HeaderSettings.Int(params.m_iINFZoneVehicleLimit, 0, 32, "m_iINFZoneVehicleLimit", m_iINFZoneVehicleLimit);
+	}
+
 	override void OnGameModeEnd(SCR_GameModeEndData data)
 	{
 		m_INFZoneVehiclesStopped = true;

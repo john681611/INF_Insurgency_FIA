@@ -64,6 +64,16 @@ modded class INS_IntelManager
 		Print(string.Format("[INF_Prisoners] Intel source set to %1.", source));
 	}
 
+	void INF_ApplyHeaderSettings(INS_MissionParams params)
+	{
+		INF_HeaderSettings.Float(params.m_fINFQuestioningChance, 0, 1, "m_fINFQuestioningChance", m_fINFQuestioningChance);
+		INF_HeaderSettings.Int(params.m_iINFIntelSource, INF_EIntelSource.SEARCH_AND_QUESTIONING, INF_EIntelSource.QUESTIONING_ONLY, "m_iINFIntelSource", m_iINFIntelSource);
+		INF_HeaderSettings.Int(params.m_iINFMissionEndMode, INF_EMissionEndMode.CACHES, INF_EMissionEndMode.CACHES_CAMPS_ZONES, "m_iINFMissionEndMode", m_iINFMissionEndMode);
+		int cacheObjective;
+		if (INF_HeaderSettings.Int(params.m_iINFCacheObjective, 0, 1, "m_iINFCacheObjective", cacheObjective))
+			m_bINFCacheObjective = cacheObjective == 1;
+	}
+
 	bool INF_HasQuestioningIntel()
 	{
 		for (int i = 0; i < m_aCacheEntities.Count(); i++)
@@ -909,7 +919,9 @@ modded class INS_IntelManager
 					m_iCachesDestroyed++;
 			}
 		}
+		vector explosionPos = cacheEntity.GetOrigin();
 		super.OnCacheDestroyed(cacheEntity);
+		INF_SpawnCacheExplosion(explosionPos);
 		INS_AmbientPatrolManager patrols = INS_AmbientPatrolManager.Cast(GetOwner().FindComponent(INS_AmbientPatrolManager));
 		if (patrols && patrols.INF_GetZoneStates())
 			patrols.INF_GetZoneStates().CacheDestroyed(cacheEntity);
@@ -924,6 +936,25 @@ modded class INS_IntelManager
 			INF_DebugContentChanged();
 			INF_QueueCampaignObjectives();
 		}
+	}
+
+	protected void INF_SpawnCacheExplosion(vector pos)
+	{
+		// Warhead explosion prefabs are not replicated, so every machine must spawn its own for clients to see and hear it.
+		Rpc(INF_RpcCacheExplosion, pos);
+		INF_RpcCacheExplosion(pos);
+	}
+
+	[RplRpc(RplChannel.Reliable, RplRcver.Broadcast)]
+	protected void INF_RpcCacheExplosion(vector pos)
+	{
+		Resource res = Resource.Load("{72BEEF40AF179763}Prefabs/Weapons/Warheads/Explosions/Explosion_Tnt_Large.et");
+		if (!res || !res.IsValid())
+			return;
+		EntitySpawnParams params = new EntitySpawnParams();
+		params.TransformMode = ETransformMode.WORLD;
+		params.Transform[3] = pos;
+		GetGame().SpawnEntityPrefab(res, GetGame().GetWorld(), params);
 	}
 
 	override protected void ShowCacheDestroyedHint(int destroyed, int total)

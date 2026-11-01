@@ -9,10 +9,23 @@ class INF_TerritoryPersistence
 {
 	protected static const string PREFIX = "$profile:INS_Saves/territory_";
 	protected ref INF_TerritorySnapshot m_State = new INF_TerritorySnapshot();
+	protected static bool s_bEnded;
 	protected bool m_Ready;
 	protected bool m_Dirty;
 	protected int m_Slot = -1;
 	protected float m_NextWriteWarning;
+
+	// Clean mission end: remove both snapshot slots so a restart begins with no secured zones or camps.
+	static void DeleteSaves()
+	{
+		s_bEnded = true;
+		for (int slot = 0; slot < 2; slot++)
+		{
+			string path = PREFIX + slot.ToString() + ".dat";
+			if (FileIO.FileExists(path) && !FileIO.DeleteFile(path))
+				Print("[INF_Territory] Cannot delete territory snapshot on clean mission end: " + path, LogLevel.ERROR);
+		}
+	}
 
 	bool IsDirty()
 	{
@@ -84,6 +97,7 @@ class INF_TerritoryPersistence
 	{
 		if (!Replication.IsServer())
 			return;
+		s_bEnded = false;
 		bool exists = false;
 		for (int slot = 0; slot < 2; slot++)
 		{
@@ -162,7 +176,7 @@ class INF_TerritoryPersistence
 
 	void Flush()
 	{
-		if (!Replication.IsServer() || !m_Ready || !m_Dirty)
+		if (!Replication.IsServer() || !m_Ready || !m_Dirty || s_bEnded)
 			return;
 		FileIO.MakeDirectory(INS_CACHE_SAVE_DIR);
 		int slot = 0;

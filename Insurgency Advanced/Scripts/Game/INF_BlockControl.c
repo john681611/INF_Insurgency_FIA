@@ -744,6 +744,10 @@ modded class INS_PatrolAgent
 {
 	bool m_bINFInbound;
 	float m_fINFInboundDeadline = -1;
+	// Set for a roadblock guard group, which stands at the roadblock rather than patrolling the zone cell.
+	INF_Roadblock m_INFRoadblock;
+	// The defend waypoint of a roadblock guard group, deleted with the group.
+	AIWaypoint m_INFDefend;
 }
 
 

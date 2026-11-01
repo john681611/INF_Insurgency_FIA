@@ -17,17 +17,7 @@ modded class SCR_DestructionMultiPhaseComponent
         INS_IntelManager mgr = INS_IntelManager.GetInstance();
         if (!mgr || !mgr.IsRegisteredCache(owner))
             return;
+        // The explosion is spawned by the objective manager's OnCacheDestroyed.
         mgr.OnCacheDestroyed(owner);
-
-        vector pos = owner.GetOrigin();
-		 // Spawn the explosion prefab
-        Resource res = Resource.Load("{72BEEF40AF179763}Prefabs/Weapons/Warheads/Explosions/Explosion_Tnt_Large.et");
-        EntitySpawnParams params = new EntitySpawnParams();
-        params.TransformMode = ETransformMode.WORLD;
-        params.Transform[3] = pos;
-        GetGame().SpawnEntityPrefab(res, GetGame().GetWorld(), params);
-        
-
-       
     }
 }

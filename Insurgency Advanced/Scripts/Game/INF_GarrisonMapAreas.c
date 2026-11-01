@@ -81,6 +81,18 @@ modded class SCR_MapDotCircleHandler
 			m_INFZoneCanvas.TessellateCircle(Vector(m_fActualRadius, m_fActualRadius, 0), m_fActualRadius, 96, fill.m_Vertices);
 		m_INFZoneCommands.Clear();
 		m_INFZoneCommands.Insert(fill);
+
+		// Border: lightened state colour, fully opaque; the line is closed by repeating the first vertex.
+		Color base = m_DotMarkerEnt.m_DotColor;
+		LineDrawCommand border = new LineDrawCommand();
+		border.m_iColor = Color.FromRGBA(
+			Math.Min(255, base.R() * 255 + 80), Math.Min(255, base.G() * 255 + 80), Math.Min(255, base.B() * 255 + 80), 255).PackToInt();
+		border.m_fWidth = 3;
+		border.m_Vertices = new array<float>();
+		border.m_Vertices.Copy(fill.m_Vertices);
+		border.m_Vertices.Insert(fill.m_Vertices[0]);
+		border.m_Vertices.Insert(fill.m_Vertices[1]);
+		m_INFZoneCommands.Insert(border);
 		m_INFZoneCanvas.SetDrawCommands(m_INFZoneCommands);
 	}
 
