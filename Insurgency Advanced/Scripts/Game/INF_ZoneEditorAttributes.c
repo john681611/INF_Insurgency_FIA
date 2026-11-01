@@ -84,6 +84,37 @@ class INF_QuestioningChanceEditorAttribute : SCR_BaseValueListEditorAttribute
 }
 
 [BaseContainerProps(), SCR_BaseEditorAttributeCustomTitle()]
+class INF_IntelSourceEditorAttribute : SCR_BaseEditorAttribute
+{
+	override SCR_BaseEditorAttributeVar ReadVariable(Managed item, SCR_AttributesManagerEditorComponent manager)
+	{
+		if (!IsGameMode(item) || !INF_ZoneEditorContext.Grid(m_GameMode))
+			return null;
+		INS_IntelManager intel = INS_IntelManager.Cast(m_GameMode.FindComponent(INS_IntelManager));
+		if (!intel)
+			return null;
+		return SCR_BaseEditorAttributeVar.CreateInt(intel.INF_GetIntelSource());
+	}
+
+	override void WriteVariable(Managed item, SCR_BaseEditorAttributeVar var,
+		SCR_AttributesManagerEditorComponent manager, int playerID)
+	{
+		if (!var || !IsGameMode(item) || !INF_ZoneEditorContext.Grid(m_GameMode))
+			return;
+		INS_IntelManager intel = INS_IntelManager.Cast(m_GameMode.FindComponent(INS_IntelManager));
+		if (intel)
+			intel.INF_SetIntelSource(var.GetInt());
+	}
+
+	override int GetEntries(notnull array<ref SCR_BaseEditorAttributeEntry> outEntries)
+	{
+		outEntries.Insert(new SCR_BaseEditorAttributeEntryText("Search body and questioning"));
+		outEntries.Insert(new SCR_BaseEditorAttributeEntryText("Questioning only"));
+		return outEntries.Count();
+	}
+}
+
+[BaseContainerProps(), SCR_BaseEditorAttributeCustomTitle()]
 class INF_TravelSettingEditorAttribute : SCR_BaseValueListEditorAttribute
 {
 	[Attribute("0")]

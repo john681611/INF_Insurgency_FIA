@@ -620,7 +620,7 @@ modded class INS_BodySearchAction
 		if (!INF_ZoneEditorContext.Grid(GetGame().GetGameMode()))
 			return true;
 		INS_IntelManager intel = INS_IntelManager.GetInstance();
-		return intel && intel.INF_IsIntelReady();
+		return intel && intel.INF_IsIntelReady() && intel.INF_IsBodySearchEnabled();
 	}
 
 	override bool CanBeShownScript(IEntity user)

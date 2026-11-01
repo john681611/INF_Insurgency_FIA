@@ -7,6 +7,12 @@ class INF_CacheIntelRecord
 	ref array<int> m_Distance = {};
 }
 
+enum INF_EIntelSource
+{
+	SEARCH_AND_QUESTIONING,
+	QUESTIONING_ONLY
+}
+
 modded class INS_IntelManager
 {
 	[Attribute("-1", UIWidgets.EditBox, "Questioning intel probability (0 to 1). -1 initialises to twice the body-search chance, capped at 1.", category: "Prisoners"), RplProp()]
@@ -29,6 +35,33 @@ modded class INS_IntelManager
 		m_fINFQuestioningChance = chance;
 		Replication.BumpMe();
 		Print(string.Format("[INF_Prisoners] Questioning intel chance set to %1.", chance));
+	}
+
+	[Attribute("0", UIWidgets.ComboBox, "Intel sources: 0 = body search and questioning, 1 = questioning only.", enums: ParamEnumArray.FromEnum(INF_EIntelSource), category: "Prisoners"), RplProp()]
+	protected int m_iINFIntelSource;
+
+	int INF_GetIntelSource()
+	{
+		return m_iINFIntelSource;
+	}
+
+	bool INF_IsBodySearchEnabled()
+	{
+		return m_iINFIntelSource != INF_EIntelSource.QUESTIONING_ONLY;
+	}
+
+	void INF_SetIntelSource(int source)
+	{
+		if (!Replication.IsServer())
+			return;
+		if (source < INF_EIntelSource.SEARCH_AND_QUESTIONING || source > INF_EIntelSource.QUESTIONING_ONLY)
+		{
+			Print("[INF_Prisoners] Invalid intel source; expected 0 or 1.", LogLevel.ERROR);
+			return;
+		}
+		m_iINFIntelSource = source;
+		Replication.BumpMe();
+		Print(string.Format("[INF_Prisoners] Intel source set to %1.", source));
 	}
 
 	bool INF_HasQuestioningIntel()

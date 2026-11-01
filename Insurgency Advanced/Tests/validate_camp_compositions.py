@@ -84,6 +84,8 @@ class CampCompositions(unittest.TestCase):
         self.assertEqual(depth, 0)
         expected = {
             "INF_QuestioningChanceEditorAttribute": "{6AA19CB200000311}",
+            "INF_IntelSourceEditorAttribute": "{6AA19CB200000313}",
+            "INF_DebugCacheMarkersEditorAttribute": "{6AA19CB200000315}",
             "INS_PatrolsEnabledEditorAttribute": "{494E530000000001}",
             "INS_ZoneCooldownEditorAttribute": "{494E530000000028}",
             "INS_MaxConcurrentCounterAttacksEditorAttribute": "{494E530000000010}",
