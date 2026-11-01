@@ -488,6 +488,38 @@ permanently blocking vehicle/wreck cleanup; blocked wreck checks retry.
 Zone activation, which the existing join pause already gates, is the only admission
 path, so vehicles need no ambient routes or private queue. Mission end cancels all custom lifecycle callbacks.
 Runtime vehicles/crews are not written into terrain indexes or mission saves.
+
+Mortar batteries
+Zone-owned artillery meant to distract and disperse, not to kill. A zone rolls for a
+battery as it activates (once per zone per mission, same won-roll-passes-to-the-next-zone
+rule as zone vehicles). The battery is two static mortar compositions (default
+MortarPlacement_S_USSR_01, set on the game mode prefab's patrol manager under Mortar
+Batteries), two 2-man gunner crews (one per mortar) and a 2-4 man guard group. Gunners
+and guards come from the configured group pool; nothing is hard-coded to a faction.
+Settings on the patrol manager (Workbench, no GM attribute yet):
+  Mortar Batteries: Chance (%)      default 15, range 0-100 (per zone; neighbouring zones roll independently)
+  Mortar Batteries: Maximum Active  default 2, range 0-4
+The battery sits 500-1500m from its zone on hidden, flat, open ground at least 300m
+from players, and covers every active zone within 2.5km, so a cluster of zones shares
+one battery. It despawns once no player is within 2km and no covered zone is active.
+Fire only follows hostile AI knowledge. Spotters are the battery's guards and the
+defenders of the covered active zones. The battery reads each spotter group's shared AI
+perception (members' sightings and gunfire the group has heard) and targets the best-known
+enemy at its last known position; knowledge is recency times certainty (a known entity is
+certain, a bare position such as gunfire half certain), from 0 to 1, and is forgotten
+after 120s. Knowledge sets the spread: full knowledge gives 30m (HE), 60m (smoke) or 90m
+(illumination), none gives the full 100m / 150m / 225m. With no known target it holds fire.
+A salvo is 18 rounds (12 HE, 6 smoke by day or illumination by night) in two stages
+of 1 special, 3 HE, 2 special, 3 HE per crew. HE blocks are one waypoint each and
+special rounds one per waypoint, so each gun rolls its own aim points. Knowledge is
+re-read between the stages; if every enemy is lost the battery ceases fire. The
+cooldown is about 3 minutes (+-30%). Ammo comes from the mortar's artillery usage
+component, so smoke and illumination need those ammo prefabs configured there.
+Like zone vehicles, battery AI sits outside the 128-AI budget and is limited by the
+battery count. Batteries run from the patrol manager's existing proximity step and zone
+activation hook with no tick of their own, use the shared spawn and despawn gates, are
+never written to mission saves, preserve secured prisoners under the zone cleanup rules
+and are removed when the mission ends. Every refusal to spawn logs its reason.
 Zone vehicles prefer road placement, then try up to 32 open-ground positions
 inside the zone with up to four headings per position. Open-ground placement
 does not require a road; it retains player distance, concealment, exclusions,

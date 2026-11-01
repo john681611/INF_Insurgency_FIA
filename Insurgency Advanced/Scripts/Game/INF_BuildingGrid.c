@@ -460,6 +460,37 @@ modded class INS_AmbientPatrolManager
 		return m_sINFCampComposition;
 	}
 
+	array<ResourceName> INF_GetGroupPrefabs()
+	{
+		return m_aGroupPrefabs;
+	}
+
+	[Attribute("15", UIWidgets.Slider, "Chance per activating zone that it owns a mortar battery. Zero disables batteries. Neighbouring zones roll independently, so the chance per cluster is higher.", "0 100 1", category: "Mortar Batteries"), RplProp()]
+	protected int m_iINFMortarChance = 15;
+	[Attribute("2", UIWidgets.Slider, "Maximum mortar batteries alive at once. Zero disables batteries.", "0 4 1", category: "Mortar Batteries"), RplProp()]
+	protected int m_iINFMortarLimit = 2;
+	[Attribute("{28D63631873AA636}Prefabs/Compositions/Slotted/SlotFlatSmall/MortarPlacement_S_USSR_01.et", UIWidgets.ResourceNamePicker, "Static composition holding the battery's mortars. Each mortar needs an AI vehicle usage component. Do not include AI groups; gunners and guards are spawned separately.", "et", category: "Mortar Batteries")]
+	protected ResourceName m_sINFMortarComposition;
+	protected ref INF_MortarBatteries m_INFMortars;
+	protected ref INF_MortarConfig m_INFMortarConfig;
+
+	INF_MortarConfig INF_GetMortarConfig()
+	{
+		if (!m_INFMortarConfig)
+			m_INFMortarConfig = new INF_MortarConfig();
+		m_INFMortarConfig.m_iChance = m_iINFMortarChance;
+		m_INFMortarConfig.m_iLimit = m_iINFMortarLimit;
+		m_INFMortarConfig.m_Composition = m_sINFMortarComposition;
+		return m_INFMortarConfig;
+	}
+
+	INF_MortarBatteries INF_GetMortars()
+	{
+		if (!m_INFMortars)
+			m_INFMortars = new INF_MortarBatteries();
+		return m_INFMortars;
+	}
+
 	int INF_GetCampCount()
 	{
 		return m_iINFCampCount;
@@ -859,6 +890,8 @@ modded class INS_AmbientPatrolManager
 		}
 		if (m_INFForestCamps)
 			m_INFForestCamps.Stop();
+		if (m_INFMortars)
+			m_INFMortars.Stop();
 		super.OnGameModeEnd(data);
 	}
 
@@ -940,6 +973,7 @@ modded class INS_AmbientPatrolManager
 			INS_AmbientVehicleManager zoneVehicles = INS_AmbientVehicleManager.Cast(GetOwner().FindComponent(INS_AmbientVehicleManager));
 			if (zoneVehicles)
 				zoneVehicles.INF_OnZoneActivated(state);
+			INF_GetMortars().OnZoneActivated(this, state, INF_GetMortarConfig());
 			for (int i = 0; i < state.m_iGroupCount; i++)
 			{
 				vector pos = INS_ZoneHelpers.RandomPositionInRadius(state.m_vCenter, state.m_fRadius);
@@ -1090,7 +1124,7 @@ modded class INS_AmbientPatrolManager
 				return true;
 			}
 		}
-		return false;
+		return m_INFMortars && m_INFMortars.BindPrisonerCleanup(group, prisoner);
 	}
 
 	void INF_CountActivationZones(INF_ActivationPolicy policy)
@@ -1162,9 +1196,11 @@ modded class INS_AmbientPatrolManager
 		INF_BlockPresence presence = m_INFZoneStates.GetPresence();
 		INS_AmbientVehicleManager zoneVehicles = INS_AmbientVehicleManager.Cast(GetOwner().FindComponent(INS_AmbientVehicleManager));
 		bool keepAlive = !presence.m_PlayerIDs.IsEmpty() || !m_INFZoneStates.GetActiveZones().IsEmpty()
-			|| (zoneVehicles && zoneVehicles.INF_HasZoneVehicles());
+			|| (zoneVehicles && zoneVehicles.INF_HasZoneVehicles()) || (m_INFMortars && m_INFMortars.HasBatteries());
 		if (zoneVehicles)
 			zoneVehicles.INF_MaintainZoneVehicles(presence);
+		if (m_INFMortars)
+			m_INFMortars.Maintain(this, presence, INF_GetMortarConfig());
 		array<INS_AmbientPatrolZoneState> activeZones = {};
 		activeZones.Copy(m_INFZoneStates.GetActiveZones());
 		foreach (INS_AmbientPatrolZoneState state : activeZones)

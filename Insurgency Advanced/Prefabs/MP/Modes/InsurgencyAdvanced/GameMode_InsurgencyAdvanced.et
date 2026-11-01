@@ -11,7 +11,8 @@ SCR_GameModeEditor : "{DA3986AF1B5032B8}Prefabs/MP/Modes/Editor/GameMode_Editor_
    m_bINFBuildingGrid 1
    m_sINFCampComposition "{8809D070C43CD78C}Prefabs/Compositions/Slotted/SlotFlatSmall/PlayerHub_S_USSR_01.et"
    m_fINFCampFootprintRadius 9
-  }
+    m_sINFMortarComposition "{28D63631873AA636}Prefabs/Compositions/Slotted/SlotFlatSmall/MortarPlacement_S_USSR_01.et"
+   }
   INS_IntelManager "{68B0FED5DE2D4E3A}" {
    m_bINFCacheObjective 1
   }
