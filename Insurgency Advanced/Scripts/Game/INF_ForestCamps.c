@@ -1,3 +1,11 @@
+modded class SCR_Faction
+{
+	int INF_GetBaseCallsignCount()
+	{
+		return m_aBaseCallsigns.Count();
+	}
+}
+
 class INF_ForestCampSite
 {
 	string m_Key;
@@ -105,6 +113,8 @@ class INF_ForestCamps
 	protected ref map<string, ref INF_ForestCell> m_Cells = new map<string, ref INF_ForestCell>();
 	protected ref array<string> m_Keys = {};
 	protected ref array<ref INF_ForestCampSite> m_Sites = {};
+	protected ref array<int> m_UsedCallsigns = {};
+	protected int m_iCallsignCount = -1;
 	protected ref array<vector> m_Buildings = {};
 	protected ref array<float> m_aBuildingClearSq = {};
 	protected int m_PublishedBuildings;
@@ -917,6 +927,32 @@ class INF_ForestCamps
 		}
 	}
 
+	// "Camp <callsign>" using a random unused base callsign index of the capturing faction; falls back to a number.
+	protected string GetCampName(Faction faction, INF_ForestCampSite site)
+	{
+		SCR_Faction scrFaction = SCR_Faction.Cast(faction);
+		if (scrFaction)
+		{
+			if (m_iCallsignCount < 0)
+				m_iCallsignCount = scrFaction.INF_GetBaseCallsignCount();
+			if (m_iCallsignCount > 0)
+			{
+				if (m_UsedCallsigns.Count() >= m_iCallsignCount)
+					m_UsedCallsigns.Clear();
+				int index = Math.RandomInt(0, m_iCallsignCount);
+				while (m_UsedCallsigns.Contains(index))
+					index = Math.RandomInt(0, m_iCallsignCount);
+				SCR_MilitaryBaseCallsign callsign = scrFaction.GetBaseCallsignByIndex(index);
+				if (callsign)
+				{
+					m_UsedCallsigns.Insert(index);
+					return "Camp " + WidgetManager.Translate(callsign.GetCallsignShort());
+				}
+			}
+		}
+		return "Camp " + (Math.Max(m_Sites.Find(site), 0) + 1);
+	}
+
 	bool MakeFriendly(INF_ForestCampSite site)
 	{
 		if (!Replication.IsServer())
@@ -959,10 +995,11 @@ class INF_ForestCamps
 			if (!owner.BindFaction(faction))
 				return false;
 		}
+		string campName = GetCampName(faction, site);
 		foreach (SCR_SpawnPoint point : spawns)
 		{
 			point.SetFaction(faction);
-			point.SetSpawnPointName("Captured Camp");
+			point.SetSpawnPointName(campName);
 			point.SetSpawnPointEnabled_S(true);
 		}
 		site.m_Friendly = true;

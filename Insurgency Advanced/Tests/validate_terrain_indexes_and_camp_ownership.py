@@ -234,7 +234,7 @@ class PermanentCampOwnership(unittest.TestCase):
         self.assertIn("m_Manager.INF_GetPlayerFaction()", friendly)
         self.assertNotIn(".GetPlayerFaction(", friendly)
         self.assertIn("GetFactionByKey(m_sINFPlayerFaction)", GRID)
-        for call in ("point.SetFaction(faction)", 'point.SetSpawnPointName("Captured Camp")',
+        for call in ("point.SetFaction(faction)", 'point.SetSpawnPointName(campName)',
                      "point.SetSpawnPointEnabled_S(true)", "site.m_Friendly = true"):
             self.assertIn(call, friendly)
 
