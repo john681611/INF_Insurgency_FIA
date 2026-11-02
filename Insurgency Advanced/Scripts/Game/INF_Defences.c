@@ -270,7 +270,7 @@ class INF_Defences
 	{
 		if (m_Config.m_sSlotCache.IsEmpty())
 		{
-			Fail("No slot cache is configured (INS_MissionParams m_sINFDefenceSlotCache), so there is no fallback; no defences placed.");
+			Fail("No slot cache is configured (INS_AmbientPatrolManager m_sINFDefenceSlotCache), so there is no fallback; no defences placed.");
 			return;
 		}
 		INF_DefenceSlotCache cache = INF_DefenceSlotCache.Load(m_Config.m_sSlotCache);
@@ -565,11 +565,7 @@ class INF_Defences
 			Fail("Saved defence composition cannot load, skipping: " + defence.m_Composition);
 			return false;
 		}
-		EntitySpawnParams params = new EntitySpawnParams();
-		params.TransformMode = ETransformMode.WORLD;
-		Math3D.AnglesToMatrix(Vector(defence.m_fYaw, 0, 0), params.Transform);
-		params.Transform[3] = defence.m_vPosition;
-		IEntity entity = GetGame().SpawnEntityPrefab(resource, GetGame().GetWorld(), params);
+		IEntity entity = SpawnAt(resource, defence.m_vPosition, defence.m_fYaw);
 		if (!entity)
 		{
 			Fail("Saved defence could not be respawned: " + defence.m_sKey);

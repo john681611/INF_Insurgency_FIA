@@ -1,8 +1,8 @@
 // A world's composition slots baked into a config, for servers whose world does not create the slot entities. The
-// mission names it in its header (INS_MissionParams.m_sINFDefenceSlotCache) and defences fall back to it when the
-// scan finds no SCR_SiteSlotEntity. Generated from the world's slot layer by the mission addon's
+// mission's game mode prefab names it (INS_AmbientPatrolManager m_sINFDefenceSlotCache) and defences fall back to it
+// when the scan finds no SCR_SiteSlotEntity. Generated from the world's slot layer by the mission addon's
 // Tools/generate_defence_slot_cache.py.
-[BaseContainerProps()]
+[BaseContainerProps(), BaseContainerCustomTitleField("m_sType")]
 class INF_DefenceSlotEntry
 {
 	[Attribute("", UIWidgets.EditBox, "Slot type, the lowercase slot prefab name without the E_ prefix, e.g. slotroadmedium.")]

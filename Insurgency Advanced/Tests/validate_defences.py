@@ -183,6 +183,7 @@ class DefencePersistence(unittest.TestCase):
         for removed in ("Sphere", "ProbeKnownSlot", "WatchForPlayer", "CollectEditableSlots"):
             self.assertNotIn(removed, DEFENCES)
         self.assertIn("m_sINFDefenceSlotCache", GRID)
+        self.assertNotIn("params.m_sINFDefenceSlotCache", GRID)
         self.assertIn("config.m_sSlotCache = m_sINFDefenceSlotCache", GRID)
 
     def test_the_roster_is_deleted_on_a_clean_mission_end(self):
@@ -212,8 +213,10 @@ class DefencePersistence(unittest.TestCase):
 
     def test_restore_respawns_at_the_saved_transform(self):
         body = defence("protected bool Restore(")
-        self.assertIn("Math3D.AnglesToMatrix(Vector(defence.m_fYaw, 0, 0), params.Transform)", body)
-        self.assertIn("params.Transform[3] = defence.m_vPosition", body)
+        self.assertIn("SpawnAt(resource, defence.m_vPosition, defence.m_fYaw)", body)
+        spawn = defence("protected static IEntity SpawnAt(")
+        self.assertIn("Math3D.AnglesToMatrix(Vector(yaw, 0, 0), params.Transform)", spawn)
+        self.assertIn("params.Transform[3] = position", spawn)
         self.assertIn("SetOccupant(defence.m_vPosition, entity)", body)
         self.assertNotIn("SCR_SiteSlotEntity", body)
 

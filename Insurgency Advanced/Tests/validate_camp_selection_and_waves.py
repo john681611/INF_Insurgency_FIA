@@ -20,7 +20,8 @@ class CampSelectionAndWaves(unittest.TestCase):
         self.assertNotIn("INF_SetCampCount", GRID)
         self.assertNotIn("INF_CampCountEditorAttribute", ATTR)
         header = (ROOT.parent / "INF Insurgency Everon/Missions/InsEden.conf").read_text()
-        self.assertIn("m_iINFCampCount 7", header)
+        # The Everon mission relies on the defaults (7 camps) and carries no m_Insurgency block.
+        self.assertNotIn("m_Insurgency", header)
         for name in ("m_iINFDefencePercent", "m_fINFTravelEnterSpeed", "m_iINFZoneVehicleLimit",
                      "m_iINFMissionEndMode", "m_iINFCounterAttackChance", "m_fINFQuestioningChance"):
             self.assertIn(name, GRID + (ROOT / "Scripts/Game/INF_CacheObjective.c").read_text())

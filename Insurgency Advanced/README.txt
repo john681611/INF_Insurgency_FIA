@@ -389,9 +389,6 @@ Game mode defaults and ranges when left at -1:
   m_fINFDefenceOwnerDistance    1000   200-3000 metres
   m_iINFDefencesPerZone         2      1-4
   m_iINFDefenceGuards           4      2-8 (road defences; small flat ones use 2-4)
-  m_sINFDefenceSlotCache        (none) Baked slot list (.conf) used when the world has no slot entities at runtime, as on
-                                       a dedicated server. The Everon mission generates it from its slot layer with
-                                       Tools/generate_defence_slot_cache.py.
   m_fINFTravelEnterSpeed        50     1-200 km/h, must exceed exit speed
   m_fINFTravelExitSpeed         30     0-199 km/h
   m_fINFTravelEnterSeconds      20     1-180
@@ -612,6 +609,11 @@ checkpoints (FIA has none) plus the FIA bunker, machine-gun nests and sandbag po
 Because the entries are the editable variants, a Game Master can select, move or delete them;
 such edits last for the session only and the saved roster respawns the original on the next
 start. Delete defence_sites.dat to re-roll defences after changing the composition list.
+Slot cache: a world whose slot entities do not exist at runtime (a dedicated server) can set Defence
+Slot Cache on the patrol manager (in the mission's game mode prefab) to a config of baked slots
+(INF_DefenceSlotCache: type, position, yaw). Defences use it only when the scan finds no slot
+entities at all. The Everon mission generates its config from Slots.layer with
+Tools/generate_defence_slot_cache.py; rerun it after the slot layer changes.
 Settings on the patrol manager (Defences category):
   Percentage           default 15, range 0-100 (0 disables; applies to a fresh selection only)
   Spacing              default 800m
