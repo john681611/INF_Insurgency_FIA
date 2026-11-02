@@ -389,6 +389,9 @@ Game mode defaults and ranges when left at -1:
   m_fINFDefenceOwnerDistance    1000   200-3000 metres
   m_iINFDefencesPerZone         2      1-4
   m_iINFDefenceGuards           4      2-8 (road defences; small flat ones use 2-4)
+  m_sINFDefenceSlotCache        (none) Baked slot list (.conf) used when the world has no slot entities at runtime, as on
+                                       a dedicated server. The Everon mission generates it from its slot layer with
+                                       Tools/generate_defence_slot_cache.py.
   m_fINFTravelEnterSpeed        50     1-200 km/h, must exceed exit speed
   m_fINFTravelExitSpeed         30     0-199 km/h
   m_fINFTravelEnterSeconds      20     1-180

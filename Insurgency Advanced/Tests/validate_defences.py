@@ -110,7 +110,7 @@ class DefencePlacement(unittest.TestCase):
         self.assertIn("child.GetVObject().GetResourceName()", body)
         self.assertIn("name.ToLower()", body)
         self.assertIn("SlotName(slot)", defence("protected bool CollectSlot("))
-        self.assertIn("SlotName(slot)", defence("protected bool TryPlace("))
+        self.assertIn("SlotName(slot)", defence("protected void Select("))
         self.assertNotIn("PrefabNameLower", defence("protected bool TryPlace("))
 
     def test_small_flat_slots_are_counted_and_logged_for_diagnosis(self):
@@ -168,21 +168,22 @@ class DefencePersistence(unittest.TestCase):
         select = defence("protected void PlaceDefences(")
         self.assertIn("!m_Sites.IsEmpty() && !Save()", select)
 
-    def test_sphere_scan_retries_after_init_and_first_spawn_until_slots_are_found(self):
+    def test_baked_slot_cache_is_the_fallback_when_the_world_has_no_slot_entities(self):
         select = defence("protected void Select(")
-        self.assertIn('StartSphereScan("startup, after all initialisation")', select)
-        watch = defence("protected void WatchForPlayer(")
-        self.assertIn("GetPlayerControlledEntity(playerId)", watch)
-        self.assertIn("if (m_bSlotsFound)", watch)
-        self.assertIn('StartSphereScan("first player spawned")', watch)
-        start = defence("protected void StartSphereScan(")
-        self.assertIn("if (m_bSlotsFound || m_bSphereRunning)", start)
-        tick = defence("protected void SphereTick(")
-        self.assertIn("SCAN_BUDGET_MS", tick)
-        self.assertIn("QueryEntitiesBySphere", tick)
-        self.assertIn("m_bSlotsFound = true", tick)
-        self.assertIn("PlaceDefences()", tick)
-        self.assertIn("SphereTick", defence("void Stop("))
+        self.assertIn("m_SeenSlotNames.IsEmpty()", select)
+        self.assertIn("UseBakedSlots()", select)
+        baked = defence("protected void UseBakedSlots(")
+        self.assertIn("INF_DefenceSlotCache.Load(m_Config.m_sSlotCache)", baked)
+        self.assertIn("m_SlotTypes.Find(type) < 0", baked)
+        self.assertIn("GetSurfaceY", baked)
+        self.assertIn("PlaceDefences(candidates)", baked)
+        self.assertIn("No slot cache is configured", baked)
+        place = defence("protected INF_Defence PlaceInSlot(")
+        self.assertIn("SpawnAt(resource, candidate.m_vPosition, candidate.m_fYaw)", place)
+        for removed in ("Sphere", "ProbeKnownSlot", "WatchForPlayer", "CollectEditableSlots"):
+            self.assertNotIn(removed, DEFENCES)
+        self.assertIn("m_sINFDefenceSlotCache", GRID)
+        self.assertIn("config.m_sSlotCache = m_sINFDefenceSlotCache", GRID)
 
     def test_the_roster_is_deleted_on_a_clean_mission_end(self):
         self.assertIn("FileIO.DeleteFile(INF_Defences.SAVE_FILE)", REWARDS)
