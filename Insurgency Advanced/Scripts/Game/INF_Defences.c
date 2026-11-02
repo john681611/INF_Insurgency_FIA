@@ -256,8 +256,31 @@ class INF_Defences
 		return true;
 	}
 
+	// Fallback for servers where the spatial query cannot see slots (no bounds without their editor mesh); the Game
+	// Master registry holds every editable slot regardless.
+	protected void CollectEditableSlots()
+	{
+		SCR_EditableEntityCore core = SCR_EditableEntityCore.Cast(SCR_EditableEntityCore.GetInstance(SCR_EditableEntityCore));
+		if (!core)
+		{
+			Log("Editable entity registry unavailable; cannot look for slots there.");
+			return;
+		}
+		set<SCR_EditableEntityComponent> editables = new set<SCR_EditableEntityComponent>();
+		core.GetAllEntities(editables, false, true);
+		int total = editables.Count();
+		foreach (SCR_EditableEntityComponent editable : editables)
+		{
+			if (editable)
+				CollectSlot(editable.GetOwner());
+		}
+		Log(string.Format("Editable entity registry holds %1 entities; %2 slots found there.", total, m_Slots.Count()));
+	}
+
 	protected void Select()
 	{
+		if (m_SeenSlotNames.IsEmpty())
+			CollectEditableSlots();
 		string seen;
 		foreach (int seenIndex, string seenName : m_SeenSlotNames)
 			seen += string.Format(" %1 x%2", seenName, m_SeenSlotCounts[seenIndex]);
