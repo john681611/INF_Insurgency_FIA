@@ -187,7 +187,7 @@ class INF_TerrainIndex
 			return false;
 		}
 		int count;
-		if (!ReadHeader(file, 1) || !file.Read(count) || count < 1 || count > INF_ForestCamps.MAX_CANDIDATES)
+		if (!ReadHeader(file, 1) || !file.Read(count) || count < 1 || count > 1000000)
 			return Invalid(file, m_CampPath);
 		array<ref INF_ForestCampSite> readCandidates = {};
 		array<string> keys = {};

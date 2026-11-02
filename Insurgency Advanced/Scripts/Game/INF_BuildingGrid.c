@@ -1,57 +1,57 @@
 modded class INS_MissionParams
 {
 	[Attribute("7", UIWidgets.Slider, "Camps randomly selected at startup for a fresh mission. Saved missions retain their roster.", "1 20 1")]
-	int m_iINFCampCount;
+	int m_iINFCampCount = 7;
 
 	// Every field below overrides the matching game mode attribute. -1 (or empty) keeps the game mode value.
 	[Attribute("-1", UIWidgets.EditBox, "Terrain-index revision (1 or more).", category: "Terrain Index")]
-	int m_iINFTerrainIndexRevision;
+	int m_iINFTerrainIndexRevision = -1;
 	[Attribute("", UIWidgets.ResourceNamePicker, "Camp composition prefab.", "et", category: "Forest Camps")]
 	ResourceName m_sINFCampComposition;
 	[Attribute("", UIWidgets.EditBox, "Player faction key.", category: "Forest Camps")]
 	string m_sINFPlayerFaction;
 	[Attribute("-1", UIWidgets.EditBox, "Camp footprint half-width in metres (3 to 24).", category: "Forest Camps")]
-	float m_fINFCampFootprintRadius;
+	float m_fINFCampFootprintRadius = -1;
 	[Attribute("-1", UIWidgets.EditBox, "Site strength multiplier (1 to 4).", category: "Grid Zones")]
-	int m_iINFSiteStrengthMultiplier;
+	int m_iINFSiteStrengthMultiplier = -1;
 	[Attribute("-1", UIWidgets.EditBox, "Counterattack chance percent (0 to 100).", category: "Grid Zones")]
-	int m_iINFCounterAttackChance;
+	int m_iINFCounterAttackChance = -1;
 	[Attribute("-1", UIWidgets.EditBox, "Mortar battery chance percent (0 to 100).", category: "Mortar Batteries")]
-	int m_iINFMortarChance;
+	int m_iINFMortarChance = -1;
 	[Attribute("-1", UIWidgets.EditBox, "Maximum mortar batteries (0 to 4).", category: "Mortar Batteries")]
-	int m_iINFMortarLimit;
+	int m_iINFMortarLimit = -1;
 	[Attribute("", UIWidgets.ResourceNamePicker, "Mortar battery composition prefab.", "et", category: "Mortar Batteries")]
 	ResourceName m_sINFMortarComposition;
 	[Attribute("-1", UIWidgets.EditBox, "Percentage of viable road and small flat slots that receive a defence (0 to 100). 0 disables defences.", category: "Defences")]
-	int m_iINFDefencePercent;
+	int m_iINFDefencePercent = -1;
 	[Attribute("-1", UIWidgets.EditBox, "Minimum spacing between road defences in metres (200 to 3000).", category: "Defences")]
-	float m_fINFDefenceSpacing;
+	float m_fINFDefenceSpacing = -1;
 	[Attribute("-1", UIWidgets.EditBox, "Defence owner-zone distance in metres (200 to 3000).", category: "Defences")]
-	float m_fINFDefenceOwnerDistance;
+	float m_fINFDefenceOwnerDistance = -1;
 	[Attribute("-1", UIWidgets.EditBox, "Maximum defences per zone (1 to 4).", category: "Defences")]
-	int m_iINFDefencesPerZone;
+	int m_iINFDefencesPerZone = -1;
 	[Attribute("-1", UIWidgets.EditBox, "Soldiers per road defence guard group (2 to 8).", category: "Defences")]
-	int m_iINFDefenceGuards;
+	int m_iINFDefenceGuards = -1;
 	[Attribute("-1", UIWidgets.EditBox, "Travel efficiency entry speed in km/h (1 to 200).", category: "Travel Efficiency")]
-	float m_fINFTravelEnterSpeed;
+	float m_fINFTravelEnterSpeed = -1;
 	[Attribute("-1", UIWidgets.EditBox, "Travel efficiency exit speed in km/h (0 to 199).", category: "Travel Efficiency")]
-	float m_fINFTravelExitSpeed;
+	float m_fINFTravelExitSpeed = -1;
 	[Attribute("-1", UIWidgets.EditBox, "Seconds at entry speed before travel efficiency starts (1 to 180).", category: "Travel Efficiency")]
-	float m_fINFTravelEnterSeconds;
+	float m_fINFTravelEnterSeconds = -1;
 	[Attribute("-1", UIWidgets.EditBox, "Seconds below exit speed before it ends (1 to 180).", category: "Travel Efficiency")]
-	float m_fINFTravelExitSeconds;
+	float m_fINFTravelExitSeconds = -1;
 	[Attribute("-1", UIWidgets.EditBox, "Zone vehicle chance percent (0 to 100).", category: "Zone Vehicles")]
-	int m_iINFZoneVehicleChance;
+	int m_iINFZoneVehicleChance = -1;
 	[Attribute("-1", UIWidgets.EditBox, "Zone vehicle cap (0 to 32).", category: "Zone Vehicles")]
-	int m_iINFZoneVehicleLimit;
+	int m_iINFZoneVehicleLimit = -1;
 	[Attribute("-1", UIWidgets.EditBox, "Questioning intel probability (0 to 1).", category: "Prisoners")]
-	float m_fINFQuestioningChance;
+	float m_fINFQuestioningChance = -1;
 	[Attribute("-1", UIWidgets.EditBox, "Intel sources: 0 = body search and questioning, 1 = questioning only.", category: "Prisoners")]
-	int m_iINFIntelSource;
+	int m_iINFIntelSource = -1;
 	[Attribute("-1", UIWidgets.EditBox, "Objectives required for victory: 0 = caches, 1 = caches and camps, 2 = caches, camps and zones.", category: "Objectives")]
-	int m_iINFMissionEndMode;
+	int m_iINFMissionEndMode = -1;
 	[Attribute("-1", UIWidgets.EditBox, "Cache destruction objective: 0 = off, 1 = on.", category: "Objectives")]
-	int m_iINFCacheObjective;
+	int m_iINFCacheObjective = -1;
 }
 
 // Applies one mission header override, rejecting values outside the attribute's range.
@@ -526,14 +526,22 @@ modded class INS_AmbientPatrolManager
 	protected bool m_bINFCampsReady;
 	[RplProp()]
 	protected string m_sINFStartupStatus;
+	[RplProp()]
+	protected bool m_bINFStartupBlocked;
+	[RplProp()]
+	protected bool m_bINFPoolReady;
 	protected string m_sINFStartupFailure;
-	protected int m_iINFScanTileTotal;
 	protected float m_fINFNextStartupHint;
+	protected bool m_bINFSawStartup;
+	protected bool m_bINFReadyHinted;
+	protected bool m_bINFSawPoolPending;
+	protected bool m_bINFPoolHinted;
 	protected ref array<vector> m_aINFScanTiles = {};
 	protected vector m_vINFScanMin;
 	protected vector m_vINFScanMax;
 	protected vector m_vINFScanTile;
 	static const int INF_SCAN_TILE_SIZE = 400;
+	static const int INF_SCAN_BUDGET_MS = 10;
 	protected ref INF_ZoneStateSystem m_INFZoneStates;
 	protected ref array<ref INF_ForestCampSite> m_INFCampSites = {};
 	[Attribute("2", UIWidgets.Slider, "Non-stacking camp/cache influence multiplier for future zone defenders and counterattacks.", "1 4 1", category: "Grid Zones"), RplProp()]
@@ -584,18 +592,15 @@ modded class INS_AmbientPatrolManager
 		return config;
 	}
 
-	// Polled by the static-site startup until the defence roster is placed or restored.
-	protected bool INF_DefencesReady()
+	// Defences are optional extras: they start once camps are known and never hold up static-site startup.
+	protected void INF_StartDefences()
 	{
 		if (!m_INFDefences)
-		{
-			m_INFDefences = new INF_Defences();
-			array<vector> avoid = {};
-			foreach (INF_ForestCampSite campSite : m_INFCampSites)
-				avoid.Insert(campSite.m_Position);
-			m_INFDefences.Begin(m_INFZoneStates, INF_BuildDefenceConfig(), avoid);
-		}
-		return m_INFDefences.IsReady();
+			return;
+		array<vector> avoid = {};
+		foreach (INF_ForestCampSite campSite : m_INFCampSites)
+			avoid.Insert(campSite.m_Position);
+		m_INFDefences.Begin(m_INFZoneStates, INF_BuildDefenceConfig(), avoid);
 	}
 
 	INF_MortarConfig INF_GetMortarConfig()
@@ -865,6 +870,8 @@ modded class INS_AmbientPatrolManager
 			m_sINFStartupFailure = "Territory save recovery failed. An administrator needs to check the server log and saved snapshots.";
 			return;
 		}
+		m_INFDefences = new INF_Defences();
+		m_INFDefences.Prepare(INF_BuildDefenceConfig());
 		if (m_INFForestCamps.LoadMapIndex())
 		{
 			m_INFForestCamps.AddBuildingZones(m_INFZoneStates);
@@ -883,8 +890,7 @@ modded class INS_AmbientPatrolManager
 				m_aINFScanTiles.Insert(Vector(x * INF_SCAN_TILE_SIZE, 0, z * INF_SCAN_TILE_SIZE));
 		}
 		Print(string.Format("[INF_Zones] Background terrain scan started: %1 tiles; discovered building zones become playable progressively.", m_aINFScanTiles.Count()));
-		m_iINFScanTileTotal = m_aINFScanTiles.Count();
-		GetGame().GetCallqueue().CallLater(INF_ScanMapTick, 50, true);
+		GetGame().GetCallqueue().CallLater(INF_ScanMapTick, 0, true);
 	}
 
 	string INF_GetStartupStatus()
@@ -896,66 +902,95 @@ modded class INS_AmbientPatrolManager
 	{
 		if (!Replication.IsServer())
 			return;
+		string failure = m_sINFStartupFailure;
+		if (failure.IsEmpty() && m_INFForestCamps)
+			failure = m_INFForestCamps.GetStartupFailure();
 		string status;
+		bool blocked;
 		if (m_bINFCampsReady)
 		{
 			status = "Mission ready. Camps, caches and objectives are initialised. Check your tasks.";
 			GetGame().GetCallqueue().Remove(INF_PublishStartupProgress);
 		}
-		else if (!m_sINFStartupFailure.IsEmpty())
-			status = m_sINFStartupFailure;
-		else if (!m_aINFScanTiles.IsEmpty())
+		else if (!failure.IsEmpty())
 		{
-			int scanned = m_iINFScanTileTotal - m_aINFScanTiles.Count();
-			status = string.Format("Surveying terrain: %1/%2 areas checked. Discovered building zones are playable; camps and caches are still preparing.",
-				scanned, m_iINFScanTileTotal);
+			status = failure;
+			blocked = true;
 		}
-		else if (m_INFForestCamps)
-			status = m_INFForestCamps.GetStartupStatus();
 		else
-			status = "Preparing mission systems. Startup progress will appear shortly.";
-		if (status == m_sINFStartupStatus)
+			status = "Initialising mission systems. Camps, caches and objectives will be ready shortly.";
+		if (status == m_sINFStartupStatus && blocked == m_bINFStartupBlocked)
 			return;
 		m_sINFStartupStatus = status;
+		m_bINFStartupBlocked = blocked;
 		Replication.BumpMe();
 		INS_IntelManager intel = INS_IntelManager.Cast(GetOwner().FindComponent(INS_IntelManager));
 		if (intel)
 			intel.INF_QueueCampaignObjectives();
 	}
 
-	protected void INF_NotifyStartupProgress()
+	void INF_OnCampPoolBuilt()
 	{
-		if (m_bINFCampsReady)
-		{
-			GetGame().GetCallqueue().Remove(INF_NotifyStartupProgress);
-			return;
-		}
-		PlayerController local = GetGame().GetPlayerController();
-		if (!local || !local.GetControlledEntity() || m_sINFStartupStatus.IsEmpty())
-			return;
-		float now = GetGame().GetWorld().GetWorldTime();
-		if (now < m_fINFNextStartupHint)
-			return;
-		SCR_HintManagerComponent.ShowCustomHint(m_sINFStartupStatus, "Mission initialisation", 8);
-		m_fINFNextStartupHint = now + 30000;
+		m_bINFPoolReady = true;
+		Replication.BumpMe();
 	}
 
+	// Two hints only: everything is ready to play, and the background camp search is done (the next start is quicker).
+	// A player who joins after both have happened sees neither. Blocking failures still need an administrator, so they repeat.
+	protected void INF_NotifyStartupProgress()
+	{
+		PlayerController local = GetGame().GetPlayerController();
+		if (!local || !local.GetControlledEntity())
+			return;
+		if (!m_bINFCampsReady)
+		{
+			m_bINFSawStartup = true;
+			float now = GetGame().GetWorld().GetWorldTime();
+			if (m_bINFStartupBlocked && now >= m_fINFNextStartupHint)
+			{
+				SCR_HintManagerComponent.ShowCustomHint(m_sINFStartupStatus, "Mission initialisation", 8);
+				m_fINFNextStartupHint = now + 30000;
+			}
+			return;
+		}
+		if (m_bINFSawStartup && !m_bINFReadyHinted)
+		{
+			m_bINFReadyHinted = true;
+			SCR_HintManagerComponent.ShowCustomHint("Everything is initialised and ready to play.", "Mission ready", 8);
+		}
+		if (!m_bINFPoolReady)
+			m_bINFSawPoolPending = true;
+		else if (m_bINFSawPoolPending && !m_bINFPoolHinted)
+		{
+			m_bINFPoolHinted = true;
+			SCR_HintManagerComponent.ShowCustomHint("Camp search complete. The next start will be quicker.", "Camp search", 8);
+		}
+	}
+
+	// Runs every frame for a fixed time budget, so the scan is as fast as possible without freezing the server.
 	protected void INF_ScanMapTick()
 	{
 		if (!Replication.IsServer())
 			return;
-		if (m_aINFScanTiles.IsEmpty())
-		{
-			GetGame().GetCallqueue().Remove(INF_ScanMapTick);
-			m_INFForestCamps.SaveMapIndex();
-			Print(string.Format("[INF_Zones] Background terrain scan complete; %1 building zones. Selecting mission sites.", m_aZones.Count()));
-			m_INFForestCamps.Begin();
-			return;
-		}
 		array<vector> players = {};
 		players.Copy(m_INFZoneStates.GetPresence().m_AllPlayers);
 		if (players.IsEmpty())
 			players.Insert(GetOwner().GetOrigin());
+		int started = System.GetTickCount();
+		while (!m_aINFScanTiles.IsEmpty() && System.GetTickCount() - started < INF_SCAN_BUDGET_MS)
+			INF_ScanNearestTile(players);
+		m_INFForestCamps.AddBuildingZones(m_INFZoneStates);
+		if (!m_aINFScanTiles.IsEmpty())
+			return;
+		GetGame().GetCallqueue().Remove(INF_ScanMapTick);
+		m_INFForestCamps.SaveMapIndex();
+		m_INFDefences.SlotsScanned();
+		Print(string.Format("[INF_Zones] Background terrain scan complete; %1 building zones. Selecting mission sites.", m_aZones.Count()));
+		m_INFForestCamps.Begin();
+	}
+
+	protected void INF_ScanNearestTile(array<vector> players)
+	{
 		int nearest;
 		vector offset = Vector(INF_SCAN_TILE_SIZE * 0.5, 0, INF_SCAN_TILE_SIZE * 0.5);
 		float nearestDistance = INF_BlockRules.Nearest(m_aINFScanTiles[0] + offset, players);
@@ -973,7 +1008,6 @@ modded class INS_AmbientPatrolManager
 		vector maximum = Vector(m_vINFScanTile[0] + INF_SCAN_TILE_SIZE, m_vINFScanMax[1], m_vINFScanTile[2] + INF_SCAN_TILE_SIZE);
 		GetGame().GetWorld().QueryEntitiesByAABB(minimum, maximum, INF_IndexBuilding);
 		m_aINFScanTiles.Remove(nearest);
-		m_INFForestCamps.AddBuildingZones(m_INFZoneStates);
 	}
 
 	void INF_FinishCampDiscovery(array<ref INF_ForestCampSite> sites)
@@ -998,8 +1032,6 @@ modded class INS_AmbientPatrolManager
 		}
 		if (!intel.INF_IsIntelReady())
 			return;
-		if (!INF_DefencesReady())
-			return;
 		foreach (INF_ForestCampSite site : m_INFCampSites)
 			m_INFZoneStates.AddCamp(site);
 		if (!intel.INF_RegisterZoneCaches(m_INFZoneStates))
@@ -1023,6 +1055,7 @@ modded class INS_AmbientPatrolManager
 		Print(string.Format("[INF_Zones] Static camps/caches ready; created %1 unique grid zones; shared AI budget=%2.",
 			m_aZones.Count(), INF_BuildingGrid.ACTIVE_BUDGET));
 		m_bINFCampsReady = true;
+		INF_StartDefences();
 		INF_PublishStartupProgress();
 		intel.INF_QueueCampaignObjectives();
 		intel.INF_DebugContentChanged();
@@ -1076,6 +1109,8 @@ modded class INS_AmbientPatrolManager
 			return true;
 		if (m_INFForestCamps)
 			m_INFForestCamps.Index(entity);
+		if (m_INFDefences)
+			m_INFDefences.OfferSlot(entity);
 		return true;
 	}
 

@@ -28,11 +28,9 @@ class CampSelectionAndWaves(unittest.TestCase):
         for count in (-1, 0, 1, 7, 20, 21):
             self.assertEqual(1 <= count <= 20, count in (1, 7, 20))
 
-    def test_fresh_cold_and_warm_paths_limit_selection_not_the_candidate_pool(self):
-        self.assertEqual(CAMP.count("int count = m_Manager.INF_GetCampCount()"), 2)
-        self.assertEqual(CAMP.count("m_Sites.Resize(count)"), 2)
-        self.assertIn("m_Sites.Count() >= count", CAMP)
-        self.assertIn("SaveCandidates(m_Sites)", CAMP)
+    def test_search_stops_at_the_required_camp_count_and_keeps_saved_roster(self):
+        self.assertIn("m_Sites.Count() >= m_Manager.INF_GetCampCount()", CAMP)
+        self.assertNotIn("Resize(count)", CAMP)
         self.assertIn("Preserving the saved camp roster", CAMP)
         index = (ROOT / "Scripts/Game/INF_TerrainIndex.c").read_text()
         self.assertIn(':vegetation-tolerant-v2', index)

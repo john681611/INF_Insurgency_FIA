@@ -75,10 +75,10 @@ class IntegratedSites(unittest.TestCase):
 
     def test_batched_search_remains_bounded_and_stops(self):
         batch = CAMP.split("protected void SearchTick()", 1)[1].split("protected void SearchStep()", 1)[0]
-        self.assertIn("batch < 8", batch)
+        self.assertIn("System.GetTickCount() - started < SEARCH_BUDGET_MS", batch)
         self.assertIn("!m_DiscoveryFinished", batch)
         self.assertIn("if (m_NavWaitSince >= 0)", batch)
-        self.assertIn("m_SearchStarted >= 120000", CAMP)
+        self.assertIn("m_SearchStarted >= 480000", CAMP)
         self.assertIn("Remove(UpdateLayouts)", CAMP.split("void Stop()", 1)[1])
 
 

@@ -309,11 +309,14 @@ brace-aware method extraction; these checks do not execute Enforce scripts.
 Reusable terrain indexes / mission separation
 Server-only derived data lives in $profile:INF_TerrainIndexes, separately from
 $profile:INS_Saves. It contains raw building/settlement positions, woodland
-cell tree counts and up to 96 validated potential camp layouts, not active
-camps, ownership, selected caches, intel, search consumption or objective progress.
-New missions shuffle that larger pool and select up to 24 sites, rechecking
-current exclusions, footprint and navigation. Existing mission manifests take
-priority on recovery and keep the actual selected layouts unchanged.
+cell tree counts and every vetted potential camp layout, not active camps,
+ownership, selected caches, intel, search consumption or objective progress.
+A first start pops random grid cells, rejecting each as early as possible, until it
+has the required camps, then unblocks the mission and keeps vetting the remaining
+cells in a rate-limited background pass (no time limit) that saves the pool. Later
+starts shuffle that pool and re-check exclusions, footprint and navigation, falling
+back to the random cell search if it cannot supply enough camps. Existing mission
+manifests take priority on recovery and keep the actual selected layouts unchanged.
 Zone building counts use indexed building positions, not another world scan.
 Clean mission-end cleanup removes mission sidecars but never terrain indexes.
 Index identity includes world resource, bounds, format version and Terrain

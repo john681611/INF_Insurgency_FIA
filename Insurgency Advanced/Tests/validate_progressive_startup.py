@@ -22,57 +22,57 @@ class ProgressiveStartup(unittest.TestCase):
     def test_startup_status_is_server_authored_replicated_and_stops_when_ready(self):
         self.assertRegex(GRID, r"\[RplProp\(\)\]\s+protected string m_sINFStartupStatus")
         self.assertRegex(GRID, r"\[RplProp\(\)\]\s+protected bool m_bINFCampsReady")
+        self.assertRegex(GRID, r"\[RplProp\(\)\]\s+protected bool m_bINFPoolReady")
         publish = body(GRID, "protected void INF_PublishStartupProgress()")
         self.assertLess(publish.index("!Replication.IsServer()"), publish.index("m_sINFStartupStatus = status"))
         self.assertIn("Replication.BumpMe()", publish)
         self.assertIn("Remove(INF_PublishStartupProgress)", publish)
-        self.assertIn("m_iINFScanTileTotal - m_aINFScanTiles.Count()", publish)
-        self.assertIn("GetStartupStatus()", publish)
+        self.assertIn("GetStartupFailure()", publish)
+        for removed in ("Surveying terrain", "m_iINFScanTileTotal"):
+            self.assertNotIn(removed, GRID)
+        self.assertNotIn("GetStartupStatus()", CAMP)
         self.assertIn("patrols.INF_GetStartupStatus()", INTEL)
+        self.assertIn("m_Manager.INF_OnCampPoolBuilt()", body(CAMP, "protected void FinishPoolBuild()"))
 
-    def test_local_notifications_support_join_in_progress_and_do_not_spam(self):
+    def test_only_two_hints_plus_repeating_failures_and_none_for_late_joiners(self):
         start = body(GRID, "override void OnGameModeStart()")
         self.assertIn("if (!System.IsConsoleApp())", start)
         self.assertLess(start.index("CallLater(INF_NotifyStartupProgress"),
                         start.index("!Replication.IsServer()"))
         notify = body(GRID, "protected void INF_NotifyStartupProgress()")
         self.assertIn("!local.GetControlledEntity()", notify)
-        self.assertIn("if (now < m_fINFNextStartupHint)", notify)
+        self.assertEqual(notify.count("ShowCustomHint"), 3)
+        self.assertIn("m_bINFStartupBlocked && now >= m_fINFNextStartupHint", notify)
         self.assertIn("now + 30000", notify)
-        self.assertIn("ShowCustomHint", notify)
-        self.assertIn("Remove(INF_NotifyStartupProgress)", notify)
-        self.assertLess(notify.index("if (m_bINFCampsReady)"),
-                        notify.index("GetGame().GetPlayerController()"))
-        ready_guard = notify.split("PlayerController local", 1)[0]
-        self.assertIn("Remove(INF_NotifyStartupProgress)", ready_guard)
-        self.assertIn("return;", ready_guard)
-        # Completion and already-ready late joins never display a startup hint.
-        next_hint, shown = 0, []
-        for now, ready in ((1000, False), (2000, False), (31000, False), (32000, True)):
-            if ready or now < next_hint:
-                continue
-            shown.append(now)
-            next_hint = now + 30000
-        self.assertEqual(shown, [1000, 31000])
-        for has_character in (False, True):
-            ready, timer_running = True, True
-            late_join_hints = []
-            if ready:
-                timer_running = False
-            elif has_character:
-                late_join_hints.append("startup")
-            self.assertFalse(timer_running)
-            self.assertEqual(late_join_hints, [])
+        self.assertIn("m_bINFSawStartup && !m_bINFReadyHinted", notify)
+        self.assertIn("m_bINFSawPoolPending && !m_bINFPoolHinted", notify)
+        # Hints fire once on a transition the client actually observed; late joiners see neither.
+        def hints(observations):
+            saw_startup = saw_pending = ready_hinted = pool_hinted = False
+            shown = []
+            for ready, pool in observations:
+                if not ready:
+                    saw_startup = True
+                    continue
+                if saw_startup and not ready_hinted:
+                    ready_hinted = True
+                    shown.append("ready")
+                if not pool:
+                    saw_pending = True
+                elif saw_pending and not pool_hinted:
+                    pool_hinted = True
+                    shown.append("pool")
+            return shown
+        self.assertEqual(hints([(False, False), (True, False), (True, False), (True, True), (True, True)]),
+                         ["ready", "pool"])
+        self.assertEqual(hints([(True, False), (True, True)]), ["pool"])
+        self.assertEqual(hints([(True, True), (True, True)]), [])
+        self.assertEqual(hints([(False, False), (True, True)]), ["ready"])
 
-    def test_progress_reports_distinct_work_stages_and_failures(self):
-        status = body(CAMP, "string GetStartupStatus()")
-        for text in ("Checking reusable camp terrain", "Finding safe camp terrain",
-                     "Preparing camps", "Preparing weapon caches", "Restoring intel",
-                     "Finalising camp arsenals", "m_StartupFailure"):
-            self.assertIn(text, status)
+    def test_startup_failures_stay_distinct_and_cleanup_removes_timers(self):
         self.assertIn("Mission initialisation is blocked", GRID)
         self.assertIn("Mission initialisation is blocked", CAMP)
-        self.assertNotIn("%", status.replace("%1", "").replace("%2", ""))
+        self.assertIn("string GetStartupFailure()", CAMP)
         stop = body(GRID, "override void OnGameModeEnd(")
         self.assertIn("Remove(INF_NotifyStartupProgress)", stop)
         self.assertIn("Remove(INF_PublishStartupProgress)", stop)
@@ -91,15 +91,17 @@ class ProgressiveStartup(unittest.TestCase):
         for check in ("pos[0] <", "pos[0] >=", "pos[2] <", "pos[2] >="):
             self.assertIn(check, callback)
 
-    def test_one_world_query_per_tick_and_nearest_player_priority(self):
+    def test_one_world_query_per_tile_and_nearest_player_priority(self):
         discover = body(GRID, "override protected void DiscoverZones()")
         scan = body(GRID, "protected void INF_ScanMapTick()")
+        tile = body(GRID, "protected void INF_ScanNearestTile(")
         self.assertNotIn("QueryEntitiesByAABB", discover)
-        self.assertEqual(scan.count("QueryEntitiesByAABB"), 1)
-        self.assertIn("CallLater(INF_ScanMapTick, 50, true)", discover)
+        self.assertEqual(tile.count("QueryEntitiesByAABB"), 1)
+        self.assertIn("CallLater(INF_ScanMapTick, 0, true)", discover)
+        self.assertIn("System.GetTickCount() - started < INF_SCAN_BUDGET_MS", scan)
         self.assertIn("m_INFZoneStates.GetPresence().m_AllPlayers", scan)
         self.assertIn("players.Insert(GetOwner().GetOrigin())", scan)
-        self.assertIn("INF_BlockRules.Nearest", scan)
+        self.assertIn("INF_BlockRules.Nearest", tile)
         pending = tiles((0, 0), (1200, 1200))
         for player, expected in (((100, 100), (0, 0)), ((1100, 1100), (800, 800))):
             nearest = min(pending, key=lambda p: (p[0] + 200 - player[0]) ** 2
@@ -133,7 +135,7 @@ class ProgressiveStartup(unittest.TestCase):
 
     def test_only_complete_scan_is_saved_and_stop_cancels_it(self):
         scan = body(GRID, "protected void INF_ScanMapTick()")
-        done = body(scan, "if (m_aINFScanTiles.IsEmpty())")
+        done = scan[scan.index("GetCallqueue().Remove(INF_ScanMapTick)"):]
         self.assertIn("Remove(INF_ScanMapTick)", done)
         self.assertLess(done.index("SaveMapIndex()"), done.index("m_INFForestCamps.Begin()"))
         self.assertEqual(scan.count("SaveMapIndex()"), 1)

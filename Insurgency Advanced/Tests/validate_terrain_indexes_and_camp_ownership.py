@@ -94,48 +94,48 @@ class TerrainIndexes(unittest.TestCase):
                       "zone.GetOwner().GetOrigin()", "zone.GetRadius()", "exclusions.Sort()"):
             self.assertIn(value, INDEX)
 
-    def test_candidate_serialization_has_no_mission_or_runtime_state(self):
-        save = body(INDEX, "void SaveCandidates(")
-        fields = set(re.findall(r"file\.Write\(site\.(\w+)\)", save))
-        self.assertEqual(fields, {"m_Key", "m_Center", "m_Position", "m_Yaw"})
+    def test_candidate_pool_is_built_in_the_background_after_camps_unblock(self):
+        step = body(CAMP, "protected void SearchStep()")
+        self.assertLess(step.index("StartLayouts()"), step.index("StartPoolBuild()"))
+        self.assertLess(step.index("INF_FinishCampDiscovery(m_Sites)"), step.index("StartPoolBuild()"))
+        start = body(CAMP, "protected void StartPoolBuild()")
+        self.assertIn("foreach (INF_ForestCampSite selected : m_Sites)", start)
+        self.assertIn("m_Target = m_Pool", start)
+        self.assertIn("CallLater(PoolTick", start)
+        tick = body(CAMP, "protected void PoolTick()")
+        self.assertIn("POOL_BUDGET_MS", tick)
+        self.assertNotIn("480000", tick)
+        finish = body(CAMP, "protected void FinishPoolBuild()")
+        self.assertIn("SaveCandidates(m_Pool)", finish)
+        self.assertIn("m_Target = m_Sites", finish)
+        self.assertIn("Remove(PoolTick)", body(CAMP, "void Stop()"))
+        pool_phase = step[step.index("if (m_BuildingPool)"):step.index("else if (m_Index")]
+        self.assertIn("m_Index >= m_Keys.Count()", pool_phase)
+        self.assertNotIn("MAX_CANDIDATES", CAMP + INDEX)
         for forbidden in ("m_RewardID", "m_Props", "m_Friendly", "m_LayoutReady",
                           "s_aSearched", "m_aCacheDestroyed", "m_bINFObjectiveCaptured"):
             self.assertNotIn(forbidden, INDEX)
 
-    def test_recovery_manifest_precedes_fresh_pool_selection(self):
+    def test_second_start_uses_cached_cells_with_the_same_full_checks(self):
         begin = body(CAMP, "void Begin()")
         self.assertLess(begin.index("GetRecoveredSites"), begin.index("LoadCandidates"))
         recovered = begin[begin.index("GetRecoveredSites"):begin.index("LoadCandidates")]
         self.assertIn("StartLayouts()", recovered)
         self.assertIn("return;", recovered)
-        self.assertIn("ShuffleSites(m_CandidatePool)", begin)
-
-    def test_whole_candidate_pool_saved_before_shuffling_and_trimming(self):
-        cold = body(CAMP, "protected void SearchStep()")
-        self.assertLess(cold.index("SaveCandidates(m_Sites)"), cold.index("ShuffleSites(m_Sites)"))
-        self.assertLess(cold.index("SaveCandidates(m_Sites)"), cold.index("m_Sites.Resize(count)"))
-        warm = body(CAMP, "protected void SelectCachedStep()")
-        self.assertNotIn("SaveCandidates", warm)
-        self.assertIn("MAX_CANDIDATES = 96", CAMP)
+        self.assertIn("SetCellOrderFromCache(cachedSites)", begin)
+        self.assertIn("BuildRandomCellOrder()", begin)
+        self.assertNotIn("SelectCachedStep", CAMP)
+        order = body(CAMP, "protected void SetCellOrderFromCache(")
+        self.assertIn("cached.m_Key", order)
+        self.assertIn("ShuffleCells()", order)
+        step = body(CAMP, "protected void SearchStep()")
+        self.assertIn("m_FromCache && m_Index >= m_Keys.Count()", step)
+        self.assertIn("if (!m_FromCache)", step)
         self.assertIn("MAX_CAMPS = 20", CAMP)
-        pool = list(range(96))
-        selections = []
-        for seed in range(5):
-            shuffled = pool.copy()
-            random.Random(seed).shuffle(shuffled)
-            selections.append(set(shuffled[:7]))
-        self.assertEqual(len(pool), 96)
-        self.assertTrue(all(len(selection) == 7 for selection in selections))
-        self.assertTrue(all(selection != selections[0] for selection in selections[1:]))
 
-    def test_warm_selection_rechecks_safety_and_navigation(self):
-        warm = body(CAMP, "protected void SelectCachedStep()")
-        for check in ("HasRoom(site.m_Position)", "FootprintFailure(site, true)",
-                      "ValidateNavigation(site)", "navigation == 1", "20000", "120000"):
-            self.assertIn(check, warm)
-        self.assertLess(warm.index("navigation == 1"), warm.index("m_Sites.Insert(site)"))
-        self.assertIn("LogLevel.WARNING", warm)
+    def test_search_stops_at_the_required_camp_count(self):
         cold = body(CAMP, "protected void SearchStep()")
+        self.assertIn("m_Sites.Count() >= m_Manager.INF_GetCampCount()", cold)
         self.assertIn("480000", cold)
         self.assertIn("HasRoom(site.m_Position)", cold)
         self.assertLess(cold.index("HasRoom(site.m_Position)"), cold.index("FootprintFailure(site, true)"))
@@ -143,9 +143,10 @@ class TerrainIndexes(unittest.TestCase):
     def test_raw_building_index_replaces_second_world_scan(self):
         discovery = body(GRID, "override protected void DiscoverZones()")
         self.assertLess(discovery.index("LoadMapIndex()"), discovery.index("CallLater(INF_ScanMapTick"))
-        scan = body(GRID, "protected void INF_ScanMapTick()")
+        scan = body(GRID, "protected void INF_ScanNearestTile(")
         self.assertIn("QueryEntitiesByAABB", scan)
-        self.assertLess(scan.index("SaveMapIndex()"), scan.index("m_INFForestCamps.Begin()"))
+        tick = body(GRID, "protected void INF_ScanMapTick()")
+        self.assertLess(tick.index("SaveMapIndex()"), tick.index("m_INFForestCamps.Begin()"))
         build = body(GRID, "void INF_StaticCampLayoutsReady()")
         self.assertIn("AddBuildingZones(m_INFZoneStates)", discovery)
         self.assertNotIn("QueryEntitiesByAABB", build)
@@ -154,21 +155,17 @@ class TerrainIndexes(unittest.TestCase):
         self.assertIn("zones.AddBuilding(m_Buildings[i])", add)
 
     def test_loads_are_staged_until_valid_footer(self):
-        for signature, assignment in (("bool LoadMap(", "buildings = readBuildings"),
-                                      ("bool LoadCandidates(", "candidates = readCandidates")):
+        for signature, assignment in (("bool LoadMap(", "buildings = readBuildings"),):
             load = body(INDEX, signature)
             self.assertLess(load.index('footer != "COMPLETE"'), load.index(assignment))
             self.assertIn("Invalid(file,", load)
             self.assertIn("!Replication.IsServer()", load)
         self.assertIn("count > 1000000", INDEX)
-        self.assertIn("count > INF_ForestCamps.MAX_CANDIDATES", INDEX)
         self.assertIn("keys.Contains(key)", INDEX)
         self.assertIn("map<string, bool> keys", INDEX)
-        self.assertIn("site.m_Key != INF_BuildingGrid.Key(site.m_Center)", INDEX)
-        self.assertIn("site.m_Yaw >= -360 && site.m_Yaw <= 360", INDEX)
 
     def test_saves_are_server_only_and_incomplete_writes_are_visible(self):
-        for signature in ("void SaveMap(", "void SaveCandidates("):
+        for signature in ("void SaveMap(",):
             save = body(INDEX, signature)
             self.assertIn("!Replication.IsServer()", save)
             self.assertIn('file.Write("COMPLETE")', save)

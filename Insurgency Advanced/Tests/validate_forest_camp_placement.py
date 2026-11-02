@@ -10,54 +10,18 @@ REWARDS = (ROOT / "Scripts/Game/INF_ForestCampRewards.c").read_text()
 
 
 class ForestCampPlacement(unittest.TestCase):
-    def test_interior_requires_wooded_center_and_six_neighbours(self):
-        def interior(position, cells):
-            x, z = (math.floor(axis / 100) for axis in position)
-            if cells.get((x, z), 0) < 8:
-                return False
-            return sum(
-                cells.get((x + dx, z + dz), 0) >= 8
-                for dx in (-1, 0, 1) for dz in (-1, 0, 1)
-                if dx or dz
-            ) >= 6
-
-        for position in ((50, 50), (-50, -50), (100, 0)):
-            x, z = (math.floor(axis / 100) for axis in position)
-            neighbours = [(x + dx, z + dz)
-                          for dx in (-1, 0, 1) for dz in (-1, 0, 1)
-                          if dx or dz]
-            for count in range(9):
-                cells = {cell: 8 for cell in neighbours[:count]}
-                self.assertFalse(interior(position, cells))
-                cells[x, z] = 7
-                self.assertFalse(interior(position, cells))
-                cells[x, z] = 8
-                self.assertEqual(interior(position, cells), count >= 6)
-        check = CAMP.split("protected bool IsForestInterior", 1)[1].split(
-            "protected void PreferInteriorCells", 1)[0]
-        self.assertIn("INF_BuildingGrid.CellIndex(position[0])", check)
-        self.assertIn("INF_BuildingGrid.CellIndex(position[2])", check)
-        self.assertIn("cell.m_Trees < 8", check)
-        self.assertIn("woodedNeighbours >= 6", check)
-
-    def test_discovery_and_selection_prefer_interiors_with_safe_edge_fallback(self):
+    def test_search_pops_random_cells_with_cheap_rejects_first(self):
         begin = CAMP.split("void Begin()", 1)[1].split("string GetStartupStatus", 1)[0]
-        self.assertIn("PreferInteriorCells()", begin)
-        self.assertLess(begin.index("GetRecoveredSites"), begin.index("PreferInteriorCells()"))
-        self.assertIn("ShuffleSites(m_CandidatePool)", begin)
-        shuffle = CAMP.split("protected void ShuffleSites", 1)[1].split(
-            "protected void SelectCachedStep", 1)[0]
-        self.assertLess(shuffle.index("Math.RandomInt"), shuffle.index("IsForestInterior"))
-        self.assertLess(shuffle.index("sites.Insert(preferred)"), shuffle.index("sites.Insert(fallback)"))
-        self.assertIn("ShuffleSites(m_Sites)", CAMP)
-        for shuffled in ([], [False], [True], [False, True, False, True]):
-            ordered = [v for v in shuffled if v] + [v for v in shuffled if not v]
-            self.assertEqual(len(ordered), len(shuffled))
-            for count in range(len(ordered) + 1):
-                self.assertEqual(sum(ordered[:count]), min(count, sum(shuffled)))
-        index = (ROOT / "Scripts/Game/INF_TerrainIndex.c").read_text()
-        self.assertIn(":forest-interior-v1", index)
-        self.assertIn("kind == 0 || context == m_CampContext", index)
+        self.assertIn("BuildRandomCellOrder()", begin)
+        self.assertLess(begin.index("GetRecoveredSites"), begin.index("BuildRandomCellOrder()"))
+        for removed in ("PreferInteriorCells", "IsForestInterior", "ShuffleSites", "m_Trees < 8", "cell.m_Trees >= 8"):
+            self.assertNotIn(removed, CAMP)
+        step = CAMP.split("protected void SearchStep()", 1)[1].split("protected void StartLayouts", 1)[0]
+        self.assertIn("MIN_TREES = 2", CAMP)
+        self.assertLess(step.index("cell.m_Trees < MIN_TREES"), step.index("HasRoom(cellCenter)"))
+        self.assertLess(step.index("HasRoom(cellCenter)"), step.index("IsWaterCell(cellCenter)"))
+        self.assertLess(step.index("IsWaterCell(cellCenter)"), step.index("FootprintFailure(site, true)"))
+        self.assertLess(step.index("FootprintFailure(site, true)"), step.index("ValidateNavigation(site)"))
 
     def test_empty_manifest_retries_without_relocating_saved_caches(self):
         recover = REWARDS.split("static bool GetRecoveredSites", 1)[1].split(
@@ -124,8 +88,8 @@ class ForestCampPlacement(unittest.TestCase):
         tick = CAMP.split("protected void SearchTick()", 1)[1].split("protected void NextAttempt", 1)[0]
         self.assertIn("int footprintFailure = FootprintFailure(site, true)", tick)
         self.assertIn("int navigation = ValidateNavigation(site)", tick)
-        self.assertLess(tick.index("if (navigation != 1)"), tick.index("m_Sites.Insert(site)"))
-        self.assertIn("m_SearchStarted >= 120000", tick)
+        self.assertLess(tick.index("if (navigation != 1)"), tick.index("m_Target.Insert(site)"))
+        self.assertIn("m_SearchStarted >= 480000", tick)
         self.assertIn("No safe woodland sites passed validation", tick)
 
 

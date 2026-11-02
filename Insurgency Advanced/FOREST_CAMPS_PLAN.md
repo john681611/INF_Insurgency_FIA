@@ -63,11 +63,12 @@ Saved: 2026-10-16.
 
 ## Automatic site search
 
-Implemented starting balance: up to 24 sites; at least eight tree entities in
-a 100m cell; sites at least 450m apart, 150m from qualifying building origins
-and 300m from settlement descriptors, outside safe zones. Searches
-try nine local offsets in interleaved sorted woodland cells, up to eight per 100ms,
-with a 120-second discovery budget and a 20-second per-candidate nav streaming
+Implemented starting balance: up to 20 sites; sites at least 450m apart, 150m
+from qualifying building origins and 300m from settlement descriptors, outside
+safe zones. Searches pop random grid cells (any terrain, no tree requirement),
+reject cheaply first (exclusions, spacing, water), then try nine local offsets,
+up to 64 steps per 100ms, until the required camp count is found, with an
+8-minute discovery budget and a 20-second per-candidate nav streaming
 timeout. Recovered sessions restore their manifest rather than rediscovering.
 Each camp spawns one complete replicated USSR Encampment composition
 (`PlayerHub_S_USSR_01.et`), not separately spawned tent props, and a base

@@ -82,7 +82,7 @@ class DefencePlacement(unittest.TestCase):
         self.assertIn("INF_BuildingGrid.IsSpawnBlocked(position)", viable)
         self.assertIn("MIN_FROM_STATIC_SITE", viable)
         self.assertIn("m_Config.m_fSpacing", defence("protected bool SpacingClear("))
-        self.assertIn("avoid.Insert(campSite.m_Position)", grid("protected bool INF_DefencesReady("))
+        self.assertIn("avoid.Insert(campSite.m_Position)", grid("protected void INF_StartDefences("))
 
     def test_one_percentage_of_all_viable_road_and_small_flat_slots(self):
         select = defence("protected void Select(")
@@ -135,7 +135,7 @@ class DefencePlacement(unittest.TestCase):
         self.assertIn("defence.m_bFlat = SlotType(defence.m_Composition) == FLAT_SLOT", defence("protected bool Restore("))
 
     def test_the_percentage_is_a_mission_header_option(self):
-        self.assertIn("int m_iINFDefencePercent;", GRID)
+        self.assertIn("int m_iINFDefencePercent = -1;", GRID)
         self.assertIn('INF_HeaderSettings.Int(params.m_iINFDefencePercent, 0, 100, "m_iINFDefencePercent", m_iINFDefencePercent)', GRID)
         self.assertIn("config.m_iPercent <= 0", defence("void Begin("))
 
@@ -174,7 +174,8 @@ class DefencePersistence(unittest.TestCase):
     def test_zero_defences_never_blocks_startup_or_changes_zone_behaviour(self):
         begin = defence("void Begin(")
         self.assertIn("config.m_iPercent <= 0", begin)
-        self.assertEqual(begin.count("m_bReady = true;"), 4)
+        self.assertEqual(begin.count("m_bReady"), 0)
+        self.assertNotIn("m_bReady", DEFENCES)
         self.assertRegex(defence("static bool GuardsAlive("), r"foreach \(INS_PatrolAgent agent : state\.m_aAgents\)")
         self.assertIn("foreach (INF_Defence defence : state.m_aINFDefences)", defence("static void AppendGuards("))
 
@@ -207,11 +208,13 @@ class DefencePersistence(unittest.TestCase):
     def test_compositions_are_untracked_by_engine_persistence_and_hold_no_ai(self):
         self.assertEqual(DEFENCES.count("INF_ForestCamps.PrepareComposition(entity)"), 2)
 
-    def test_startup_waits_for_the_roster_before_camps_are_ready(self):
+    def test_defences_never_block_camp_startup_and_reuse_the_terrain_scan(self):
         body = grid("void INF_StaticCampLayoutsReady(")
-        self.assertIn("if (!INF_DefencesReady())", body)
-        self.assertLess(body.index("INF_DefencesReady()"), body.index("m_INFZoneStates.AddCamp(site)"))
-        self.assertLess(body.index("INF_DefencesReady()"), body.index("m_bINFCampsReady = true"))
+        self.assertNotIn("INF_DefencesReady", body)
+        self.assertLess(body.index("m_bINFCampsReady = true"), body.index("INF_StartDefences()"))
+        self.assertIn("m_INFDefences.OfferSlot(entity)", grid("protected bool INF_IndexBuilding("))
+        self.assertIn("m_INFDefences.SlotsScanned()", grid("protected void INF_ScanMapTick("))
+        self.assertIn("if (m_bScanned)", defence("void Begin("))
 
     def test_scan_stops_when_the_mission_ends(self):
         self.assertIn("m_INFDefences.Stop()", grid("override void OnGameModeEnd("))

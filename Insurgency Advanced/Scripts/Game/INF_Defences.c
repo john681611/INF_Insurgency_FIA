@@ -30,7 +30,7 @@ class INF_Defences
 	static const int SAVE_VERSION = 1;
 	static const int MAX_SITES = 256;
 	static const int TILE_SIZE = 400;
-	static const int TILES_PER_TICK = 8;
+	static const int SCAN_BUDGET_MS = 10;
 	static const float MIN_FROM_STATIC_SITE = 250;
 	static const float GUARD_RADIUS = 15;
 	static const float DEFEND_RADIUS = 25;
@@ -59,7 +59,9 @@ class INF_Defences
 	protected int m_iSpacingRejects;
 	protected int m_iFlatSeen;
 	protected int m_iFlatOccupied;
-	protected bool m_bReady;
+	protected bool m_bCollecting;
+	protected bool m_bScanned;
+	protected bool m_bResolved;
 
 	static void Log(string message)
 	{
@@ -71,9 +73,28 @@ class INF_Defences
 		Print("[INF_Defences] " + message, LogLevel.WARNING);
 	}
 
-	bool IsReady()
+	// Called before the terrain scan so the scan can hand over slots it meets anyway, avoiding a second full-map pass.
+	void Prepare(INF_DefenceConfig config)
 	{
-		return m_bReady;
+		m_Config = config;
+		if (!Replication.IsServer() || config.m_iPercent <= 0)
+			return;
+		if (FileIO.FileExists(INS_CACHE_SAVE_FILE) && FileIO.FileExists(SAVE_FILE))
+			return;
+		ResolveCompositions();
+		m_bCollecting = !m_SlotTypes.IsEmpty();
+	}
+
+	void OfferSlot(IEntity entity)
+	{
+		if (m_bCollecting)
+			CollectSlot(entity);
+	}
+
+	void SlotsScanned()
+	{
+		if (m_bCollecting)
+			m_bScanned = true;
 	}
 
 	void Stop()
@@ -111,27 +132,26 @@ class INF_Defences
 		m_Zones = zones;
 		m_Config = config;
 		if (!Replication.IsServer() || !zones)
-		{
-			m_bReady = true;
 			return;
-		}
 		m_Avoid.Copy(avoid);
 		if (FileIO.FileExists(INS_CACHE_SAVE_FILE) && FileIO.FileExists(SAVE_FILE))
 		{
 			Recover();
-			m_bReady = true;
 			return;
 		}
 		if (config.m_iPercent <= 0)
 		{
 			Log("Disabled: defence percentage is 0.");
-			m_bReady = true;
 			return;
 		}
 		ResolveCompositions();
 		if (m_SlotTypes.IsEmpty())
+			return;
+		// The terrain scan already collected the slots; only a reused map index needs the tile scan below.
+		if (m_bScanned)
 		{
-			m_bReady = true;
+			Select();
+			m_Slots.Clear();
 			return;
 		}
 		GetGame().GetWorld().GetBoundBox(m_vMin, m_vMax);
@@ -145,11 +165,14 @@ class INF_Defences
 				m_Tiles.Insert(Vector(tileX * TILE_SIZE, 0, tileZ * TILE_SIZE));
 		}
 		Log(string.Format("Searching %1 map tiles for %2 slot types.", m_Tiles.Count(), m_SlotTypes.Count()));
-		GetGame().GetCallqueue().CallLater(ScanTick, 100, true);
+		GetGame().GetCallqueue().CallLater(ScanTick, 0, true);
 	}
 
 	protected void ResolveCompositions()
 	{
+		if (m_bResolved)
+			return;
+		m_bResolved = true;
 		foreach (ResourceName candidate : m_Config.m_aComposition)
 		{
 			Resource resource = Resource.Load(candidate);
@@ -170,7 +193,8 @@ class INF_Defences
 
 	protected void ScanTick()
 	{
-		for (int step = 0; step < TILES_PER_TICK && !m_Tiles.IsEmpty(); step++)
+		int started = System.GetTickCount();
+		while (!m_Tiles.IsEmpty() && System.GetTickCount() - started < SCAN_BUDGET_MS)
 		{
 			int last = m_Tiles.Count() - 1;
 			vector tile = m_Tiles[last];
@@ -184,7 +208,6 @@ class INF_Defences
 		GetGame().GetCallqueue().Remove(ScanTick);
 		Select();
 		m_Slots.Clear();
-		m_bReady = true;
 	}
 
 	// Slots written as $grp instances in a layer carry no prefab data, so their prefab name is empty; the slot's own

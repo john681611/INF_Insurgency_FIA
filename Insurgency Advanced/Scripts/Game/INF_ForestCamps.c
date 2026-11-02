@@ -107,11 +107,15 @@ class INF_ForestCell
 class INF_ForestCamps
 {
 	static const int MAX_CAMPS = 20;
-	static const int MAX_CANDIDATES = 96;
 	static const float MIN_SPACING = 450;
+	static const int SEARCH_BUDGET_MS = 10;
+	static const int POOL_BUDGET_MS = 3;
+	// Cells with fewer trees are open ground; the tree counts come free from the terrain scan.
+	static const int MIN_TREES = 2;
 	protected INS_AmbientPatrolManager m_Manager;
 	protected ref map<string, ref INF_ForestCell> m_Cells = new map<string, ref INF_ForestCell>();
 	protected ref array<string> m_Keys = {};
+	protected ref array<vector> m_aKeyCenters = {};
 	protected ref array<ref INF_ForestCampSite> m_Sites = {};
 	protected ref array<int> m_UsedCallsigns = {};
 	protected int m_iCallsignCount = -1;
@@ -132,13 +136,17 @@ class INF_ForestCamps
 	protected int m_iTestedLayouts;
 	protected bool m_DiscoveryFinished;
 	protected ref INF_TerrainIndex m_TerrainIndex;
-	protected ref array<ref INF_ForestCampSite> m_CandidatePool = {};
-	protected bool m_SelectingCached;
+	protected ref array<ref INF_ForestCampSite> m_Pool = {};
+	// The list new sites are spaced against and added to: the mission's camps, or the background pool.
+	protected array<ref INF_ForestCampSite> m_Target;
+	protected bool m_FromCache;
+	protected bool m_BuildingPool;
 	protected string m_StartupFailure;
 
 	void INF_ForestCamps(INS_AmbientPatrolManager manager)
 	{
 		m_Manager = manager;
+		m_Target = m_Sites;
 		m_TerrainIndex = new INF_TerrainIndex(manager);
 	}
 
@@ -220,69 +228,75 @@ class INF_ForestCamps
 			StartLayouts();
 			return;
 		}
-		if (m_TerrainIndex.LoadCandidates(m_CandidatePool))
+		array<ref INF_ForestCampSite> cachedSites = {};
+		if (m_TerrainIndex.LoadCandidates(cachedSites))
 		{
-			ShuffleSites(m_CandidatePool);
-			m_SelectingCached = true;
-			m_SearchStarted = GetGame().GetWorld().GetWorldTime();
-			GetGame().GetCallqueue().CallLater(SearchTick, 100, true);
-			return;
+			m_FromCache = true;
+			SetCellOrderFromCache(cachedSites);
+			Print(string.Format("[INF_ForestCamps] Searching %1 cached camp cells in random order with full checks.", m_Keys.Count()));
+		}
+		else
+		{
+			BuildRandomCellOrder();
+			Print(string.Format("[INF_ForestCamps] Popping random map cells until %1 camps are found.", m_Manager.INF_GetCampCount()));
 		}
 		m_SearchStarted = GetGame().GetWorld().GetWorldTime();
-		foreach (string key, INF_ForestCell cell : m_Cells)
-		{
-			if (cell.m_Trees >= 8)
-				m_Keys.Insert(key);
-		}
-		m_Keys.Sort();
-		array<string> spread = {};
-		int stride = Math.Ceil(m_Keys.Count() / 24.0);
-		for (int offset = 0; offset < stride; offset++)
-		{
-			for (int band = 0; band < 24; band++)
-			{
-				int index = band * stride + offset;
-				if (index < m_Keys.Count())
-					spread.Insert(m_Keys[index]);
-			}
-		}
-		m_Keys = spread;
-		PreferInteriorCells();
-		Print(string.Format("[INF_ForestCamps] Building a reusable pool from %1 woodland cells, up to %2 potential camps.", m_Keys.Count(), MAX_CANDIDATES));
-		GetGame().GetCallqueue().CallLater(SearchTick, 100, true);
+		GetGame().GetCallqueue().CallLater(SearchTick, 0, true);
 	}
 
-	string GetStartupStatus()
+	protected void ShuffleCells()
 	{
-		if (!m_StartupFailure.IsEmpty())
-			return m_StartupFailure;
-		if (!m_DiscoveryFinished)
+		for (int i = m_Keys.Count() - 1; i > 0; i--)
 		{
-			if (m_SelectingCached)
-				return string.Format("Checking reusable camp terrain: %1/%2 areas checked. Building zones are playable while mission sites prepare.",
-					m_Index, m_CandidatePool.Count());
-			return string.Format("Finding safe camp terrain: %1/%2 woodland areas checked. Building zones are playable; the first search can take several minutes.",
-				m_Index, m_Keys.Count());
+			int other = Math.RandomInt(0, i + 1);
+			string key = m_Keys[i];
+			m_Keys[i] = m_Keys[other];
+			m_Keys[other] = key;
+			vector swap = m_aKeyCenters[i];
+			m_aKeyCenters[i] = m_aKeyCenters[other];
+			m_aKeyCenters[other] = swap;
 		}
-		int compositions;
-		int arsenals;
-		foreach (INF_ForestCampSite site : m_Sites)
+	}
+
+	// A cached cell is only a hint; it goes through exactly the same checks as any other cell.
+	protected void SetCellOrderFromCache(array<ref INF_ForestCampSite> cachedSites)
+	{
+		m_Keys.Clear();
+		m_aKeyCenters.Clear();
+		foreach (INF_ForestCampSite cached : cachedSites)
 		{
-			if (site.m_CompositionReady)
-				compositions++;
-			if (site.m_LayoutReady)
-				arsenals++;
+			m_Keys.Insert(cached.m_Key);
+			m_aKeyCenters.Insert(cached.m_Center);
 		}
-		if (compositions < m_Sites.Count())
-			return string.Format("Preparing camps: %1/%2 placed. Unready sites are being retried; building zones remain playable.",
-				compositions, m_Sites.Count());
-		if (!INF_ForestCampRewards.AreCachesReady())
-			return "Preparing weapon caches. Building zones are playable; intel searches and final objectives are not ready yet.";
-		INS_IntelManager intel = INS_IntelManager.GetInstance();
-		if (!intel || !intel.INF_IsIntelReady())
-			return "Restoring intel and cache progress. Building zones are playable; intel searches are not ready yet.";
-		return string.Format("Finalising camp arsenals and objectives: %1/%2 camps ready. Building zones remain playable.",
-			arsenals, m_Sites.Count());
+		ShuffleCells();
+	}
+
+	// Every grid cell is a candidate; HasRoom and the footprint checks reject unsuitable ones lazily.
+	protected void BuildRandomCellOrder()
+	{
+		m_Keys.Clear();
+		m_aKeyCenters.Clear();
+		vector boundsMin, boundsMax;
+		GetGame().GetWorld().GetBoundBox(boundsMin, boundsMax);
+		int firstX = INF_BuildingGrid.CellIndex(boundsMin[0]);
+		int lastX = INF_BuildingGrid.CellIndex(boundsMax[0]);
+		int firstZ = INF_BuildingGrid.CellIndex(boundsMin[2]);
+		int lastZ = INF_BuildingGrid.CellIndex(boundsMax[2]);
+		for (int x = firstX; x <= lastX; x++)
+		{
+			for (int z = firstZ; z <= lastZ; z++)
+			{
+				vector center = Vector(x * INF_BuildingGrid.SIZE + INF_BuildingGrid.HALF, 0, z * INF_BuildingGrid.SIZE + INF_BuildingGrid.HALF);
+				m_Keys.Insert(INF_BuildingGrid.Key(center));
+				m_aKeyCenters.Insert(center);
+			}
+		}
+		ShuffleCells();
+	}
+
+	string GetStartupFailure()
+	{
+		return m_StartupFailure;
 	}
 
 	static vector Offset(INF_ForestCampSite site, vector local)
@@ -511,7 +525,7 @@ class INF_ForestCamps
 			if (vector.DistanceSqXZ(center, building) < m_aBuildingClearSq[index])
 				return false;
 		}
-		foreach (INF_ForestCampSite site : m_Sites)
+		foreach (INF_ForestCampSite site : m_Target)
 		{
 			if (vector.DistanceSqXZ(center, site.m_Position) < MIN_SPACING * MIN_SPACING)
 				return false;
@@ -521,12 +535,55 @@ class INF_ForestCamps
 
 	protected void SearchTick()
 	{
-		for (int batch = 0; batch < 8 && !m_Stopped && !m_DiscoveryFinished; batch++)
+		int started = System.GetTickCount();
+		while (!m_Stopped && !m_DiscoveryFinished && System.GetTickCount() - started < SEARCH_BUDGET_MS)
 		{
 			SearchStep();
 			if (m_NavWaitSince >= 0)
 				break;
 		}
+	}
+
+	// The pool only serves the next start and the mission is already live, so it takes a smaller slice.
+	protected void PoolTick()
+	{
+		int started = System.GetTickCount();
+		while (!m_Stopped && m_BuildingPool && System.GetTickCount() - started < POOL_BUDGET_MS)
+		{
+			SearchStep();
+			if (m_NavWaitSince >= 0)
+				break;
+		}
+	}
+
+	protected void StartPoolBuild()
+	{
+		m_Pool.Clear();
+		foreach (INF_ForestCampSite selected : m_Sites)
+		{
+			INF_ForestCampSite copy = new INF_ForestCampSite();
+			copy.m_Key = selected.m_Key;
+			copy.m_Center = selected.m_Center;
+			copy.m_Position = selected.m_Position;
+			copy.m_Yaw = selected.m_Yaw;
+			m_Pool.Insert(copy);
+		}
+		m_Target = m_Pool;
+		m_BuildingPool = true;
+		m_NavWaitSince = -1;
+		m_Attempt = 0;
+		Print(string.Format("[INF_ForestCamps] Camps unblocked; building the reusable camp pool in the background from %1 remaining cells.", m_Keys.Count() - m_Index));
+		GetGame().GetCallqueue().CallLater(PoolTick, 0, true);
+	}
+
+	protected void FinishPoolBuild()
+	{
+		GetGame().GetCallqueue().Remove(PoolTick);
+		m_BuildingPool = false;
+		m_Target = m_Sites;
+		Print(string.Format("[INF_ForestCamps] Background pool complete: %1 vetted camp sites.", m_Pool.Count()));
+		m_TerrainIndex.SaveCandidates(m_Pool);
+		m_Manager.INF_OnCampPoolBuilt();
 	}
 
 	protected void ConfigureSite(INF_ForestCampSite site)
@@ -535,47 +592,77 @@ class INF_ForestCamps
 		site.m_FootprintRadius = m_Manager.INF_GetCampFootprintRadius();
 	}
 
+	protected bool IsWaterCell(vector center)
+	{
+		BaseWorld world = GetGame().GetWorld();
+		float ground = world.GetSurfaceY(center[0], center[2]);
+		EWaterSurfaceType waterType;
+		float lakeArea;
+		float water = SCR_WorldTools.GetWaterSurfaceY(world, center, waterType, lakeArea);
+		return ground <= Math.Max(world.GetOceanBaseHeight(), water) + 0.5;
+	}
+
 	protected void SearchStep()
 	{
 		if (m_Stopped)
 			return;
-		if (m_SelectingCached)
+		if (m_BuildingPool)
 		{
-			SelectCachedStep();
+			if (m_Index >= m_Keys.Count())
+			{
+				FinishPoolBuild();
+				return;
+			}
+		}
+		else if (m_FromCache && m_Index >= m_Keys.Count() && m_Sites.Count() < m_Manager.INF_GetCampCount())
+		{
+			Print(string.Format("[INF_ForestCamps] Cached cells gave %1 of %2 camps; searching random map cells for the rest.", m_Sites.Count(), m_Manager.INF_GetCampCount()), LogLevel.WARNING);
+			m_FromCache = false;
+			m_Index = 0;
+			m_Attempt = 0;
+			m_NavWaitSince = -1;
+			BuildRandomCellOrder();
 			return;
 		}
-		if (m_Index >= m_Keys.Count() || m_Sites.Count() >= MAX_CANDIDATES
+		else if (m_Index >= m_Keys.Count() || m_Sites.Count() >= m_Manager.INF_GetCampCount()
 			|| GetGame().GetWorld().GetWorldTime() - m_SearchStarted >= 480000)
 		{
 			GetGame().GetCallqueue().Remove(SearchTick);
 			m_DiscoveryFinished = true;
-			Print(string.Format("[INF_ForestCamps] Discovery complete: %1 validated potential camp sites.", m_Sites.Count()));
+			Print(string.Format("[INF_ForestCamps] Discovery complete: %1 validated camp sites.", m_Sites.Count()));
 			Print(string.Format("[INF_ForestCamps] Search diagnostics: cells visited=%1/%2; layouts tested=%3; spatial rejects=%4; terrain rejects=%5; clearance rejects=%6; navigation rejects=%7; navigation timeouts=%8.",
 				m_Index, m_Keys.Count(), m_iTestedLayouts, m_iSpatialRejects, m_iTerrainRejects,
 				m_iClearanceRejects, m_iNavigationRejects, m_iNavigationTimeouts));
 			if (m_Sites.IsEmpty())
 				Print("[INF_ForestCamps] No safe woodland sites passed validation; camps will not spawn unchecked.", LogLevel.WARNING);
-			m_TerrainIndex.SaveCandidates(m_Sites);
-			ShuffleSites(m_Sites);
-			int count = m_Manager.INF_GetCampCount();
-			if (m_Sites.Count() > count)
-				m_Sites.Resize(count);
 			m_Manager.INF_FinishCampDiscovery(m_Sites);
 			StartLayouts();
+			if (!m_FromCache)
+				StartPoolBuild();
 			return;
 		}
-		INF_ForestCell cell = m_Cells.Get(m_Keys[m_Index]);
-		if (!HasRoom(cell.m_Center))
+		vector cellCenter = m_aKeyCenters[m_Index];
+		if (m_Attempt == 0)
 		{
-			m_iSpatialRejects++;
-			NextCell();
-			return;
+			INF_ForestCell cell = m_Cells.Get(m_Keys[m_Index]);
+			if (!cell || cell.m_Trees < MIN_TREES || !HasRoom(cellCenter))
+			{
+				m_iSpatialRejects++;
+				NextCell();
+				return;
+			}
+			if (IsWaterCell(cellCenter))
+			{
+				m_iTerrainRejects++;
+				NextCell();
+				return;
+			}
 		}
 		INF_ForestCampSite site = new INF_ForestCampSite();
 		ConfigureSite(site);
 		site.m_Key = m_Keys[m_Index];
-		site.m_Center = cell.m_Center;
-		site.m_Center[1] = GetGame().GetWorld().GetSurfaceY(cell.m_Center[0], cell.m_Center[2]);
+		site.m_Center = cellCenter;
+		site.m_Center[1] = GetGame().GetWorld().GetSurfaceY(cellCenter[0], cellCenter[2]);
 		int row = Math.Floor(m_Attempt / 3.0);
 		int offsetX = (m_Attempt - row * 3 - 1) * 15;
 		int offsetZ = (row - 1) * 15;
@@ -616,116 +703,7 @@ class INF_ForestCamps
 			NextAttempt();
 			return;
 		}
-		m_Sites.Insert(site);
-		NextCell();
-	}
-
-	protected bool IsForestInterior(vector position)
-	{
-		int x = INF_BuildingGrid.CellIndex(position[0]);
-		int z = INF_BuildingGrid.CellIndex(position[2]);
-		int woodedNeighbours = 0;
-		for (int dx = -1; dx <= 1; dx++)
-		{
-			for (int dz = -1; dz <= 1; dz++)
-			{
-				int cellX = x + dx;
-				int cellZ = z + dz;
-				string key = cellX.ToString() + ":" + cellZ.ToString();
-				INF_ForestCell cell = m_Cells.Get(key);
-				if (!cell || cell.m_Trees < 8)
-				{
-					if (dx == 0 && dz == 0)
-						return false;
-					continue;
-				}
-				if (dx != 0 || dz != 0)
-					woodedNeighbours++;
-			}
-		}
-		return woodedNeighbours >= 6;
-	}
-
-	protected void PreferInteriorCells()
-	{
-		array<string> interior = {};
-		array<string> edges = {};
-		foreach (string key : m_Keys)
-		{
-			INF_ForestCell cell = m_Cells.Get(key);
-			if (IsForestInterior(cell.m_Center))
-				interior.Insert(key);
-			else
-				edges.Insert(key);
-		}
-		foreach (string edge : edges)
-			interior.Insert(edge);
-		m_Keys = interior;
-	}
-
-	protected void ShuffleSites(array<ref INF_ForestCampSite> sites)
-	{
-		for (int i = sites.Count() - 1; i > 0; i--)
-		{
-			int other = Math.RandomInt(0, i + 1);
-			INF_ForestCampSite temp = sites[i];
-			sites[i] = sites[other];
-			sites[other] = temp;
-		}
-		// Keep random order within each tier, but exhaust interiors before edges.
-		array<ref INF_ForestCampSite> interior = {};
-		array<ref INF_ForestCampSite> edges = {};
-		foreach (INF_ForestCampSite site : sites)
-		{
-			if (IsForestInterior(site.m_Position))
-				interior.Insert(site);
-			else
-				edges.Insert(site);
-		}
-		sites.Clear();
-		foreach (INF_ForestCampSite preferred : interior)
-			sites.Insert(preferred);
-		foreach (INF_ForestCampSite fallback : edges)
-			sites.Insert(fallback);
-	}
-
-	protected void SelectCachedStep()
-	{
-		int count = m_Manager.INF_GetCampCount();
-		if (m_Index >= m_CandidatePool.Count() || m_Sites.Count() >= count
-			|| GetGame().GetWorld().GetWorldTime() - m_SearchStarted >= 120000)
-		{
-			GetGame().GetCallqueue().Remove(SearchTick);
-			m_DiscoveryFinished = true;
-			if (m_Sites.Count() > count)
-				m_Sites.Resize(count);
-			Print(string.Format("[INF_ForestCamps] Fresh mission selected %1 camps from %2 cached potential sites; no woodland discovery scan.",
-				m_Sites.Count(), m_CandidatePool.Count()));
-			if (m_Sites.IsEmpty())
-				Print("[INF_ForestCamps] No cached sites currently pass safety/navigation checks; camps will not spawn unchecked. After terrain edits, increase Terrain Index Revision.", LogLevel.WARNING);
-			m_Manager.INF_FinishCampDiscovery(m_Sites);
-			StartLayouts();
-			return;
-		}
-		INF_ForestCampSite site = m_CandidatePool[m_Index];
-		ConfigureSite(site);
-		if (!HasRoom(site.m_Position) || FootprintFailure(site, true) != 0)
-		{
-			NextCell();
-			return;
-		}
-		int navigation = ValidateNavigation(site);
-		if (navigation == 0)
-		{
-			float now = GetGame().GetWorld().GetWorldTime();
-			if (m_NavWaitSince < 0)
-				m_NavWaitSince = now;
-			if (now - m_NavWaitSince < 20000)
-				return;
-			Print("[INF_ForestCamps] Cached candidate navigation timed out; skipping rather than spawning unchecked.", LogLevel.WARNING);
-		}
-		if (navigation == 1)
-			m_Sites.Insert(site);
+		m_Target.Insert(site);
 		NextCell();
 	}
 
@@ -1024,6 +1002,7 @@ class INF_ForestCamps
 	{
 		m_Stopped = true;
 		GetGame().GetCallqueue().Remove(SearchTick);
+		GetGame().GetCallqueue().Remove(PoolTick);
 		GetGame().GetCallqueue().Remove(UpdateLayouts);
 		foreach (INF_ForestCampSite site : m_Sites)
 			Cleanup(site);
