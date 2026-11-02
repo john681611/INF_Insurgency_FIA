@@ -319,10 +319,19 @@ class INF_Defences
 	protected bool ProbeEntity(IEntity entity)
 	{
 		string className = entity.ClassName();
+		// Slot-like entities are listed by name too, so a slot that is not an SCR_SiteSlotEntity on this server shows up.
+		string label = INF_BuildingGrid.PrefabNameLower(entity);
+		if (label.IndexOf("slot") == -1 && entity.GetVObject())
+		{
+			label = entity.GetVObject().GetResourceName();
+			label.ToLower();
+		}
+		if (label.IndexOf("slot") != -1)
+			className += "[" + label + "]";
 		int index = m_ProbeNames.Find(className);
 		if (index >= 0)
 			m_ProbeCounts.Set(index, m_ProbeCounts[index] + 1);
-		else if (m_ProbeNames.Count() < 12)
+		else if (m_ProbeNames.Count() < 24)
 		{
 			m_ProbeNames.Insert(className);
 			m_ProbeCounts.Insert(1);
