@@ -50,6 +50,8 @@ class INF_MortarBattery
 
 class INF_MortarBatteries
 {
+	// Maximum waypoint priority (attribute range 0-2000) so nearby combat does not pre-empt the fire mission.
+	static const float ARTILLERY_PRIORITY_LEVEL = 2000;
 	static const ResourceName WAYPOINT_ARTILLERY = "{C524700A27CFECDD}Prefabs/AI/Waypoints/AIWaypoint_ArtillerySupport.et";
 	static const ResourceName WAYPOINT_DEFEND = "{93291E72AC23930F}Prefabs/AI/Waypoints/AIWaypoint_Defend.et";
 	static const float PLACE_MIN_FROM_ZONE = 500;
@@ -109,36 +111,23 @@ class INF_MortarBatteries
 			return;
 		}
 		if (config.m_iChance <= 0)
-		{
-			Log("Zone " + key + ": not spawning, spawn chance is 0.");
 			return;
-		}
 		if (m_Batteries.Count() >= config.m_iLimit)
-		{
-			Log(string.Format("Zone %1: not spawning, battery limit reached (%2/%3).", key, m_Batteries.Count(), config.m_iLimit));
 			return;
-		}
 		if (config.m_Composition == "")
 		{
 			Fail("Zone " + key + ": not spawning, no mortar composition is configured on INS_AmbientPatrolManager (Mortar Batteries > Mortar Composition).");
 			return;
 		}
 		if (m_Rolls.Contains(key))
-		{
-			Log("Zone " + key + ": not spawning, this zone already rolled for a battery this mission.");
 			return;
-		}
 		m_Rolls.Set(key, true);
 		bool win = m_bWinCarried || Math.RandomInt(0, 100) < config.m_iChance;
 		if (!win)
-		{
-			Log(string.Format("Zone %1: roll lost (chance %2 of 100).", key, config.m_iChance));
 			return;
-		}
 		INF_MortarBattery covering = Covering(zone.m_vCenter);
 		if (covering)
 		{
-			Log("Zone " + key + ": not spawning, already covered by a battery at " + covering.m_vPos.ToString() + ".");
 			m_bWinCarried = false;
 			return;
 		}
@@ -490,8 +479,6 @@ class INF_MortarBatteries
 			ResourceName ammo = usage.GetAmmoResourceName(type);
 			if (ammo == "")
 				Fail("Battery for zone " + key + ": mortar " + gun.GetPrefabData().GetPrefabName() + " has no " + typename.EnumToString(SCR_EAIArtilleryAmmoType, type) + " ammo prefab configured, that ammo cannot be fired.");
-			else
-				Log("Battery for zone " + key + ": mortar " + typename.EnumToString(SCR_EAIArtilleryAmmoType, type) + " ammo is " + ammo + ".");
 		}
 	}
 
@@ -603,7 +590,6 @@ class INF_MortarBatteries
 			}
 			battery.m_State = INF_EMortarState.COOLDOWN;
 			battery.m_fNextFireAt = now + COOLDOWN_MS * Math.RandomFloat(0.7, 1.3);
-			Log(string.Format("Battery for zone %1: salvo finished, next in %2s.", key, (int)((battery.m_fNextFireAt - now) / 1000)));
 			return;
 		}
 		if (AllCrewsDead(battery))
@@ -619,13 +605,6 @@ class INF_MortarBatteries
 		float knowledge;
 		if (!FindKnownTarget(patrols, battery, target, knowledge))
 		{
-			// Hold fire with no cooldown until something is known; log what the spotters know every 30s.
-			if (now >= battery.m_fNextNoTargetLogAt)
-			{
-				battery.m_fNextNoTargetLogAt = now + 30000;
-				Log(string.Format("Battery for zone %1: holding fire, nothing known in range. Spotter groups %2, shared targets %3, hostile %4, freshest hostile sighting %5s (-1 = none).",
-					key, battery.m_iSpotters, battery.m_iSharedTargets, battery.m_iHostileTargets, battery.m_fFreshestSeen));
-			}
 			return;
 		}
 		battery.m_iStage = 0;
@@ -699,8 +678,6 @@ class INF_MortarBatteries
 				bestAge = infoAge;
 			}
 		}
-		if (found)
-			Log(string.Format("Battery for zone %1: best known enemy was seen %2s ago, knowledge %3 (0 to 1), from %4 spotter groups.", battery.m_sKey, bestAge, knowledge, battery.m_iSpotters));
 		return found;
 	}
 
@@ -786,6 +763,7 @@ class INF_MortarBatteries
 					}
 					artillery.SetTargetShotCount(roundsPerWaypoint[run]);
 					artillery.SetAmmoType(types[run]);
+					artillery.SetPriorityLevel(ARTILLERY_PRIORITY_LEVEL);
 					artillery.SetActive(true);
 					crew.m_Group.AddWaypoint(waypoint);
 					crew.m_Salvo.Insert(waypoint);

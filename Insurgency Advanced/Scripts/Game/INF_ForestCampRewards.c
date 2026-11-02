@@ -508,10 +508,6 @@ modded class INS_CacheSpawnManager
 			if (!chosen.IsEmpty())
 				SaveCachePositions(chosen);
 		}
-		else
-		{
-			Print(string.Format("[INF_ForestCampRewards] Recovering %1 saved cache position(s).", chosen.Count()));
-		}
 		Print(string.Format("[INF_ForestCampRewards] Authoritative cache roster: configured=%1, selected=%2, recovered=%3.",
 			m_iCacheCount, chosen.Count(), recovered));
 

@@ -221,7 +221,6 @@ class INF_ForestCamps
 				ConfigureSite(restored);
 				m_Sites.Insert(restored);
 			}
-			Print(string.Format("[INF_ForestCamps] Restored %1 saved camp layouts for cache recovery.", m_Sites.Count()));
 			if (m_Sites.Count() != m_Manager.INF_GetCampCount())
 				Print("[INF_ForestCamps] Preserving the saved camp roster; the camp-count setting only applies to a fresh selection.", LogLevel.WARNING);
 			m_Manager.INF_FinishCampDiscovery(m_Sites);
@@ -233,13 +232,9 @@ class INF_ForestCamps
 		{
 			m_FromCache = true;
 			SetCellOrderFromCache(cachedSites);
-			Print(string.Format("[INF_ForestCamps] Searching %1 cached camp cells in random order with full checks.", m_Keys.Count()));
 		}
 		else
-		{
 			BuildRandomCellOrder();
-			Print(string.Format("[INF_ForestCamps] Popping random map cells until %1 camps are found.", m_Manager.INF_GetCampCount()));
-		}
 		m_SearchStarted = GetGame().GetWorld().GetWorldTime();
 		GetGame().GetCallqueue().CallLater(SearchTick, 0, true);
 	}
@@ -572,7 +567,6 @@ class INF_ForestCamps
 		m_BuildingPool = true;
 		m_NavWaitSince = -1;
 		m_Attempt = 0;
-		Print(string.Format("[INF_ForestCamps] Camps unblocked; building the reusable camp pool in the background from %1 remaining cells.", m_Keys.Count() - m_Index));
 		GetGame().GetCallqueue().CallLater(PoolTick, 0, true);
 	}
 
@@ -581,7 +575,6 @@ class INF_ForestCamps
 		GetGame().GetCallqueue().Remove(PoolTick);
 		m_BuildingPool = false;
 		m_Target = m_Sites;
-		Print(string.Format("[INF_ForestCamps] Background pool complete: %1 vetted camp sites.", m_Pool.Count()));
 		m_TerrainIndex.SaveCandidates(m_Pool);
 		m_Manager.INF_OnCampPoolBuilt();
 	}
@@ -757,8 +750,6 @@ class INF_ForestCamps
 				continue;
 			}
 			site.m_LayoutReady = true;
-			Print(string.Format("[INF_ForestCamps] Camp %1 persistent layout ready: %2 props; cache objective=%3.",
-				site.m_Key, site.m_Props.Count(), INF_ForestCampRewards.IsCacheSite(site.m_RewardID)));
 		}
 		if (complete)
 		{
@@ -809,7 +800,6 @@ class INF_ForestCamps
 			Cleanup(site);
 			return false;
 		}
-		Print("[INF_ForestCamps] Spawned persistent composition: " + site.m_Composition);
 		return true;
 	}
 

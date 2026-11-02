@@ -806,8 +806,6 @@ modded class INS_AmbientPatrolManager
 		if (m_INFZoneStates)
 			m_INFZoneStates.InvalidatePresence();
 		Replication.BumpMe();
-		Print(string.Format("[INF_Activation] Travel efficiency: enter at %1km/h for %2s; exit below %3km/h for %4s. Travel timers reset.",
-			m_fINFTravelEnterSpeed, m_fINFTravelEnterSeconds, m_fINFTravelExitSpeed, m_fINFTravelExitSeconds));
 	}
 
 	override void OnGameModeStart()
@@ -875,7 +873,6 @@ modded class INS_AmbientPatrolManager
 		if (m_INFForestCamps.LoadMapIndex())
 		{
 			m_INFForestCamps.AddBuildingZones(m_INFZoneStates);
-			Print(string.Format("[INF_Zones] Terrain index reused; %1 building zones available while mission sites initialise.", m_aZones.Count()));
 			m_INFForestCamps.Begin();
 			return;
 		}
@@ -889,7 +886,6 @@ modded class INS_AmbientPatrolManager
 			for (int z = firstZ; z < endZ; z++)
 				m_aINFScanTiles.Insert(Vector(x * INF_SCAN_TILE_SIZE, 0, z * INF_SCAN_TILE_SIZE));
 		}
-		Print(string.Format("[INF_Zones] Background terrain scan started: %1 tiles; discovered building zones become playable progressively.", m_aINFScanTiles.Count()));
 		GetGame().GetCallqueue().CallLater(INF_ScanMapTick, 0, true);
 	}
 

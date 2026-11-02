@@ -62,7 +62,18 @@ class INF_Defences
 	protected bool m_bCollecting;
 	protected bool m_bScanned;
 	protected bool m_bResolved;
-
+	protected bool m_bSelected;
+	protected bool m_bSlotsFound;
+	protected bool m_bSphereRunning;
+	protected string m_sSphereReason;
+	protected int m_iSphereCells;
+	protected int m_iSphereNextReport;
+	protected int m_iSphereStarted;
+	protected ref array<vector> m_SphereQueue = {};
+	protected ref set<IEntity> m_SphereSeen = new set<IEntity>();
+	static const int SPHERE_STEP = 400;
+	static const float SPHERE_RADIUS = 300;
+	static const int PLAYER_WATCH_MS = 5000;
 	static void Log(string message)
 	{
 		Print("[INF_Defences] " + message);
@@ -100,6 +111,9 @@ class INF_Defences
 	void Stop()
 	{
 		GetGame().GetCallqueue().Remove(ScanTick);
+		GetGame().GetCallqueue().Remove(SphereTick);
+		GetGame().GetCallqueue().Remove(WatchForPlayer);
+		GetGame().GetCallqueue().Remove(ProbeKnownSlot);
 	}
 
 	// The slot type is the folder under Slotted/, e.g. slotroadmedium; world slots are matched on it.
@@ -147,6 +161,10 @@ class INF_Defences
 		ResolveCompositions();
 		if (m_SlotTypes.IsEmpty())
 			return;
+		// Independent of the terrain and tile scans: if they find no slots, sphere scans retry after init and again
+		// once the first player has spawned.
+		GetGame().GetCallqueue().CallLater(WatchForPlayer, PLAYER_WATCH_MS, true);
+		Log("Watching for the first spawned player to retry the slot search if the startup searches find none.");
 		// The terrain scan already collected the slots; only a reused map index needs the tile scan below.
 		if (m_bScanned)
 		{
@@ -164,7 +182,6 @@ class INF_Defences
 			for (int tileZ = firstZ; tileZ < endZ; tileZ++)
 				m_Tiles.Insert(Vector(tileX * TILE_SIZE, 0, tileZ * TILE_SIZE));
 		}
-		Log(string.Format("Searching %1 map tiles for %2 slot types.", m_Tiles.Count(), m_SlotTypes.Count()));
 		GetGame().GetCallqueue().CallLater(ScanTick, 0, true);
 	}
 
@@ -269,18 +286,70 @@ class INF_Defences
 		set<SCR_EditableEntityComponent> editables = new set<SCR_EditableEntityComponent>();
 		core.GetAllEntities(editables, false, true);
 		int total = editables.Count();
+		array<string> classNames = {};
+		array<int> classCounts = {};
 		foreach (SCR_EditableEntityComponent editable : editables)
 		{
-			if (editable)
-				CollectSlot(editable.GetOwner());
+			if (!editable)
+				continue;
+			IEntity owner = editable.GetOwner();
+			CollectSlot(owner);
+			string className = owner.ClassName();
+			int classIndex = classNames.Find(className);
+			if (classIndex >= 0)
+				classCounts.Set(classIndex, classCounts[classIndex] + 1);
+			else if (classNames.Count() < 12)
+			{
+				classNames.Insert(className);
+				classCounts.Insert(1);
+			}
 		}
-		Log(string.Format("Editable entity registry holds %1 entities; %2 slots found there.", total, m_Slots.Count()));
+		string classes;
+		foreach (int classIndex, string className : classNames)
+			classes += string.Format(" %1 x%2", className, classCounts[classIndex]);
+		Log(string.Format("Editable entity registry holds %1 entities; %2 slots found there. Classes:%3", total, m_Slots.Count(), classes));
+	}
+
+	// Diagnostic for a dedicated server that sees no slots: the first slot in Slots.layer is at this fixed spot, so the
+	// entities found around it show whether the slot layer exists there at all, and whether it appears later.
+	protected static const vector PROBE_POSITION = Vector(7563.3, 17.5, 8102.6);
+	protected ref array<string> m_ProbeNames = {};
+	protected ref array<int> m_ProbeCounts = {};
+
+	protected bool ProbeEntity(IEntity entity)
+	{
+		string className = entity.ClassName();
+		int index = m_ProbeNames.Find(className);
+		if (index >= 0)
+			m_ProbeCounts.Set(index, m_ProbeCounts[index] + 1);
+		else if (m_ProbeNames.Count() < 12)
+		{
+			m_ProbeNames.Insert(className);
+			m_ProbeCounts.Insert(1);
+		}
+		return true;
+	}
+
+	protected void ProbeKnownSlot(int attempt)
+	{
+		m_ProbeNames.Clear();
+		m_ProbeCounts.Clear();
+		GetGame().GetWorld().QueryEntitiesBySphere(PROBE_POSITION, 300, ProbeEntity);
+		string found;
+		foreach (int index, string name : m_ProbeNames)
+			found += string.Format(" %1 x%2", name, m_ProbeCounts[index]);
+		Log(string.Format("Probe %1 around the first slot position (300m), players online %2:%3", attempt, GetGame().GetPlayerManager().GetPlayerCount(), found));
+		if (attempt < 3)
+			GetGame().GetCallqueue().CallLater(ProbeKnownSlot, 60000, false, attempt + 1);
 	}
 
 	protected void Select()
 	{
+		m_bSelected = true;
 		if (m_SeenSlotNames.IsEmpty())
 			CollectEditableSlots();
+		if (m_SeenSlotNames.IsEmpty())
+			ProbeKnownSlot(1);
 		string seen;
 		foreach (int seenIndex, string seenName : m_SeenSlotNames)
 			seen += string.Format(" %1 x%2", seenName, m_SeenSlotCounts[seenIndex]);
@@ -288,11 +357,126 @@ class INF_Defences
 		if (m_Slots.IsEmpty())
 		{
 			if (m_SeenSlotNames.IsEmpty())
-				Fail("The world contains no composition slots (SCR_SiteSlotEntity); its layers must include the slot layer. No defences placed.");
+				Fail("The world contains no composition slots (SCR_SiteSlotEntity); its layers must include the slot layer. No defences placed yet; retrying with a sphere scan.");
 			else
 				Fail("No free matching slots (road slots or small flat slots); no defences placed.");
+			if (m_SeenSlotNames.IsEmpty())
+				StartSphereScan("startup, after all initialisation");
 			return;
 		}
+		m_bSlotsFound = true;
+		PlaceDefences();
+	}
+
+	// Polls until the first player controls an entity, then runs one sphere scan if no slots were found by then.
+	protected void WatchForPlayer()
+	{
+		if (!m_bSelected)
+			return;
+		array<int> playerIds = {};
+		GetGame().GetPlayerManager().GetPlayers(playerIds);
+		bool spawned;
+		foreach (int playerId : playerIds)
+		{
+			if (GetGame().GetPlayerManager().GetPlayerControlledEntity(playerId))
+				spawned = true;
+		}
+		if (!spawned)
+			return;
+		GetGame().GetCallqueue().Remove(WatchForPlayer);
+		if (m_bSlotsFound)
+		{
+			Log("First player spawned; slots were already found, no retry needed.");
+			return;
+		}
+		Log(string.Format("First player spawned (%1 online); no slots found yet, retrying with a sphere scan.", playerIds.Count()));
+		StartSphereScan("first player spawned");
+	}
+
+	// Independent of the terrain and tile scans: sphere queries on an overlapping grid cover the whole map.
+	protected void StartSphereScan(string reason)
+	{
+		if (m_bSlotsFound || m_bSphereRunning)
+		{
+			Log(string.Format("Sphere scan (%1) skipped: slots found=%2, scan already running=%3.", reason, m_bSlotsFound, m_bSphereRunning));
+			return;
+		}
+		m_bSphereRunning = true;
+		m_sSphereReason = reason;
+		m_SphereQueue.Clear();
+		m_SphereSeen.Clear();
+		m_Slots.Clear();
+		m_SeenSlotNames.Clear();
+		m_SeenSlotCounts.Clear();
+		m_iFlatSeen = 0;
+		m_iFlatOccupied = 0;
+		vector minimum, maximum;
+		GetGame().GetWorld().GetBoundBox(minimum, maximum);
+		int firstX = Math.Floor(minimum[0] / SPHERE_STEP);
+		int firstZ = Math.Floor(minimum[2] / SPHERE_STEP);
+		int endX = Math.Ceil(maximum[0] / SPHERE_STEP);
+		int endZ = Math.Ceil(maximum[2] / SPHERE_STEP);
+		for (int cellX = firstX; cellX < endX; cellX++)
+		{
+			for (int cellZ = firstZ; cellZ < endZ; cellZ++)
+				m_SphereQueue.Insert(Vector((cellX + 0.5) * SPHERE_STEP, 0, (cellZ + 0.5) * SPHERE_STEP));
+		}
+		m_iSphereCells = m_SphereQueue.Count();
+		m_iSphereNextReport = 25;
+		m_iSphereStarted = System.GetTickCount();
+		Log(string.Format("Sphere scan (%1) started: %2 cells, radius %3m, world bounds %4 to %5, players online %6.",
+			reason, m_iSphereCells, SPHERE_RADIUS, minimum.ToString(), maximum.ToString(), GetGame().GetPlayerManager().GetPlayerCount()));
+		GetGame().GetCallqueue().CallLater(SphereTick, 0, true);
+	}
+
+	protected bool SphereEntity(IEntity entity)
+	{
+		if (!SCR_SiteSlotEntity.Cast(entity) || m_SphereSeen.Contains(entity))
+			return true;
+		m_SphereSeen.Insert(entity);
+		return CollectSlot(entity);
+	}
+
+	protected void SphereTick()
+	{
+		int started = System.GetTickCount();
+		while (!m_SphereQueue.IsEmpty() && System.GetTickCount() - started < SCAN_BUDGET_MS)
+		{
+			int last = m_SphereQueue.Count() - 1;
+			vector centre = m_SphereQueue[last];
+			m_SphereQueue.Remove(last);
+			centre[1] = GetGame().GetWorld().GetSurfaceY(centre[0], centre[2]);
+			GetGame().GetWorld().QueryEntitiesBySphere(centre, SPHERE_RADIUS, SphereEntity);
+		}
+		int done = m_iSphereCells - m_SphereQueue.Count();
+		if (m_iSphereCells > 0 && done * 100 / m_iSphereCells >= m_iSphereNextReport && !m_SphereQueue.IsEmpty())
+		{
+			Log(string.Format("Sphere scan (%1): %2 of %3 cells searched, %4 slots found so far.", m_sSphereReason, done, m_iSphereCells, m_SphereSeen.Count()));
+			m_iSphereNextReport += 25;
+		}
+		if (!m_SphereQueue.IsEmpty())
+			return;
+		GetGame().GetCallqueue().Remove(SphereTick);
+		m_bSphereRunning = false;
+		Log(string.Format("Sphere scan (%1) finished in %2 ms: %3 cells, %4 distinct slots, %5 free matching slots.",
+			m_sSphereReason, System.GetTickCount() - m_iSphereStarted, m_iSphereCells, m_SphereSeen.Count(), m_Slots.Count()));
+		if (m_Slots.IsEmpty())
+		{
+			if (m_SphereSeen.IsEmpty())
+				Fail("Sphere scan (" + m_sSphereReason + ") found no composition slots; no defences placed from this attempt.");
+			else
+				Fail("Sphere scan (" + m_sSphereReason + ") found slots but none free and matching; no defences placed.");
+			return;
+		}
+		m_bSlotsFound = true;
+		GetGame().GetCallqueue().Remove(WatchForPlayer);
+		Log("Sphere scan found slots; later retries are cancelled.");
+		PlaceDefences();
+		m_Slots.Clear();
+	}
+
+	protected void PlaceDefences()
+	{
 		array<SCR_SiteSlotEntity> candidates = {};
 		foreach (SCR_SiteSlotEntity slot : m_Slots)
 		{

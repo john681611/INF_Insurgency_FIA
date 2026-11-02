@@ -251,8 +251,6 @@ modded class INS_GarrisonManager
 		// The inherited component is retained only as the existing map-area host.
 		// Do not start upstream garrison discovery, persistence or its spawn queue.
 		m_bEnabled = false;
-		if (Replication.IsServer())
-			Print("[INF_BuildingGrid] Authored garrisons retired; building-grid and camps own zone infantry.");
 
 		if (!Replication.IsServer() || !m_bINFShowZoneAreas)
 			return;
@@ -284,8 +282,6 @@ modded class INS_GarrisonManager
 		GetGame().GetWorld().QueryEntitiesByAABB(minimum, maximum, INF_CollectStaleArea);
 		foreach (INF_GarrisonMapArea stale : m_INFStaleAreas)
 			SCR_EntityHelper.DeleteEntityAndChildren(stale);
-		if (!m_INFStaleAreas.IsEmpty())
-			Print(string.Format("[INF_GarrisonMapAreas] Removed %1 stale map area(s).", m_INFStaleAreas.Count()));
 		m_INFStaleAreas.Clear();
 	}
 

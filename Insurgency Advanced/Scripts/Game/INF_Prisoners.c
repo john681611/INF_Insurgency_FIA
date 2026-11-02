@@ -234,7 +234,6 @@ class INF_PrisonerComponent : ScriptComponent
 		Replication.BumpMe();
 		GetGame().GetCallqueue().CallLater(MaintainRestraints, 1000, false);
 		Respond(user, "Prisoner secured. Stop their bleeding and treat their wounds; they must be conscious before questioning.");
-		Print(string.Format("[INF_Prisoners] Player %1 secured hostile AI.", GetGame().GetPlayerManager().GetPlayerIdFromControlledEntity(user)));
 	}
 
 	void Question(IEntity user)

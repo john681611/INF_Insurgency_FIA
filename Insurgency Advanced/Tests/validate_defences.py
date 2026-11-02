@@ -85,7 +85,7 @@ class DefencePlacement(unittest.TestCase):
         self.assertIn("avoid.Insert(campSite.m_Position)", grid("protected void INF_StartDefences("))
 
     def test_one_percentage_of_all_viable_road_and_small_flat_slots(self):
-        select = defence("protected void Select(")
+        select = defence("protected void PlaceDefences(")
         self.assertIn("Math.Ceil(candidates.Count() * m_Config.m_iPercent / 100.0)", select)
         self.assertIn("m_Sites.Count() >= quota", select)
         self.assertNotIn("cache", select.lower().replace("cache save", ""))
@@ -165,8 +165,24 @@ class DefencePersistence(unittest.TestCase):
         self.assertIn("FileIO.FileExists(INS_CACHE_SAVE_FILE) && FileIO.FileExists(SAVE_FILE)", begin)
         self.assertLess(begin.index("Recover();"), begin.index("ResolveCompositions();"))
         self.assertIn('"$profile:INS_Saves/defence_sites.dat"', DEFENCES)
-        select = defence("protected void Select(")
+        select = defence("protected void PlaceDefences(")
         self.assertIn("!m_Sites.IsEmpty() && !Save()", select)
+
+    def test_sphere_scan_retries_after_init_and_first_spawn_until_slots_are_found(self):
+        select = defence("protected void Select(")
+        self.assertIn('StartSphereScan("startup, after all initialisation")', select)
+        watch = defence("protected void WatchForPlayer(")
+        self.assertIn("GetPlayerControlledEntity(playerId)", watch)
+        self.assertIn("if (m_bSlotsFound)", watch)
+        self.assertIn('StartSphereScan("first player spawned")', watch)
+        start = defence("protected void StartSphereScan(")
+        self.assertIn("if (m_bSlotsFound || m_bSphereRunning)", start)
+        tick = defence("protected void SphereTick(")
+        self.assertIn("SCAN_BUDGET_MS", tick)
+        self.assertIn("QueryEntitiesBySphere", tick)
+        self.assertIn("m_bSlotsFound = true", tick)
+        self.assertIn("PlaceDefences()", tick)
+        self.assertIn("SphereTick", defence("void Stop("))
 
     def test_the_roster_is_deleted_on_a_clean_mission_end(self):
         self.assertIn("FileIO.DeleteFile(INF_Defences.SAVE_FILE)", REWARDS)

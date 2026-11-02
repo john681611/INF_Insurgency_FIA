@@ -29,12 +29,11 @@ class MortarBattery(unittest.TestCase):
         self.assertIn("protected int m_iINFMortarLimit = 2;", GRID)
         self.assertIn('"0 4 1"', GRID)
 
-    def test_every_spawn_refusal_is_logged(self):
+    def test_failed_spawns_are_logged_but_dice_rolls_are_silent(self):
         start = body("void OnZoneActivated(")
-        # The first return is the client-side guard, which is intentionally silent.
-        for early_return in start.split("return;")[1:-1]:
-            self.assertRegex(early_return[-400:], r"(Log|Fail|CarryWin)\(")
+        self.assertIn("Fail(", start)
         self.assertIn("CarryWin(", start)
+        self.assertNotIn("roll lost", start)
         self.assertIn("m_bWinCarried || Math.RandomInt(0, 100) < config.m_iChance", start)
         self.assertIn("Placement rejected", body("protected bool FindPosition("))
 
@@ -97,7 +96,6 @@ class MortarBattery(unittest.TestCase):
         fire = body("protected void Fire(")
         wait = fire.split("FindKnownTarget(patrols, battery, target, knowledge))", 1)[1].split("battery.m_iStage = 0", 1)[0]
         self.assertNotIn("m_fNextFireAt", wait)
-        self.assertIn("m_fNextNoTargetLogAt", wait)
         self.assertIn("now + COOLDOWN_MS", fire)
 
     def test_spread_never_drops_below_the_floor_and_widens_as_knowledge_falls(self):

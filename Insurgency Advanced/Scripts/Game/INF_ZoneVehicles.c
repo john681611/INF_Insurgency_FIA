@@ -795,7 +795,6 @@ modded class INS_AmbientVehicleManager
 		unit.m_Deadline = GetGame().GetWorld().GetWorldTime() + 15000;
 		zone.m_fINFSpawnReadyAt = Math.Max(zone.m_fINFSpawnReadyAt, unit.m_Deadline);
 		m_INFZoneVehicles.Insert(unit);
-		Print(string.Format("[INF_ZoneVehicles] Spawned %1 in zone %2 at %3.", prefab, INF_BuildingGrid.Key(zone.m_vCenter), pos));
 		GetGame().GetCallqueue().CallLater(INF_ZoneSpawnCrew, 500, false, unit);
 		patrols.INF_GetZoneStates().InvalidatePresence();
 	}

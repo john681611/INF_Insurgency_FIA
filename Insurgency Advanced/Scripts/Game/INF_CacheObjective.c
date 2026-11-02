@@ -34,7 +34,6 @@ modded class INS_IntelManager
 		}
 		m_fINFQuestioningChance = chance;
 		Replication.BumpMe();
-		Print(string.Format("[INF_Prisoners] Questioning intel chance set to %1.", chance));
 	}
 
 	[Attribute("0", UIWidgets.ComboBox, "Intel sources: 0 = body search and questioning, 1 = questioning only.", enums: ParamEnumArray.FromEnum(INF_EIntelSource), category: "Prisoners"), RplProp()]
@@ -61,7 +60,6 @@ modded class INS_IntelManager
 		}
 		m_iINFIntelSource = source;
 		Replication.BumpMe();
-		Print(string.Format("[INF_Prisoners] Intel source set to %1.", source));
 	}
 
 	void INF_ApplyHeaderSettings(INS_MissionParams params)
@@ -222,7 +220,6 @@ modded class INS_IntelManager
 		Replication.BumpMe();
 		GetGame().GetCallqueue().Remove(TriggerMissionComplete);
 		m_bINFMissionEndQueued = false;
-		Print(string.Format("[INF_Objectives] Mission-end mode changed to %1 (0=caches, 1=caches+camps, 2=caches+camps+zones).", value));
 		INF_QueueCampaignObjectives();
 	}
 
