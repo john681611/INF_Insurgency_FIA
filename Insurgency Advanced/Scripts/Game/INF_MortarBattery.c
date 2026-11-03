@@ -605,6 +605,11 @@ class INF_MortarBatteries
 		float knowledge;
 		if (!FindKnownTarget(patrols, battery, target, knowledge))
 		{
+			if (now >= battery.m_fNextNoTargetLogAt)
+			{
+				battery.m_fNextNoTargetLogAt = now + 30000;
+				Log(string.Format("Battery for zone %1: no known target (spotter groups %2, shared targets %3, hostile targets %4, freshest seen %5s ago).", key, battery.m_iSpotters, battery.m_iSharedTargets, battery.m_iHostileTargets, battery.m_fFreshestSeen));
+			}
 			return;
 		}
 		battery.m_iStage = 0;
@@ -636,7 +641,11 @@ class INF_MortarBatteries
 					observers.Insert(patrol.m_Group);
 			}
 		}
-		float now = GetGame().GetWorld().GetWorldTime();
+		// SCR_AITargetInfo.m_fTimestamp is PerceptionManager time in seconds, not world time in milliseconds.
+		PerceptionManager perceptionManager = GetGame().GetPerceptionManager();
+		if (!perceptionManager)
+			return false;
+		float now = perceptionManager.GetTime();
 		bool found;
 		float bestAge;
 		knowledge = 0;
@@ -660,7 +669,7 @@ class INF_MortarBatteries
 				if (info.m_DamageManager && info.m_DamageManager.IsDestroyed())
 					continue;
 				battery.m_iHostileTargets++;
-				float infoAge = Math.Max(0, (now - info.m_fTimestamp) * 0.001);
+				float infoAge = Math.Max(0, now - info.m_fTimestamp);
 				if (battery.m_fFreshestSeen < 0 || infoAge < battery.m_fFreshestSeen)
 					battery.m_fFreshestSeen = infoAge;
 				float range = vector.DistanceXZ(info.m_vWorldPos, battery.m_vPos);
