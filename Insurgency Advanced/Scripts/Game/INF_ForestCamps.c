@@ -19,6 +19,7 @@ class INF_ForestCampSite
 	bool m_CompositionReady;
 	bool m_Friendly;
 	ref array<IEntity> m_Props = {};
+	string m_sLastFailure;
 }
 
 [ComponentEditorProps(category: "Insurgency Advanced", description: "Replicated ownership of a permanently secured camp.")]
@@ -107,6 +108,11 @@ class INF_ForestCell
 class INF_ForestCamps
 {
 	static const int MAX_CAMPS = 20;
+	protected static string s_sLastBlocker;
+	// A saved reward cache is restored before the cache registry knows it, so the camp's own cache would otherwise block its footprint.
+	static const float OWN_CACHE_RADIUS = 3;
+	protected static bool s_bIgnoreOwnCache;
+	protected static vector s_vOwnCache;
 	static const float MIN_SPACING = 450;
 	static const int SEARCH_BUDGET_MS = 10;
 	static const int POOL_BUDGET_MS = 3;
@@ -351,9 +357,20 @@ class INF_ForestCamps
 	}
 
 	// 0=valid, 1=terrain/water/slope, 2=obstructed layout.
-	static int FootprintFailure(INF_ForestCampSite site, bool reserveRewardSlot = false)
+	static int FootprintFailure(INF_ForestCampSite site, bool reserveRewardSlot = false, bool ignoreOwnCache = false)
+	{
+		s_bIgnoreOwnCache = ignoreOwnCache;
+		if (ignoreOwnCache)
+			s_vOwnCache = INF_ForestCampRewards.GetCachePosition(site.m_Position, site.m_Yaw);
+		int failure = CheckFootprint(site, reserveRewardSlot);
+		s_bIgnoreOwnCache = false;
+		return failure;
+	}
+
+	protected static int CheckFootprint(INF_ForestCampSite site, bool reserveRewardSlot)
 	{
 		BaseWorld world = GetGame().GetWorld();
+		s_sLastBlocker = string.Empty;
 		float ground = world.GetSurfaceY(site.m_Position[0], site.m_Position[2]);
 		int steps = Math.Ceil(site.m_FootprintRadius / 3.0);
 		float spacing = site.m_FootprintRadius / steps;
@@ -381,6 +398,14 @@ class INF_ForestCamps
 
 	static bool CampObstacleFilter(notnull IEntity entity, vector start, vector direction)
 	{
+		if (s_bIgnoreOwnCache)
+		{
+			IEntity root = entity;
+			while (root.GetParent())
+				root = root.GetParent();
+			if (vector.DistanceXZ(root.GetOrigin(), s_vOwnCache) < OWN_CACHE_RADIUS)
+				return false;
+		}
 		return !BaseTree.Cast(entity);
 	}
 
@@ -411,9 +436,51 @@ class INF_ForestCamps
 			else
 				fraction = world.TraceMove(trace, null);
 			if (fraction < 1)
+			{
+				s_sLastBlocker = DescribeBlocker(trace.TraceEnt, start + (end - start) * fraction, pos);
 				return false;
+			}
 		}
 		return true;
+	}
+
+	static string DescribeBlocker(IEntity entity, vector hit, vector sitePosition)
+	{
+		if (!entity)
+			return string.Format("terrain/world at %1", hit);
+		string prefab = "no prefab";
+		EntityPrefabData data = entity.GetPrefabData();
+		if (data)
+			prefab = data.GetPrefabName();
+		string childInfo = "no children";
+		IEntity child = entity.GetChildren();
+		if (child)
+		{
+			int children;
+			string firstPrefab = "no prefab";
+			EntityPrefabData childData = child.GetPrefabData();
+			if (childData)
+				firstPrefab = childData.GetPrefabName();
+			while (child)
+			{
+				children++;
+				child = child.GetSibling();
+			}
+			childInfo = string.Format("%1 children, first %2", children, firstPrefab);
+		}
+		string parentInfo = "top-level";
+		IEntity root = entity.GetParent();
+		if (root)
+		{
+			while (root.GetParent())
+				root = root.GetParent();
+			string rootPrefab = "no prefab";
+			EntityPrefabData rootData = root.GetPrefabData();
+			if (rootData)
+				rootPrefab = rootData.GetPrefabName();
+			parentInfo = string.Format("root %1 (%2) at %3, %4m from camp", root.ClassName(), rootPrefab, root.GetOrigin(), vector.DistanceXZ(root.GetOrigin(), sitePosition));
+		}
+		return string.Format("%1 (%2) at %3, %4m from camp, %5, %6", entity.ClassName(), prefab, entity.GetOrigin(), vector.DistanceXZ(entity.GetOrigin(), sitePosition), parentInfo, childInfo);
 	}
 
 	static bool RewardSlotClear(INF_ForestCampSite site)
@@ -716,10 +783,22 @@ class INF_ForestCamps
 		{
 			if (camp.m_CompositionReady)
 				continue;
-			if (!ValidateFootprint(camp) || !SpawnLayout(camp))
+			int footprint = FootprintFailure(camp, false, true);
+			if (footprint != 0 || !SpawnLayout(camp))
 			{
 				Cleanup(camp);
-				Print("[INF_ForestCamps] Static composition not ready: " + camp.m_Key + "; retrying startup.", LogLevel.ERROR);
+				string stage = "layout spawn failed";
+				if (footprint != 0)
+					stage = string.Format("footprint failed, code %1 (1 terrain, 2 obstructed)", footprint);
+				if (footprint == 2 && s_sLastBlocker != string.Empty)
+					stage += "; blocked by " + s_sLastBlocker;
+				// The same failure repeats every second; only print it when the reason changes.
+				string failure = camp.m_Key + " (" + stage + ")";
+				if (failure != camp.m_sLastFailure)
+				{
+					camp.m_sLastFailure = failure;
+					Print("[INF_ForestCamps] Static composition not ready: " + failure + "; retrying startup.", LogLevel.ERROR);
+				}
 				compositionsReady = false;
 				continue;
 			}

@@ -16,12 +16,25 @@ class IntegratedSites(unittest.TestCase):
         self.assertIn("!intel.INF_IsIntelReady()", layout)
         self.assertNotIn("PlayerSafe", layout)
         self.assertNotIn("m_Players", layout)
-        self.assertIn("!ValidateFootprint(camp) || !SpawnLayout(camp)", layout)
+        self.assertIn("int footprint = FootprintFailure(camp, false, true)", layout)
+        self.assertNotIn("m_bRecovered", CAMP)
+        self.assertIn("footprint != 0 || !SpawnLayout(camp)", layout)
         self.assertIn("Cleanup(camp)", layout)
         self.assertIn("!BindArsenalSearch(site)", layout)
         self.assertLess(layout.index("FinishCampObjects()"), layout.index("!INF_ForestCampRewards.AreCachesReady()"))
         self.assertIn("LogLevel.ERROR", layout)
         self.assertLess(layout.index("site.m_LayoutReady = true"), layout.index("INF_StaticCampLayoutsReady()"))
+
+    def test_camp_footprint_ignores_its_own_saved_cache(self):
+        layout = CAMP.split("protected void UpdateLayouts()", 1)[1].split("protected void NextAttempt", 1)[0]
+        self.assertIn("FootprintFailure(camp, false, true)", layout)
+        footprint = CAMP.split("static int FootprintFailure(", 1)[1].split("protected static int CheckFootprint", 1)[0]
+        self.assertIn("s_vOwnCache = INF_ForestCampRewards.GetCachePosition(", footprint)
+        self.assertLess(footprint.index("CheckFootprint("), footprint.index("s_bIgnoreOwnCache = false"))
+        selection = CAMP.split("FootprintFailure(site, true)", 1)
+        self.assertEqual(2, len(selection))
+        filt = CAMP.split("static bool CampObstacleFilter", 1)[1].split("static bool ClearVolume", 1)[0]
+        self.assertIn("OWN_CACHE_RADIUS", filt)
 
     def test_static_props_survive_capture_eviction_and_spawn_failure(self):
         self.assertNotIn("INF_ForestCamps.Cleanup(", GRID)
