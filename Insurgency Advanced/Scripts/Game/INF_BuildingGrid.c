@@ -582,10 +582,6 @@ modded class INS_AmbientPatrolManager
 	protected ResourceName m_sINFDefenceSlotCache;
 	protected ref INF_Defences m_INFDefences;
 
-	[Attribute("0", UIWidgets.CheckBox, "Development only. On start, copy every hand-placed cache spawn point into all buildings of the same type and write $profile:INF/Caches_Generated.layer. Turn off for normal play.", category: "Caches")]
-	protected bool m_bINFExportCacheCandidates;
-	protected ref INF_CacheCandidateExporter m_INFCacheExporter;
-
 	protected INF_DefenceConfig INF_BuildDefenceConfig()
 	{
 		INF_DefenceConfig config = new INF_DefenceConfig();
@@ -852,11 +848,6 @@ modded class INS_AmbientPatrolManager
 		}
 		m_INFForestCamps = new INF_ForestCamps(this);
 		INF_ForestCampRewards.BeginDiscovery();
-		if (m_bINFExportCacheCandidates && Replication.IsServer())
-		{
-			m_INFCacheExporter = new INF_CacheCandidateExporter();
-			m_INFCacheExporter.Start();
-		}
 		INS_IntelManager intel = INS_IntelManager.Cast(GetOwner().FindComponent(INS_IntelManager));
 		if (!intel)
 		{

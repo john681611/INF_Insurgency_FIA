@@ -614,29 +614,6 @@ Slot Cache on the patrol manager (in the mission's game mode prefab) to a config
 (INF_DefenceSlotCache: type, position, yaw). Defences use it only when the scan finds no slot
 entities at all. The Everon mission generates its config from Slots.layer with
 Tools/generate_defence_slot_cache.py; rerun it after the slot layer changes.
-Cache pool generator (development tool, Scripts/Game/INF_CacheCandidates.c): the base mod chooses
-caches from every INS_CacheSpawnPoint in the world, so a short hand-placed list is easy to learn.
-The generator copies each hand-placed point into the other buildings of the same prefab. Per
-building it records the point's position relative to that building, scans the map for buildings
-with the same prefab, keeps the copies that sit on a floor (short downward trace) and are not the
-hand-placed point itself, then keeps a random sample of at most MAX_PER_TYPE (30) per prefab so
-common buildings (garages, barns) do not dominate. It writes a layer of INS_CacheSpawnPoint
-entities that can be checked in World Editor. It runs inside the game because the map's buildings
-belong to the parent world and are not in the layer files.
-To regenerate on a mission:
-  1. Add or move hand-placed INS_CacheSpawnPoint entities inside buildings (the more spots and
-     building types, the better the variety).
-  2. Empty the mission's generated layer file (keep the layer registered). It must not feed itself:
-     generated points would become anchors.
-  3. Tick Caches: Export cache candidates (m_bINFExportCacheCandidates) on the mission's game mode
-     prefab and start the mission once.
-  4. The log shows [INF_CacheExport] lines: points anchored, then kept-of-found per prefab, then the
-     total, floor rejections and skipped copies. Anchors with no building are warned about.
-  5. Copy $profile:INF/Caches_Generated.layer over the generated layer file, untick the option, and
-     reload the world in World Editor so it does not overwrite the layer.
-  6. Delete INS_Saves (cache_positions.dat) to pick a fresh roster; saved rosters keep their spots.
-A prefab with only one building on the map (a church) has nothing to copy to. Everon keeps its
-generated spots in Worlds/InsEden_Layers/Caches_Generated.layer.
 Settings on the patrol manager (Defences category):
   Percentage           default 15, range 0-100 (0 disables; applies to a fresh selection only)
   Spacing              default 800m
