@@ -382,7 +382,7 @@ Game mode defaults and ranges when left at -1:
   m_fINFCampFootprintRadius     9      3-24 metres
   m_iINFSiteStrengthMultiplier  2      1-4
   m_iINFCounterAttackChance     10     0-100 percent
-  m_iINFMortarChance            15     0-100 percent
+  m_iINFMortarChance            10     0-100 percent
   m_iINFMortarLimit             2      0-4
   m_iINFDefencePercent          15     0-100 percent (0 disables defences)
   m_fINFDefenceSpacing          800    200-3000 metres (road defences)
@@ -560,7 +560,7 @@ MortarPlacement_S_USSR_01, set on the game mode prefab's patrol manager under Mo
 Batteries), two 2-man gunner crews (one per mortar) and a 2-4 man guard group. Gunners
 and guards come from the configured group pool; nothing is hard-coded to a faction.
 Settings on the patrol manager (Workbench, no GM attribute yet):
-  Mortar Batteries: Chance (%)      default 15, range 0-100 (per zone; neighbouring zones roll independently)
+  Mortar Batteries: Chance (%)      default 10, range 0-100 (per zone; neighbouring zones roll independently)
   Mortar Batteries: Maximum Active  default 2, range 0-4
 The battery sits 500-1500m from its zone on hidden, flat, open ground at least 300m
 from players, and covers every active zone within 2.5km, so a cluster of zones shares
@@ -574,9 +574,18 @@ after 120s. Knowledge sets the spread: full knowledge gives 30m (HE), 60m (smoke
 (illumination), none gives the full 100m / 150m / 225m. With no known target it holds fire.
 A salvo is 18 rounds (12 HE, 6 smoke by day or illumination by night) in two stages
 of 1 special, 3 HE, 2 special, 3 HE per crew. HE blocks are one waypoint each and
-special rounds one per waypoint, so each gun rolls its own aim points. Knowledge is
-re-read between the stages; if every enemy is lost the battery ceases fire. The
-cooldown is about 3 minutes (+-30%). Ammo comes from the mortar's artillery usage
+special rounds one per waypoint, so each gun rolls its own aim points.
+Order of events: when the AI go from knowing nothing to knowing an enemy, the battery
+waits a random 20-60s (the AI deciding and ordering). The order locks the target point.
+The first time a battery fires, its crews need a further random 15-30s to get ready; later
+missions skip this. The salvo has two stages; between them is a random 8-20s pause while
+the AI watch the fall of shot, and the second stage picks its aim the same way as the first,
+from the position and knowledge the AI have then, so an imperfect picture still gives a
+wider spread. If every enemy is lost by then the battery ceases fire. The cooldown is about
+3 minutes (+-30%) and takes no orders at all: knowledge is only tracked, and any new
+report starts its decision delay once the cooldown is over. If the enemy was never lost,
+the next mission is ordered at once when the cooldown ends, with no decision delay; if it
+was lost in between, the decision delay applies. Ammo comes from the mortar's artillery usage
 component, so smoke and illumination need those ammo prefabs configured there.
 Like zone vehicles, battery AI sits outside the 128-AI budget and is limited by the
 battery count. Batteries run from the patrol manager's existing proximity step and zone

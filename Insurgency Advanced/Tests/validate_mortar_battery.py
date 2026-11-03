@@ -24,8 +24,8 @@ class MortarBattery(unittest.TestCase):
         self.assertNotIn("SpawnPrefab(config.m_Prefab", MORTAR)
 
     def test_settings_default_to_play_values(self):
-        self.assertIn("protected int m_iINFMortarChance = 15;", GRID)
-        self.assertIn('[Attribute("15", UIWidgets.Slider', GRID)
+        self.assertIn("protected int m_iINFMortarChance = 10;", GRID)
+        self.assertIn('[Attribute("10", UIWidgets.Slider', GRID)
         self.assertIn("protected int m_iINFMortarLimit = 2;", GRID)
         self.assertIn('"0 4 1"', GRID)
 
@@ -62,14 +62,19 @@ class MortarBattery(unittest.TestCase):
         self.assertIn("SCR_EAIArtilleryAmmoType.HIGH_EXPLOSIVE", salvo)
         self.assertIn("IsNight()", salvo)
 
-    def test_salvo_runs_in_two_stages_with_knowledge_refreshed_after_the_first_he_block(self):
+    def test_salvo_runs_in_two_stages_with_a_gap_and_a_correction(self):
         fire = body("protected void Fire(")
         salvo = body("protected bool StartSalvo(")
         self.assertIn("static const int SALVO_STAGES = 2;", MORTAR)
+        self.assertIn("static const float STAGE_GAP_MIN_MS = 8000;", MORTAR)
+        self.assertIn("static const float STAGE_GAP_MAX_MS = 20000;", MORTAR)
         self.assertIn("run = stage * 2; run < stage * 2 + 2", salvo)
         self.assertIn("battery.m_iStage + 1 < SALVO_STAGES", fire)
+        self.assertIn("Math.RandomFloat(STAGE_GAP_MIN_MS, STAGE_GAP_MAX_MS)", fire)
         self.assertIn("FindKnownTarget(patrols, battery, nextTarget, nextKnowledge)", fire)
+        self.assertIn("battery.m_vLockedTarget = nextTarget;", fire)
         self.assertIn("StartSalvo(battery, nextTarget, nextKnowledge, battery.m_iStage)", fire)
+        self.assertNotIn("corrected", fire)
         self.assertIn("ceasing fire", fire)
         self.assertNotIn("SALVO_TIMEOUT_MS", MORTAR)
 
@@ -96,11 +101,47 @@ class MortarBattery(unittest.TestCase):
         self.assertIn("FindKnownTarget(patrols, battery, nextTarget, nextKnowledge)", fire)
         self.assertNotIn("players", fire)
 
-    def test_battery_holds_fire_without_a_cooldown_until_something_is_known(self):
+    def test_a_decision_delay_runs_from_no_knowledge_to_knowledge(self):
         fire = body("protected void Fire(")
-        wait = fire.split("FindKnownTarget(patrols, battery, target, knowledge))", 1)[1].split("battery.m_iStage = 0", 1)[0]
-        self.assertNotIn("m_fNextFireAt", wait)
-        self.assertIn("now + COOLDOWN_MS", fire)
+        self.assertIn("static const float DECISION_DELAY_MIN_MS = 20000;", MORTAR)
+        self.assertIn("static const float DECISION_DELAY_MAX_MS = 60000;", MORTAR)
+        lost = fire.split("FindKnownTarget(patrols, battery, target, knowledge))", 1)[1].split("// Going from no knowledge", 1)[0]
+        self.assertIn("battery.m_bKnowledge = false;", lost)
+        self.assertIn("battery.m_fOrderAt = 0;", lost)
+        gained = fire.split("// Going from no knowledge", 1)[1]
+        cooldown_gate = fire.split("// The cooldown takes no orders", 1)[1].split("// Going from no knowledge", 1)[0]
+        self.assertIn("if (now < battery.m_fNextFireAt)", cooldown_gate)
+        gained = gained.split("if (now < battery.m_fOrderAt)", 1)[0]
+        self.assertIn("Math.RandomFloat(DECISION_DELAY_MIN_MS, DECISION_DELAY_MAX_MS)", gained)
+        self.assertIn("battery.m_bKnowledge = true;", gained)
+
+    def test_the_order_locks_the_target_and_only_the_first_mission_waits_for_the_crews(self):
+        fire = body("protected void Fire(")
+        begin = body("protected void BeginSalvo(")
+        self.assertIn("static const float READY_DELAY_MIN_MS = 15000;", MORTAR)
+        self.assertIn("static const float READY_DELAY_MAX_MS = 30000;", MORTAR)
+        order = fire.split("// The order: the point is locked in", 1)[1]
+        self.assertLess(order.index("battery.m_vLockedTarget = target;"), order.index("BeginSalvo(battery, now)"))
+        self.assertIn("if (!battery.m_bHasFired)", order)
+        self.assertIn("Math.RandomFloat(READY_DELAY_MIN_MS, READY_DELAY_MAX_MS)", order)
+        self.assertIn("battery.m_bHasFired = true;", begin)
+        self.assertIn("StartSalvo(battery, battery.m_vLockedTarget, battery.m_fLockedKnowledge, 0)", begin)
+
+    def test_the_target_is_only_corrected_between_the_stages(self):
+        fire = body("protected void Fire(")
+        begin = body("protected void BeginSalvo(")
+        firing = fire.split("if (AllCrewsDead(battery))", 1)[0]
+        self.assertEqual(firing.count("FindKnownTarget("), 1)
+        self.assertLess(firing.index("battery.m_fStageAt = now + "), firing.index("FindKnownTarget("))
+        self.assertIn("battery.m_fStageAt = 0;", begin)
+
+    def test_knowledge_held_through_the_cooldown_orders_the_next_mission_at_once(self):
+        fire = body("protected void Fire(")
+        cooldown = fire.split("battery.m_State = INF_EMortarState.COOLDOWN;", 1)[1].split("return;", 1)[0]
+        self.assertIn("now + COOLDOWN_MS", cooldown)
+        self.assertIn("battery.m_fOrderAt = 0;", cooldown)
+        self.assertNotIn("battery.m_bKnowledge = true;", cooldown)
+        self.assertIn("battery.m_bKnowledge = false;", fire.split("ceasing fire", 1)[0])
 
     def test_spread_never_drops_below_the_floor_and_widens_as_knowledge_falls(self):
         spread = body("protected float KnowledgeSpread(")

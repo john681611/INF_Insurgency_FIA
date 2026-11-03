@@ -34,14 +34,17 @@ class INF_MortarBattery
 	float m_fSpawnAt;
 	float m_fDeadline;
 	float m_fNextFireAt;
+	float m_fOrderAt;
+	float m_fReadyAt;
+	float m_fStageAt;
+	bool m_bKnowledge;
+	bool m_bTargetLocked;
+	bool m_bHasFired;
+	vector m_vLockedTarget;
+	float m_fLockedKnowledge;
 	float m_fNextCleanupAt;
 	bool m_bCrewDeadLogged;
 	string m_sWaiting;
-	float m_fNextNoTargetLogAt;
-	float m_fFreshestSeen = -1;
-	int m_iSpotters;
-	int m_iSharedTargets;
-	int m_iHostileTargets;
 	ref array<IEntity> m_Compositions = {};
 	ref array<ref INF_MortarCrew> m_Crews = {};
 	SCR_AIGroup m_GuardGroup;
@@ -75,6 +78,15 @@ class INF_MortarBatteries
 	static const float ILLUMINATION_SPREAD_RADIUS = 225;
 	static const float COOLDOWN_MS = 180000;
 	static const float FIRST_FIRE_DELAY_MS = 10000;
+	// Random time from the AI first knowing of an enemy to the fire mission being ordered.
+	static const float DECISION_DELAY_MIN_MS = 20000;
+	static const float DECISION_DELAY_MAX_MS = 60000;
+	// Extra time for the crews to get ready, only before the battery's first mission.
+	static const float READY_DELAY_MIN_MS = 15000;
+	static const float READY_DELAY_MAX_MS = 30000;
+	// Short pause between the two stages of a salvo, before the correction is aimed.
+	static const float STAGE_GAP_MIN_MS = 8000;
+	static const float STAGE_GAP_MAX_MS = 20000;
 	static const int SALVO_STAGES = 2;
 	static const float STAGE_TIMEOUT_MS = 240000;
 	static const float INIT_TIMEOUT_MS = 45000;
@@ -568,16 +580,31 @@ class INF_MortarBatteries
 		string key = battery.m_sKey;
 		if (battery.m_State == INF_EMortarState.FIRING)
 		{
-			if (now < battery.m_fDeadline && !SalvoDone(battery))
-				return;
-			ClearSalvoWaypoints(battery);
-			// The gap after the first HE block: the second stage aims on what the AI know now, not at the start.
-			if (battery.m_iStage + 1 < SALVO_STAGES && !AllCrewsDead(battery))
+			if (battery.m_fStageAt <= 0)
 			{
+				if (now < battery.m_fDeadline && !SalvoDone(battery))
+					return;
+				ClearSalvoWaypoints(battery);
+				// A short pause between the stages while the AI watch the fall of shot and correct.
+				if (battery.m_iStage + 1 < SALVO_STAGES && !AllCrewsDead(battery))
+				{
+					battery.m_fStageAt = now + Math.RandomFloat(STAGE_GAP_MIN_MS, STAGE_GAP_MAX_MS);
+					return;
+				}
+			}
+			else if (now < battery.m_fStageAt)
+				return;
+			else
+			{
+				battery.m_fStageAt = 0;
 				vector nextTarget;
 				float nextKnowledge;
+				// The correction: the next stage picks its aim the same way as the first, from the position and
+				// knowledge the AI have now.
 				if (FindKnownTarget(patrols, battery, nextTarget, nextKnowledge))
 				{
+					battery.m_vLockedTarget = nextTarget;
+					battery.m_fLockedKnowledge = nextKnowledge;
 					battery.m_iStage++;
 					if (StartSalvo(battery, nextTarget, nextKnowledge, battery.m_iStage))
 					{
@@ -586,10 +613,16 @@ class INF_MortarBatteries
 					}
 				}
 				else
-					Log(string.Format("Battery for zone %1: lost track of every enemy after stage %2, ceasing fire (spotter groups %3, hostile targets %4).", key, battery.m_iStage + 1, battery.m_iSpotters, battery.m_iHostileTargets));
+				{
+					battery.m_bKnowledge = false;
+					Log(string.Format("Battery for zone %1: lost track of every enemy after stage %2, ceasing fire.", key, battery.m_iStage + 1));
+				}
 			}
 			battery.m_State = INF_EMortarState.COOLDOWN;
 			battery.m_fNextFireAt = now + COOLDOWN_MS * Math.RandomFloat(0.7, 1.3);
+			// The commander still has the picture: if the enemy is still known when the cooldown ends, the next
+			// order is immediate. Losing the enemy during the cooldown clears this.
+			battery.m_fOrderAt = 0;
 			return;
 		}
 		if (AllCrewsDead(battery))
@@ -599,27 +632,61 @@ class INF_MortarBatteries
 			battery.m_bCrewDeadLogged = true;
 			return;
 		}
-		if (now < battery.m_fNextFireAt)
+		// An ordered mission stands: the target is locked, and the crews only need to get ready the first time.
+		if (battery.m_bTargetLocked)
+		{
+			if (now >= battery.m_fReadyAt)
+				BeginSalvo(battery, now);
 			return;
+		}
 		vector target;
 		float knowledge;
 		if (!FindKnownTarget(patrols, battery, target, knowledge))
 		{
-			if (now >= battery.m_fNextNoTargetLogAt)
-			{
-				battery.m_fNextNoTargetLogAt = now + 30000;
-				Log(string.Format("Battery for zone %1: no known target (spotter groups %2, shared targets %3, hostile targets %4, freshest seen %5s ago).", key, battery.m_iSpotters, battery.m_iSharedTargets, battery.m_iHostileTargets, battery.m_fFreshestSeen));
-			}
+			battery.m_bKnowledge = false;
+			battery.m_fOrderAt = 0;
 			return;
 		}
-		battery.m_iStage = 0;
-		if (!StartSalvo(battery, target, knowledge, 0))
-			battery.m_fNextFireAt = now + 30000;
-		else
+		// The cooldown takes no orders: knowledge only keeps being tracked, and a new report starts its decision delay
+		// once the cooldown is over.
+		if (now < battery.m_fNextFireAt)
+			return;
+		// Going from no knowledge to knowledge: the AI take a random time to pass the report up and decide.
+		if (!battery.m_bKnowledge)
 		{
-			battery.m_State = INF_EMortarState.FIRING;
-			battery.m_fDeadline = now + STAGE_TIMEOUT_MS;
+			battery.m_bKnowledge = true;
+			float delay = Math.RandomFloat(DECISION_DELAY_MIN_MS, DECISION_DELAY_MAX_MS);
+			battery.m_fOrderAt = now + delay;
+			Log(string.Format("Battery for zone %1: enemy reported, fire mission ordered in %2s.", key, (int)(delay / 1000)));
 		}
+		if (now < battery.m_fOrderAt)
+			return;
+		// The order: the point is locked in and does not change while the guns fire.
+		battery.m_vLockedTarget = target;
+		battery.m_fLockedKnowledge = knowledge;
+		battery.m_bTargetLocked = true;
+		float ready = 0;
+		if (!battery.m_bHasFired)
+			ready = Math.RandomFloat(READY_DELAY_MIN_MS, READY_DELAY_MAX_MS);
+		battery.m_fReadyAt = now + ready;
+		Log(string.Format("Battery for zone %1: fire mission ordered on %2, crews ready in %3s.", key, target.ToString(), (int)(ready / 1000)));
+		if (ready <= 0)
+			BeginSalvo(battery, now);
+	}
+
+	protected void BeginSalvo(INF_MortarBattery battery, float now)
+	{
+		battery.m_bTargetLocked = false;
+		battery.m_fStageAt = 0;
+		battery.m_iStage = 0;
+		if (!StartSalvo(battery, battery.m_vLockedTarget, battery.m_fLockedKnowledge, 0))
+		{
+			battery.m_fNextFireAt = now + 30000;
+			return;
+		}
+		battery.m_bHasFired = true;
+		battery.m_State = INF_EMortarState.FIRING;
+		battery.m_fDeadline = now + STAGE_TIMEOUT_MS;
 	}
 
 	// The battery only fires on what hostile AI actually know: the guards and the defenders of the active zones it
@@ -647,12 +714,7 @@ class INF_MortarBatteries
 			return false;
 		float now = perceptionManager.GetTime();
 		bool found;
-		float bestAge;
 		knowledge = 0;
-		battery.m_iSpotters = observers.Count();
-		battery.m_iSharedTargets = 0;
-		battery.m_iHostileTargets = 0;
-		battery.m_fFreshestSeen = -1;
 		foreach (SCR_AIGroup observer : observers)
 		{
 			SCR_AIGroupUtilityComponent utility = observer.GetGroupUtilityComponent();
@@ -663,15 +725,11 @@ class INF_MortarBatteries
 			{
 				if (!info)
 					continue;
-				battery.m_iSharedTargets++;
 				if (ownFaction && info.m_Faction && !ownFaction.IsFactionEnemy(info.m_Faction))
 					continue;
 				if (info.m_DamageManager && info.m_DamageManager.IsDestroyed())
 					continue;
-				battery.m_iHostileTargets++;
 				float infoAge = Math.Max(0, now - info.m_fTimestamp);
-				if (battery.m_fFreshestSeen < 0 || infoAge < battery.m_fFreshestSeen)
-					battery.m_fFreshestSeen = infoAge;
 				float range = vector.DistanceXZ(info.m_vWorldPos, battery.m_vPos);
 				if (infoAge >= KNOWN_MAX_AGE_S || range < MIN_FIRE_RANGE || range > MAX_FIRE_RANGE)
 					continue;
@@ -684,7 +742,6 @@ class INF_MortarBatteries
 				found = true;
 				knowledge = infoKnowledge;
 				target = info.m_vWorldPos;
-				bestAge = infoAge;
 			}
 		}
 		return found;
