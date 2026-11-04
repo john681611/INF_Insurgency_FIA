@@ -57,7 +57,11 @@ modded class SCR_PlayerController
 			return;
 		SCR_HintManagerComponent hints = SCR_HintManagerComponent.GetInstance();
 		if (hints)
+		{
+			// A shown hint of equal or higher priority would reject this one; hiding first makes the response always replace it.
+			SCR_HintManagerComponent.HideHint();
 			SCR_HintManagerComponent.ShowCustomHint(message, "Prisoner", 10);
+		}
 		else
 			Print("[INF_Prisoners] Cannot show prisoner response: hint manager missing. " + message, LogLevel.ERROR);
 	}
