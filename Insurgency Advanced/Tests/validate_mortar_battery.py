@@ -24,7 +24,7 @@ class MortarBattery(unittest.TestCase):
         self.assertNotIn("SpawnPrefab(config.m_Prefab", MORTAR)
 
     def test_settings_default_to_play_values(self):
-        self.assertIn("protected int m_iINFMortarChance = 10;", GRID)
+        self.assertIn("protected int m_iINFMortarChance = INF_MortarConfig.DEFAULT_CHANCE;", GRID)
         self.assertIn('[Attribute("10", UIWidgets.Slider', GRID)
         self.assertIn("protected int m_iINFMortarLimit = 2;", GRID)
         self.assertIn('"0 4 1"', GRID)

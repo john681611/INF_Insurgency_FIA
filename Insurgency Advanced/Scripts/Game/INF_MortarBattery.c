@@ -11,7 +11,8 @@ enum INF_EMortarState
 
 class INF_MortarConfig
 {
-	int m_iChance = 100;
+	static const int DEFAULT_CHANCE = 5;
+	int m_iChance = DEFAULT_CHANCE;
 	int m_iLimit = 2;
 	ResourceName m_Composition;
 }

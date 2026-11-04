@@ -390,7 +390,7 @@ Game mode defaults and ranges when left at -1:
   m_fINFCampFootprintRadius     9      3-24 metres
   m_iINFSiteStrengthMultiplier  2      1-4
   m_iINFCounterAttackChance     10     0-100 percent
-  m_iINFMortarChance            10     0-100 percent
+  m_iINFMortarChance            5      0-100 percent
   m_iINFMortarLimit             2      0-4
   m_iINFDefencePercent          15     0-100 percent (0 disables defences)
   m_fINFDefenceSpacing          800    200-3000 metres (road defences)

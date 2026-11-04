@@ -605,7 +605,7 @@ modded class INS_AmbientPatrolManager
 	}
 
 	[Attribute("10", UIWidgets.Slider, "Chance per activating zone that it owns a mortar battery. Zero disables batteries. Neighbouring zones roll independently, so the chance per cluster is higher.", "0 100 1", category: "Mortar Batteries"), RplProp()]
-	protected int m_iINFMortarChance = 10;
+	protected int m_iINFMortarChance = INF_MortarConfig.DEFAULT_CHANCE;
 	[Attribute("2", UIWidgets.Slider, "Maximum mortar batteries alive at once. Zero disables batteries.", "0 4 1", category: "Mortar Batteries"), RplProp()]
 	protected int m_iINFMortarLimit = 2;
 	[Attribute("{28D63631873AA636}Prefabs/Compositions/Slotted/SlotFlatSmall/MortarPlacement_S_USSR_01.et", UIWidgets.ResourceNamePicker, "Static composition holding the battery's mortars. Each mortar needs an AI vehicle usage component. Do not include AI groups; gunners and guards are spawned separately.", "et", category: "Mortar Batteries")]
