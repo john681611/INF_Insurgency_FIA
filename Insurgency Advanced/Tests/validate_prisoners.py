@@ -121,7 +121,7 @@ class Prisoners(unittest.TestCase):
         drop = method(SOURCE, "void DropCarriedWeapons(", "void StopPrisonerLoiter(")
         for text in ("!Replication.IsServer()", "!m_bCaptured", "m_bWeaponsDropped",
                      "inventory.GetItems(items)", "weapon.GetWeaponType()",
-                     "inventory.TryRemoveItemFromInventory(item)", "WarnHandling"):
+                     "inventory.TryRemoveItemFromInventory(item, null, callback)", "WarnHandling"):
             self.assertIn(text, drop)
         for kind in ("RIFLE", "SNIPERRIFLE", "MACHINEGUN", "HANDGUN",
                      "ROCKETLAUNCHER",                      "GRENADELAUNCHER", "AUTOCANNON",
@@ -129,8 +129,11 @@ class Prisoners(unittest.TestCase):
                                  self.assertIn("EWeaponType.WT_" + kind, drop)
         self.assertNotIn("DeleteEntity", drop)
         self.assertIn("if (!foundWeapon && m_aDroppedWeapons.IsEmpty())", drop)
-        self.assertIn("MoveDroppedToPile(pilePos)", drop)
+        self.assertIn("MoveDroppedToPile()", drop)
         self.assertIn("item.GetParent()", method(SOURCE, "void MoveDroppedToPile(", "protected void"))
+        self.assertIn("class INF_PrisonerDropCallback : ScriptedInventoryOperationCallback", SOURCE)
+        self.assertIn("m_Prisoner.INF_OnWeaponDropped(m_Item)", SOURCE)
+        self.assertIn("DistanceXZ(item.GetOrigin(), m_vPile)", method(SOURCE, "void VerifyPiled(", "protected void"))
         capture = method(SOURCE, "void Capture(", "void Question(")
         self.assertLess(capture.index("m_bCaptured = true"), capture.index("DropCarriedWeapons()"))
         self.assertLess(capture.index("DropCarriedWeapons()"), capture.index("ApplyRestraints()"))

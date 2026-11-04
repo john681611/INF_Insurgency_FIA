@@ -6,36 +6,51 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = (ROOT / "Scripts/Game/INF_Prisoners.c").read_text()
 EFFECTS = ROOT / "Prefabs/Effects/Pastafarian"
-EXEMPT = {"BLEEDING"}
+EXEMPT = {"BLEEDING", "TRUE", "REGENERATION", "HEALING"}
+MIN_DAMAGE = 5
 
 
-def penalty(server=True, captured=True, cooling_down=False, damage=1,
-            kind="KINETIC", player=1, offender_alive=True, roll=0):
-    return (server and captured and not cooling_down and damage > 0
-            and kind not in EXEMPT and player > 0 and offender_alive and roll < .30)
+def penalty(server=True, captured=True, cooling_down=False, damage=10,
+            kind="KINETIC", player=1, offender_alive=True, roll=0, already_dead=False):
+    return (server and captured and not cooling_down and not already_dead and damage >= MIN_DAMAGE
+            and kind not in EXEMPT and player > 0 and offender_alive and roll < .20)
 
 
 class PrisonerAccountability(unittest.TestCase):
-    def test_exact_thirty_percent_threshold(self):
-        for roll, expected in ((0, True), (.299999, True), (.30, False), (.999999, False)):
+    def test_exact_twenty_percent_threshold(self):
+        for roll, expected in ((0, True), (.199999, True), (.20, False), (.999999, False)):
             self.assertEqual(penalty(roll=roll), expected)
-        self.assertIn("Math.RandomFloat01() >= 0.30", SOURCE)
+        self.assertIn("Math.RandomFloat01() >= 0.20", SOURCE)
 
-    def test_any_player_injury_except_bleeding_counts_once_per_cooldown(self):
+    def test_real_player_attacks_count_once_per_cooldown_but_not_bleed_outs_or_scrapes(self):
         for server, captured, cooling_down in product((False, True), repeat=3):
             self.assertEqual(penalty(server=server, captured=captured, cooling_down=cooling_down),
                              (server, captured, cooling_down) == (True, True, False))
         for kind in ("KINETIC", "EXPLOSIVE", "FRAGMENTATION", "PROCESSED_FRAGMENTATION", "MELEE",
-                     "COLLISION", "FIRE", "INCENDIARY", "TRUE"):
+                     "COLLISION", "FIRE", "INCENDIARY"):
             self.assertTrue(penalty(kind=kind))
-        self.assertFalse(penalty(kind="BLEEDING"))
-        self.assertIn("context.damageType == EDamageType.BLEEDING", SOURCE)
+        for kind in EXEMPT:
+            self.assertFalse(penalty(kind=kind))
+        guard = SOURCE.split("static bool IsExemptDamage(", 1)[1].split("}", 1)[0]
+        for kind in EXEMPT:
+            self.assertIn("EDamageType." + kind, guard)
+        self.assertFalse(penalty(damage=MIN_DAMAGE - 1))
+        self.assertTrue(penalty(damage=MIN_DAMAGE))
+        self.assertIn("MIN_COUNTED_DAMAGE = 5", SOURCE)
+        self.assertIn("context.damageValue < MIN_COUNTED_DAMAGE", SOURCE)
         self.assertFalse(penalty(player=0))
-        self.assertFalse(penalty(damage=0))
         self.assertFalse(penalty(offender_alive=False))
         self.assertIn("now < m_fNextPenaltyAt", SOURCE)
         self.assertIn("m_fNextPenaltyAt = now + PENALTY_COOLDOWN_MS", SOURCE)
         self.assertIn("PENALTY_COOLDOWN_MS = 3000", SOURCE)
+
+    def test_only_the_killing_blow_counts_not_hits_on_a_body(self):
+        self.assertFalse(penalty(already_dead=True))
+        callback = SOURCE.split("protected void OnCapturedDamage(", 1)[1].split("protected void Respond(", 1)[0]
+        self.assertIn("|| m_bDeathSeen)", callback)
+        self.assertLess(callback.index("|| m_bDeathSeen)"), callback.index("m_bDeathSeen = true"))
+        maintain = SOURCE.split("protected void MaintainRestraints(", 1)[1].split("DropCarriedWeapons();", 1)[0]
+        self.assertIn("m_bDeathSeen = true", maintain)
 
     def test_native_damage_context_is_bound_only_after_capture_and_unbound_on_delete(self):
         self.assertIn("m_DamageManager.GetOnDamage().Insert(OnCapturedDamage)", SOURCE)
@@ -44,7 +59,7 @@ class PrisonerAccountability(unittest.TestCase):
         self.assertIn("GetOnDamage().Remove(OnCapturedDamage)", SOURCE)
         callback = SOURCE.split("protected void OnCapturedDamage(", 1)[1].split(
             "protected void Respond(", 1)[0]
-        self.assertNotIn("m_DamageManager.IsDestroyed()", callback)  # injuries count, not only the killing blow
+        self.assertIn("m_DamageManager.IsDestroyed()", callback)  # marks the death; only the blow before it can count
         self.assertIn("context.instigator.GetInstigatorPlayerID()", callback)
         self.assertNotIn("GetInstigator()", callback)  # never blame a stale pre-capture attacker
         self.assertLess(callback.index("m_fNextPenaltyAt = now"), callback.index("Math.RandomFloat01()"))

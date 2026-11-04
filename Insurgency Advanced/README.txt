@@ -88,13 +88,16 @@ automatic initial default, or an explicit probability from 0 to 1.
 Dialogue currently has twelve refusal lines and four helpful lines. The
 questioner's reliable owner RPC shows their response; successful intel follows
 the existing shared map/hint system. No reward is consumed before intel startup.
-Captured prisoners' native damage callbacks treat any injury attributed to a player
-after capture as abuse, whatever the damage type, except bleeding; pre-capture
-wounds and bleeding do not count. A burst of hits is one offence: each prisoner has
-a 3 second cooldown. Every offence shows all connected players a warning naming the
+Captured prisoners' native damage callbacks treat a real attack attributed to a player
+after capture as abuse, whatever the weapon (shooting, melee, blast, fire, vehicles).
+Bleeding, its fatal damage, healing and regeneration are exempt, so a prisoner dying of
+wounds from before capture never blames the captor; scrapes below a minimum damage
+and any damage to a prisoner who is already dead do not count either (only the blow that
+kills can). A burst of hits is one offence: each prisoner has a 3 second cooldown. Every
+offence shows all connected players a warning naming the
 responsible player, through the existing reliable owner notification path; the
-warning replaces any hint already on screen. A 30% roll additionally strikes the
-offender with lightning (more severe wording); the other 70% get an ominous
+warning replaces any hint already on screen. A 20% roll additionally strikes the
+offender with lightning (more severe wording); the other 80% get an ominous
 warning only. Visual effects inherit native replication; direct penalty damage
 affects only the offender, not bystanders. Damage that is not attributed to a
 player is logged (rate limited) so a missed attack type can be found. Verify

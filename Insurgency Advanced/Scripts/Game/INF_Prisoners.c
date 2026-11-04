@@ -33,6 +33,19 @@ class INF_PrisonerComponentClass : ScriptComponentClass
 {
 }
 
+// Tells the prisoner when the server has finished taking a weapon out of the inventory, so it can be moved to the pile.
+class INF_PrisonerDropCallback : ScriptedInventoryOperationCallback
+{
+	INF_PrisonerComponent m_Prisoner;
+	IEntity m_Item;
+
+	override protected void OnComplete()
+	{
+		if (m_Prisoner)
+			m_Prisoner.INF_OnWeaponDropped(m_Item);
+	}
+}
+
 class INF_PrisonerComponent : ScriptComponent
 {
 	[RplProp(onRplName: "OnCapturedChanged")]
@@ -42,14 +55,30 @@ class INF_PrisonerComponent : ScriptComponent
 	protected bool m_bQuestioned;
 	protected bool m_bWeaponsDropped;
 	protected ref array<IEntity> m_aDroppedWeapons = {};
+	protected ref array<ref INF_PrisonerDropCallback> m_aDropCallbacks = {};
+	protected vector m_vPile;
+	protected bool m_bPileSet;
+	protected static const float PILE_SCATTER_SMALL = 0.10;
+	protected static const float PILE_SCATTER_LARGE = 0.30;
+	protected static const float PILE_LARGE_ITEM = 0.5;
 	protected ELoiteringType m_PrisonerLoiter = ELoiteringType.NONE;
 	protected float m_fNextHandlingWarning;
 	protected float m_fNextLoiterAttempt;
 	protected float m_fNextACESurrenderAttempt;
 	protected SCR_CharacterDamageManagerComponent m_DamageManager;
 	protected float m_fNextPenaltyAt;
+	protected bool m_bDeathSeen;
 	protected float m_fNextIgnoredLog;
 	protected static const float PENALTY_COOLDOWN_MS = 3000;
+	// Glancing bumps and scrapes do not count as abuse.
+	protected static const float MIN_COUNTED_DAMAGE = 5;
+
+	// Bleeding and its fatal "true" damage carry the original attacker, so a prisoner dying of wounds from before capture must not blame the captor.
+	protected static bool IsExemptDamage(EDamageType type)
+	{
+		return type == EDamageType.BLEEDING || type == EDamageType.TRUE
+			|| type == EDamageType.REGENERATION || type == EDamageType.HEALING;
+	}
 	protected float m_fCleanupRadius = -1;
 	protected float m_fCleanupDelay;
 	protected float m_fDistantSince = -1;
@@ -275,17 +304,20 @@ class INF_PrisonerComponent : ScriptComponent
 	// Any player-attributed injury after capture counts, not only the killing blow; a burst of hits is one offence.
 	protected void OnCapturedDamage(notnull BaseDamageContext context)
 	{
-		if (!Replication.IsServer() || !m_bCaptured)
+		if (!Replication.IsServer() || !m_bCaptured || m_bDeathSeen)
 			return;
+		// Only the blow that kills can count; anything landing on a body afterwards (or its bleed-out) is not abuse.
+		if (m_DamageManager && m_DamageManager.IsDestroyed())
+			m_bDeathSeen = true;
 		float now = GetGame().GetWorld().GetWorldTime();
 		if (now < m_fNextPenaltyAt)
 			return;
 		int attackerID;
 		if (context.instigator)
 			attackerID = context.instigator.GetInstigatorPlayerID();
-		if (context.damageValue <= 0 || attackerID <= 0 || context.damageType == EDamageType.BLEEDING)
+		if (context.damageValue < MIN_COUNTED_DAMAGE || attackerID <= 0 || IsExemptDamage(context.damageType))
 		{
-			// Bleeding is the one exception; other ignored damage is logged to spot an attack that slips through.
+			// Bleeding, its final kill and other non-attack damage are exempt; other ignored damage is logged to spot an attack that slips through.
 			if (now >= m_fNextIgnoredLog && context.damageType != EDamageType.BLEEDING)
 			{
 				m_fNextIgnoredLog = now + 5000;
@@ -304,9 +336,10 @@ class INF_PrisonerComponent : ScriptComponent
 		if (!damage || damage.IsDestroyed())
 			return;
 		m_fNextPenaltyAt = now + PENALTY_COOLDOWN_MS;
+		Print(string.Format("[INF_Prisoners] Prisoner abuse counted (damage %1, type %2, attacker player %3).", context.damageValue, typename.EnumToString(EDamageType, context.damageType), attackerID));
 
 		string offenderName = players.GetPlayerName(attackerID);
-		if (Math.RandomFloat01() >= 0.30)
+		if (Math.RandomFloat01() >= 0.20)
 		{
 			BroadcastPrisonerWarning(string.Format("The Flying Spaghetti Monster saw what %1 did to a prisoner. He is watching, and His patience is not endless.", offenderName));
 			return;
@@ -392,6 +425,7 @@ class INF_PrisonerComponent : ScriptComponent
 			controller = target.GetCharacterController();
 		if (!controller || controller.GetLifeState() == ECharacterLifeState.DEAD)
 		{
+			m_bDeathSeen = true;
 			StopPrisonerLoiter(controller);
 			return;
 		}
@@ -438,10 +472,14 @@ class INF_PrisonerComponent : ScriptComponent
 		array<IEntity> items = {};
 		inventory.GetItems(items);
 		bool foundWeapon;
-		// Single pile ~2 m beside the body so items stay out of the medical UI's reach.
-		vector pilePos = GetOwner().GetOrigin() + GetOwner().GetTransformAxis(0) * 2;
-		pilePos[1] = GetGame().GetWorld().GetSurfaceY(pilePos[0], pilePos[2]) + 0.1;
-		MoveDroppedToPile(pilePos);
+		if (!m_bPileSet)
+		{
+			// Single pile ~2 m beside the body so items stay out of the medical UI's reach.
+			m_vPile = GetOwner().GetOrigin() + GetOwner().GetTransformAxis(0) * 2;
+			m_vPile[1] = GetGame().GetWorld().GetSurfaceY(m_vPile[0], m_vPile[2]) + 0.1;
+			m_bPileSet = true;
+		}
+		MoveDroppedToPile();
 		foreach (IEntity item : items)
 		{
 			if (!item)
@@ -457,12 +495,18 @@ class INF_PrisonerComponent : ScriptComponent
 				&& type != EWeaponType.WT_FRAGGRENADE && type != EWeaponType.WT_SMOKEGRENADE)
 				continue;
 			foundWeapon = true;
-			if (!inventory.TryRemoveItemFromInventory(item))
+			if (m_aDroppedWeapons.Find(item) >= 0)
+				continue;
+			// On a dedicated server the removal completes later; the callback moves the item once the server has actually dropped it.
+			INF_PrisonerDropCallback callback = new INF_PrisonerDropCallback();
+			callback.m_Prisoner = this;
+			callback.m_Item = item;
+			if (!inventory.TryRemoveItemFromInventory(item, null, callback))
 			{
 				WarnHandling("Prisoner weapon drop is not ready; retrying while the prisoner remains restrained.");
 				continue;
 			}
-			// The removal completes asynchronously on a dedicated server, so the item is moved on a later tick once it is free.
+			m_aDropCallbacks.Insert(callback);
 			m_aDroppedWeapons.Insert(item);
 		}
 		// Native inventory operations may finish later; verify empty (and every drop moved) on the next tick.
@@ -470,7 +514,16 @@ class INF_PrisonerComponent : ScriptComponent
 			m_bWeaponsDropped = true;
 	}
 
-	protected void MoveDroppedToPile(vector pilePos)
+	// Called by the removal callback (or the polling fallback below) once the item is free of the inventory.
+	void INF_OnWeaponDropped(IEntity item)
+	{
+		if (!item || m_aDroppedWeapons.Find(item) < 0)
+			return;
+		m_aDroppedWeapons.RemoveItem(item);
+		MoveToPile(item, 0);
+	}
+
+	protected void MoveDroppedToPile()
 	{
 		for (int index = m_aDroppedWeapons.Count() - 1; index >= 0; index--)
 		{
@@ -478,16 +531,51 @@ class INF_PrisonerComponent : ScriptComponent
 			if (item && item.GetParent())
 				continue;
 			m_aDroppedWeapons.Remove(index);
-			if (!item)
-				continue;
-			item.SetOrigin(pilePos);
-			Physics itemPhysics = item.GetPhysics();
-			if (itemPhysics)
-			{
-				itemPhysics.SetVelocity(vector.Zero);
-				itemPhysics.SetActive(ActiveState.ACTIVE);
-			}
+			if (item)
+				MoveToPile(item, 0);
 		}
+	}
+
+	// Small items land 5-10 cm from the pile centre and rifle-sized ones 15-30 cm, so nothing sits exactly on top of another.
+	// The move is verified later because on a dedicated server the engine can still be placing a freshly dropped item.
+	protected void MoveToPile(IEntity item, int attempt)
+	{
+		vector mins;
+		vector maxs;
+		item.GetBounds(mins, maxs);
+		float length = Math.Max(maxs[0] - mins[0], Math.Max(maxs[1] - mins[1], maxs[2] - mins[2]));
+		float maxRadius = PILE_SCATTER_SMALL;
+		if (length >= PILE_LARGE_ITEM)
+			maxRadius = PILE_SCATTER_LARGE;
+		float radius = Math.RandomFloat(maxRadius * 0.5, maxRadius);
+		float angle = Math.RandomFloat(0, Math.PI2);
+		vector position = m_vPile;
+		position[0] = position[0] + Math.Cos(angle) * radius;
+		position[2] = position[2] + Math.Sin(angle) * radius;
+		position[1] = GetGame().GetWorld().GetSurfaceY(position[0], position[2]) + 0.1;
+		item.SetOrigin(position);
+		Physics itemPhysics = item.GetPhysics();
+		if (itemPhysics)
+		{
+			itemPhysics.SetVelocity(vector.Zero);
+			itemPhysics.SetActive(ActiveState.ACTIVE);
+		}
+		Print(string.Format("[INF_Prisoners] Moved dropped weapon to the pile (attempt %1).", attempt + 1));
+		GetGame().GetCallqueue().CallLater(VerifyPiled, 1500, false, item, attempt);
+	}
+
+	protected void VerifyPiled(IEntity item, int attempt)
+	{
+		if (!item || item.GetParent())
+			return;
+		if (vector.DistanceXZ(item.GetOrigin(), m_vPile) <= 1.5)
+			return;
+		if (attempt >= 2)
+		{
+			WarnHandling("Dropped prisoner weapon did not stay in the pile.");
+			return;
+		}
+		MoveToPile(item, attempt + 1);
 	}
 
 	protected void StopPrisonerLoiter(CharacterControllerComponent controller)
