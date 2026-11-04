@@ -86,6 +86,8 @@ modded class INS_IntelManager
 	protected bool m_bINFCacheObjective;
 
 	protected SCR_Task m_INFCacheTask;
+	protected IEntity m_INFFireSoundEntity;
+	protected AudioHandle m_INFFireSoundHandle = AudioHandle.Invalid;
 	[RplProp()]
 	protected bool m_bINFIntelLoaded;
 	protected bool m_bINFIntelLoadFailed;
@@ -1040,8 +1042,9 @@ modded class INS_IntelManager
 			}
 		}
 		vector explosionPos = cacheEntity.GetOrigin();
+		IEntity standIn = INF_SpawnCacheStandIn(cacheEntity);
 		super.OnCacheDestroyed(cacheEntity);
-		INF_SpawnCacheExplosion(explosionPos);
+		INF_SpawnCacheExplosion(explosionPos, standIn);
 		INS_AmbientPatrolManager patrols = INS_AmbientPatrolManager.Cast(GetOwner().FindComponent(INS_AmbientPatrolManager));
 		if (patrols && patrols.INF_GetZoneStates())
 			patrols.INF_GetZoneStates().CacheDestroyed(cacheEntity);
@@ -1058,25 +1061,212 @@ modded class INS_IntelManager
 		}
 	}
 
-	protected void INF_SpawnCacheExplosion(vector pos)
+	protected void INF_SpawnCacheExplosion(vector pos, IEntity standIn)
 	{
-		// Warhead explosion prefabs are not replicated, so every machine must spawn its own for clients to see and hear it.
-		Rpc(INF_RpcCacheExplosion, pos);
-		INF_RpcCacheExplosion(pos);
+		// Vanilla explosives detonated on the spot give blast damage, effects and sound; spawned on the server they replicate.
+		if (!Replication.IsServer())
+			return;
+		ResourceName grenade = "{645C73791ECA1698}Prefabs/Weapons/Grenades/Grenade_RGD5.et";
+		ResourceName shell81 = "{38BAE094333E31BF}Prefabs/Weapons/Ammo/Ammo_Shell_81mm_HE_M821.et";
+		ResourceName shell82 = "{98EC9C526AFBA282}Prefabs/Weapons/Ammo/Ammo_Shell_82mm_HE_O832DU.et";
+		ResourceName demoBlock = "{33CBDE73AB48172A}Prefabs/Weapons/Explosives/DemoBlock_M112/DemoBlock_M112.et";
+		ResourceName fuelBlast = "{8BC4C95E01FC9BD3}Prefabs/Weapons/Warheads/Explosions/Explosion_Fuel_Large.et";
+		ResourceName ammoBlastSmall = "{6BB2F747B4896E02}Prefabs/Weapons/Warheads/Explosions/Explosion_AmmoRack_Small.et";
+		ResourceName ammoBlast = "{7E091BB73AC18ED0}Prefabs/Weapons/Warheads/Explosions/Explosion_AmmoRack_Medium.et";
+
+		// A cook-off that escalates so anyone nearby can get clear: a campfire-sized fire smoulders for 10 s, then grenades, rising fire and
+		// blasts build to the finale. The vanilla vehicle ammo-fire sound grows with the fire and is put out shortly after the finale.
+		int t = 10000;
+		if (standIn)
+			GetGame().GetCallqueue().CallLater(INF_DeleteSpentCharge, t + 11000, false, standIn);
+		INF_ScheduleFire(false, pos, 0);
+		INF_ScheduleFireSound(1, pos, 0);
+		INF_ScheduleCharge(grenade, pos + "0.5 0.5 0", t + 3500);
+		INF_ScheduleFire(true, pos, t + 3500);
+		INF_ScheduleFireSound(2, pos, t + 5000);
+		INF_ScheduleCharge(grenade, pos + "-0.5 0.5 0.5", t + 6000);
+		INF_ScheduleCharge(ammoBlastSmall, pos + "0 0.5 0", t + 7000);
+		INF_ScheduleCharge(grenade, pos + "0.5 0.5 -0.5", t + 7800);
+		INF_ScheduleCharge(shell82, pos + "0 0.5 0", t + 8500);
+		INF_ScheduleCharge(demoBlock, pos + "0 0.5 0", t + 9500);
+		INF_ScheduleCharge(ammoBlast, pos + "0 0.5 0", t + 10000);
+		INF_ScheduleCharge(demoBlock, pos + "0 0.5 0", t + 10500);
+		INF_ScheduleCharge(fuelBlast, pos + "0 0.5 0", t + 11000);
+		INF_ScheduleCharge(ammoBlast, pos + "0 0.5 0", t + 11000);
+		GetGame().GetCallqueue().CallLater(INF_BroadcastBlastSound, t + 11000, false, pos);
+		INF_ScheduleCharge(shell82, pos + "0 0.5 0", t + 11000);
+		INF_ScheduleFireSound(0, pos, t + 15000);
+	}
+	// The destroyed cache vanishes at once, so an invincible copy of its prop stands in until the finale.
+	protected IEntity INF_SpawnCacheStandIn(IEntity cacheEntity)
+	{
+		if (!Replication.IsServer() || !cacheEntity)
+			return null;
+		EntityPrefabData prefabData = cacheEntity.GetPrefabData();
+		if (!prefabData)
+			return null;
+		Resource res = Resource.Load(prefabData.GetPrefabName());
+		if (!res || !res.IsValid())
+			return null;
+		EntitySpawnParams params = new EntitySpawnParams();
+		params.TransformMode = ETransformMode.WORLD;
+		cacheEntity.GetWorldTransform(params.Transform);
+		IEntity standIn = GetGame().SpawnEntityPrefab(res, GetGame().GetWorld(), params);
+		if (!standIn)
+			return null;
+		DamageManagerComponent damage = DamageManagerComponent.Cast(standIn.FindComponent(DamageManagerComponent));
+		if (damage)
+			damage.EnableDamageHandling(false);
+		return standIn;
 	}
 
-	[RplRpc(RplChannel.Reliable, RplRcver.Broadcast)]
-	protected void INF_RpcCacheExplosion(vector pos)
+	protected void INF_BroadcastBlastSound(vector pos)
 	{
-		Resource res = Resource.Load("{72BEEF40AF179763}Prefabs/Weapons/Warheads/Explosions/Explosion_Tnt_Large.et");
+		Rpc(INF_RpcBlastSound, pos);
+		INF_RpcBlastSound(pos);
+	}
+
+	// Plays the vanilla fuel-explosion sound in 3D at the cache; the entity is local to each machine and removed afterwards.
+	[RplRpc(RplChannel.Reliable, RplRcver.Broadcast)]
+	protected void INF_RpcBlastSound(vector pos)
+	{
+		Resource res = Resource.Load("{6AA19CB200000544}Prefabs/Effects/INF_CacheFireSound.et");
 		if (!res || !res.IsValid())
 			return;
 		EntitySpawnParams params = new EntitySpawnParams();
 		params.TransformMode = ETransformMode.WORLD;
 		params.Transform[3] = pos;
-		GetGame().SpawnEntityPrefab(res, GetGame().GetWorld(), params);
+		IEntity blast = GetGame().SpawnEntityPrefab(res, GetGame().GetWorld(), params);
+		if (!blast)
+			return;
+		SoundComponent sound = SoundComponent.Cast(blast.FindComponent(SoundComponent));
+		if (sound)
+			sound.SoundEvent("SOUND_EXPLOSION");
+		GetGame().GetCallqueue().CallLater(INF_DeleteSpentCharge, 8000, false, blast);
 	}
 
+	protected void INF_ScheduleFireSound(int scale, vector pos, int delayMs)
+	{
+		GetGame().GetCallqueue().CallLater(INF_BroadcastFireSound, delayMs, false, scale, pos);
+	}
+
+	protected void INF_BroadcastFireSound(int scale, vector pos)
+	{
+		// Sound entities are local to each machine, so every machine runs its own fire sound.
+		Rpc(INF_RpcFireSound, scale, pos);
+		INF_RpcFireSound(scale, pos);
+	}
+
+	// Drives the vanilla vehicle ammo-rack fire sound: scale 1-3 is small to large, 0 puts it out.
+	[RplRpc(RplChannel.Reliable, RplRcver.Broadcast)]
+	protected void INF_RpcFireSound(int scale, vector pos)
+	{
+		if (scale <= 0)
+		{
+			if (m_INFFireSoundEntity)
+			{
+				AudioSystem.TerminateSoundFadeOut(m_INFFireSoundHandle, true, 1.5);
+				SCR_EntityHelper.DeleteEntityAndChildren(m_INFFireSoundEntity);
+			}
+			m_INFFireSoundEntity = null;
+			m_INFFireSoundHandle = AudioHandle.Invalid;
+			return;
+		}
+
+		if (!m_INFFireSoundEntity)
+		{
+			Resource res = Resource.Load("{6AA19CB200000544}Prefabs/Effects/INF_CacheFireSound.et");
+			if (!res || !res.IsValid())
+			{
+				Print("[INF_Objectives] Cache fire sound prefab failed to load.", LogLevel.ERROR);
+				return;
+			}
+			EntitySpawnParams params = new EntitySpawnParams();
+			params.TransformMode = ETransformMode.WORLD;
+			params.Transform[3] = pos;
+			m_INFFireSoundEntity = GetGame().SpawnEntityPrefab(res, GetGame().GetWorld(), params);
+			if (!m_INFFireSoundEntity)
+				return;
+		}
+
+		SignalsManagerComponent signals = SignalsManagerComponent.Cast(m_INFFireSoundEntity.FindComponent(SignalsManagerComponent));
+		if (signals)
+			signals.SetSignalValue(signals.AddOrFindSignal("SuppliesFireState"), scale);
+
+		SoundComponent sound = SoundComponent.Cast(m_INFFireSoundEntity.FindComponent(SoundComponent));
+		if (sound && m_INFFireSoundHandle == AudioHandle.Invalid)
+			m_INFFireSoundHandle = sound.SoundEvent("SOUND_VEHICLE_AMMORACKFIRE_LP");
+	}
+	protected void INF_ScheduleFire(bool medium, vector pos, int delayMs)
+	{
+		GetGame().GetCallqueue().CallLater(INF_BroadcastFire, delayMs, false, medium, pos);
+	}
+
+	protected void INF_BroadcastFire(bool medium, vector pos)
+	{
+		// Particle entities are not replicated, so every machine spawns its own fire.
+		Rpc(INF_RpcFire, medium, pos);
+		INF_RpcFire(medium, pos);
+	}
+
+	[RplRpc(RplChannel.Reliable, RplRcver.Broadcast)]
+	protected void INF_RpcFire(bool medium, vector pos)
+	{
+		ResourceName particle = "{C0E2E7DC28B71E2C}Particles/Enviroment/Campfire_medium_normal.ptc";
+		int burnMs = 13500;
+		if (medium)
+		{
+			particle = "{B073169BAA0BDD62}Particles/Logistics/Fire/Ammunition_Fire/Ammunition_Fire_Medium.ptc";
+			burnMs = 11500;
+		}		ParticleEffectEntitySpawnParams spawnParams = new ParticleEffectEntitySpawnParams();
+		spawnParams.TransformMode = ETransformMode.WORLD;
+		spawnParams.Transform[3] = pos;
+		ParticleEffectEntity fire = ParticleEffectEntity.SpawnParticleEffect(particle, spawnParams);
+		if (!fire)
+		{
+			Print("[INF_Objectives] Cache fire particle failed to spawn.", LogLevel.ERROR);
+			return;
+		}
+		GetGame().GetCallqueue().CallLater(fire.StopEmission, burnMs);
+	}
+
+	protected void INF_ScheduleCharge(ResourceName charge, vector pos, int delayMs)
+	{
+		GetGame().GetCallqueue().CallLater(INF_DetonateCharge, delayMs, false, charge, pos);
+	}
+
+	protected void INF_DetonateCharge(ResourceName charge, vector pos)
+	{
+		Resource res = Resource.Load(charge);
+		if (!res || !res.IsValid())
+		{
+			Print(string.Format("[INF_Objectives] Cache explosion prefab failed to load: %1", charge), LogLevel.ERROR);
+			return;
+		}
+		EntitySpawnParams params = new EntitySpawnParams();
+		params.TransformMode = ETransformMode.WORLD;
+		params.Transform[3] = pos;
+		IEntity entity = GetGame().SpawnEntityPrefab(res, GetGame().GetWorld(), params);
+		if (!entity)
+			return;
+		// Effect-only prefabs may fire on spawn without a trigger component.
+		BaseTriggerComponent trigger = BaseTriggerComponent.Cast(entity.FindComponent(BaseTriggerComponent));
+		if (trigger)
+		{
+			// Mortar shells are inert until armed, so arm before detonating.
+			trigger.SetLive();
+			trigger.OnUserTrigger(entity);
+		}
+		// Fire prefabs manage their own burn time, so only spent explosives are cleaned up.
+		if (!charge.Contains("/Fires/"))
+			GetGame().GetCallqueue().CallLater(INF_DeleteSpentCharge, 3000, false, entity);
+	}
+
+	protected void INF_DeleteSpentCharge(IEntity entity)
+	{
+		if (entity)
+			SCR_EntityHelper.DeleteEntityAndChildren(entity);
+	}
 	override protected void ShowCacheDestroyedHint(int destroyed, int total)
 	{
 		if (INF_ZoneEditorContext.Grid(GetOwner()) && m_iINFMissionEndMode != INF_EMissionEndMode.CACHES && destroyed >= total)

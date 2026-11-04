@@ -1,0 +1,14 @@
+
+GenericEntity {
+ ID "6AA19CB200000541"
+ components {
+  SoundComponent "{6AA19CB200000542}" {
+   Filenames {
+    "{F41C3D53A2B69D85}Sounds/Vehicles/_SharedData/Destruction/Vehicles_Destruction_Fires.acp"
+    "{9D94BEBA8AA8A997}Sounds/Particles/Logistics/Explosion/Fuel/Particles_Explosions_Fuel_Large.acp"
+   }
+  }
+  SignalsManagerComponent "{6AA19CB200000543}" {
+  }
+ }
+}
