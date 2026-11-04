@@ -19,6 +19,7 @@ class INF_ForestCampSite
 	bool m_CompositionReady;
 	bool m_Friendly;
 	ref array<IEntity> m_Props = {};
+	IEntity m_Service;
 	string m_sLastFailure;
 }
 
@@ -108,6 +109,9 @@ class INF_ForestCell
 class INF_ForestCamps
 {
 	static const int MAX_CAMPS = 20;
+	static const ResourceName SERVICE_PREFAB = "{5753634EAFFBA2F6}Prefabs/Props/Military/Compositions/US/VehicleService_US.et";
+	static const float SERVICE_OFFSET = 2;
+	static const int SERVICE_CHECK_MS = 30000;
 	protected static string s_sLastBlocker;
 	// A saved reward cache is restored before the cache registry knows it, so the camp's own cache would otherwise block its footprint.
 	static const float OWN_CACHE_RADIUS = 3;
@@ -1050,12 +1054,70 @@ class INF_ForestCamps
 			point.SetSpawnPointEnabled_S(true);
 		}
 		site.m_Friendly = true;
+		SpawnService(site);
+		GetGame().GetCallqueue().Remove(MaintainServices);
+		GetGame().GetCallqueue().CallLater(MaintainServices, SERVICE_CHECK_MS, true);
 		Print("[INF_ForestCamps] Permanent camp now belongs to " + faction.GetFactionKey() + " with spawning enabled: " + site.m_Key);
 		return true;
 	}
 
+	// Vehicle service station beside the arsenal, facing the camp centre. Not persisted itself: the captured camp is, and recreates it.
+	protected void SpawnService(INF_ForestCampSite site)
+	{
+		if (site.m_Service || !site.m_Friendly)
+			return;
+		INF_ForestCampSearchComponent search;
+		foreach (IEntity root : site.m_Props)
+		{
+			search = FindArsenal(root);
+			if (search)
+				break;
+		}
+		if (!search)
+			return;
+		Resource resource = Resource.Load(SERVICE_PREFAB);
+		if (!resource || !resource.IsValid())
+		{
+			Print("[INF_ForestCamps] Cannot load camp vehicle service prefab: " + SERVICE_PREFAB, LogLevel.ERROR);
+			return;
+		}
+		vector arsenalTransform[4];
+		search.GetOwner().GetWorldTransform(arsenalTransform);
+		vector position = arsenalTransform[3] + arsenalTransform[0] * SERVICE_OFFSET;
+		position[1] = GetGame().GetWorld().GetSurfaceY(position[0], position[2]);
+		vector inward = site.m_Position - position;
+		EntitySpawnParams params = new EntitySpawnParams();
+		params.TransformMode = ETransformMode.WORLD;
+		Math3D.AnglesToMatrix(Vector(inward.ToYaw(), 0, 0), params.Transform);
+		params.Transform[3] = position;
+		IEntity service = GetGame().SpawnEntityPrefab(resource, GetGame().GetWorld(), params);
+		if (!service)
+		{
+			Print("[INF_ForestCamps] Camp vehicle service spawn failed: " + site.m_Key, LogLevel.ERROR);
+			return;
+		}
+		PersistenceSystem persistence = PersistenceSystem.GetInstance();
+		if (persistence)
+			persistence.StopTracking(service, true);
+		site.m_Service = service;
+	}
+
+	protected void MaintainServices()
+	{
+		if (m_Stopped)
+			return;
+		foreach (INF_ForestCampSite site : m_Sites)
+		{
+			if (site.m_Friendly && !site.m_Service)
+				SpawnService(site);
+		}
+	}
+
 	static void Cleanup(INF_ForestCampSite site)
 	{
+		if (site.m_Service)
+			SCR_EntityHelper.DeleteEntityAndChildren(site.m_Service);
+		site.m_Service = null;
 		foreach (IEntity prop : site.m_Props)
 		{
 			if (prop)
@@ -1073,6 +1135,7 @@ class INF_ForestCamps
 		GetGame().GetCallqueue().Remove(SearchTick);
 		GetGame().GetCallqueue().Remove(PoolTick);
 		GetGame().GetCallqueue().Remove(UpdateLayouts);
+		GetGame().GetCallqueue().Remove(MaintainServices);
 		foreach (INF_ForestCampSite site : m_Sites)
 			Cleanup(site);
 	}
