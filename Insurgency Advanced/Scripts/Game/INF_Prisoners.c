@@ -41,6 +41,7 @@ class INF_PrisonerComponent : ScriptComponent
 	[RplProp()]
 	protected bool m_bQuestioned;
 	protected bool m_bWeaponsDropped;
+	protected ref array<IEntity> m_aDroppedWeapons = {};
 	protected ELoiteringType m_PrisonerLoiter = ELoiteringType.NONE;
 	protected float m_fNextHandlingWarning;
 	protected float m_fNextLoiterAttempt;
@@ -440,6 +441,7 @@ class INF_PrisonerComponent : ScriptComponent
 		// Single pile ~2 m beside the body so items stay out of the medical UI's reach.
 		vector pilePos = GetOwner().GetOrigin() + GetOwner().GetTransformAxis(0) * 2;
 		pilePos[1] = GetGame().GetWorld().GetSurfaceY(pilePos[0], pilePos[2]) + 0.1;
+		MoveDroppedToPile(pilePos);
 		foreach (IEntity item : items)
 		{
 			if (!item)
@@ -460,14 +462,32 @@ class INF_PrisonerComponent : ScriptComponent
 				WarnHandling("Prisoner weapon drop is not ready; retrying while the prisoner remains restrained.");
 				continue;
 			}
+			// The removal completes asynchronously on a dedicated server, so the item is moved on a later tick once it is free.
+			m_aDroppedWeapons.Insert(item);
+		}
+		// Native inventory operations may finish later; verify empty (and every drop moved) on the next tick.
+		if (!foundWeapon && m_aDroppedWeapons.IsEmpty())
+			m_bWeaponsDropped = true;
+	}
+
+	protected void MoveDroppedToPile(vector pilePos)
+	{
+		for (int index = m_aDroppedWeapons.Count() - 1; index >= 0; index--)
+		{
+			IEntity item = m_aDroppedWeapons[index];
+			if (item && item.GetParent())
+				continue;
+			m_aDroppedWeapons.Remove(index);
+			if (!item)
+				continue;
 			item.SetOrigin(pilePos);
 			Physics itemPhysics = item.GetPhysics();
 			if (itemPhysics)
+			{
 				itemPhysics.SetVelocity(vector.Zero);
+				itemPhysics.SetActive(ActiveState.ACTIVE);
+			}
 		}
-		// Native inventory operations may finish later; verify empty on the next tick.
-		if (!foundWeapon)
-			m_bWeaponsDropped = true;
 	}
 
 	protected void StopPrisonerLoiter(CharacterControllerComponent controller)

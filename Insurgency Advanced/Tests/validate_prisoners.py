@@ -128,7 +128,9 @@ class Prisoners(unittest.TestCase):
                                           "FRAGGRENADE", "SMOKEGRENADE"):
                                  self.assertIn("EWeaponType.WT_" + kind, drop)
         self.assertNotIn("DeleteEntity", drop)
-        self.assertIn("if (!foundWeapon)", drop)
+        self.assertIn("if (!foundWeapon && m_aDroppedWeapons.IsEmpty())", drop)
+        self.assertIn("MoveDroppedToPile(pilePos)", drop)
+        self.assertIn("item.GetParent()", method(SOURCE, "void MoveDroppedToPile(", "protected void"))
         capture = method(SOURCE, "void Capture(", "void Question(")
         self.assertLess(capture.index("m_bCaptured = true"), capture.index("DropCarriedWeapons()"))
         self.assertLess(capture.index("DropCarriedWeapons()"), capture.index("ApplyRestraints()"))
