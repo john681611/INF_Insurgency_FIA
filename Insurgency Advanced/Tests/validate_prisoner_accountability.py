@@ -6,13 +6,13 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = (ROOT / "Scripts/Game/INF_Prisoners.c").read_text()
 EFFECTS = ROOT / "Prefabs/Effects/Pastafarian"
-DIRECT = {"KINETIC", "EXPLOSIVE", "FRAGMENTATION", "PROCESSED_FRAGMENTATION"}
+EXEMPT = {"BLEEDING"}
 
 
-def penalty(server=True, captured=True, dead=True, handled=False, damage=1,
+def penalty(server=True, captured=True, cooling_down=False, damage=1,
             kind="KINETIC", player=1, offender_alive=True, roll=0):
-    return (server and captured and dead and not handled and damage > 0
-            and kind in DIRECT and player > 0 and offender_alive and roll < .30)
+    return (server and captured and not cooling_down and damage > 0
+            and kind not in EXEMPT and player > 0 and offender_alive and roll < .30)
 
 
 class PrisonerAccountability(unittest.TestCase):
@@ -21,18 +21,21 @@ class PrisonerAccountability(unittest.TestCase):
             self.assertEqual(penalty(roll=roll), expected)
         self.assertIn("Math.RandomFloat01() >= 0.30", SOURCE)
 
-    def test_only_direct_fatal_damage_to_captured_ai_counts(self):
-        for server, captured, dead, handled in product((False, True), repeat=4):
-            self.assertEqual(penalty(server=server, captured=captured, dead=dead, handled=handled),
-                             (server, captured, dead, handled) == (True, True, True, False))
-        for kind in DIRECT:
+    def test_any_player_injury_except_bleeding_counts_once_per_cooldown(self):
+        for server, captured, cooling_down in product((False, True), repeat=3):
+            self.assertEqual(penalty(server=server, captured=captured, cooling_down=cooling_down),
+                             (server, captured, cooling_down) == (True, True, False))
+        for kind in ("KINETIC", "EXPLOSIVE", "FRAGMENTATION", "PROCESSED_FRAGMENTATION", "MELEE",
+                     "COLLISION", "FIRE", "INCENDIARY", "TRUE"):
             self.assertTrue(penalty(kind=kind))
-            self.assertIn("EDamageType." + kind, SOURCE)
-        for kind in ("BLEEDING", "TRUE", "COLLISION", "FIRE", "REGENERATION", "HEALING"):
-            self.assertFalse(penalty(kind=kind))
+        self.assertFalse(penalty(kind="BLEEDING"))
+        self.assertIn("context.damageType == EDamageType.BLEEDING", SOURCE)
         self.assertFalse(penalty(player=0))
         self.assertFalse(penalty(damage=0))
         self.assertFalse(penalty(offender_alive=False))
+        self.assertIn("now < m_fNextPenaltyAt", SOURCE)
+        self.assertIn("m_fNextPenaltyAt = now + PENALTY_COOLDOWN_MS", SOURCE)
+        self.assertIn("PENALTY_COOLDOWN_MS = 3000", SOURCE)
 
     def test_native_damage_context_is_bound_only_after_capture_and_unbound_on_delete(self):
         self.assertIn("m_DamageManager.GetOnDamage().Insert(OnCapturedDamage)", SOURCE)
@@ -41,14 +44,14 @@ class PrisonerAccountability(unittest.TestCase):
         self.assertIn("GetOnDamage().Remove(OnCapturedDamage)", SOURCE)
         callback = SOURCE.split("protected void OnCapturedDamage(", 1)[1].split(
             "protected void Respond(", 1)[0]
-        self.assertIn("!m_DamageManager.IsDestroyed()", callback)
+        self.assertNotIn("m_DamageManager.IsDestroyed()", callback)  # injuries count, not only the killing blow
         self.assertIn("context.instigator.GetInstigatorPlayerID()", callback)
         self.assertNotIn("GetInstigator()", callback)  # never blame a stale pre-capture attacker
-        self.assertLess(callback.index("m_bDeathHandled = true"), callback.index("Math.RandomFloat01()"))
+        self.assertLess(callback.index("m_fNextPenaltyAt = now"), callback.index("Math.RandomFloat01()"))
         self.assertLess(callback.index("context.damageType"), callback.index("Math.RandomFloat01()"))
 
     def test_lethal_damage_targets_only_the_current_offender(self):
-        self.assertIn("players.GetPlayerControlledEntity(killerID)", SOURCE)
+        self.assertIn("players.GetPlayerControlledEntity(attackerID)", SOURCE)
         self.assertIn("offender.FindComponent(SCR_CharacterDamageManagerComponent)", SOURCE)
         self.assertIn("parameters.Transform[3] = offender.GetOrigin()", SOURCE)
         self.assertIn("damage.Kill(Instigator.CreateInstigator(null))", SOURCE)
@@ -75,8 +78,8 @@ class PrisonerAccountability(unittest.TestCase):
     def test_global_message_names_the_offender_and_only_follows_an_actual_strike(self):
         callback = SOURCE.split("protected void OnCapturedDamage(", 1)[1].split(
             "protected void Respond(", 1)[0]
-        self.assertIn("The Flying Spaghetti Monster is displeased with %1 for killing a prisoner. R'amen.", callback)
-        self.assertIn("players.GetPlayerName(killerID)", callback)
+        self.assertIn("The Flying Spaghetti Monster is displeased with %1 for harming a prisoner. R'amen.", callback)
+        self.assertIn("players.GetPlayerName(attackerID)", callback)
         self.assertIn("players.GetPlayers(recipients)", callback)
         self.assertIn("foreach (int playerID : recipients)", callback)
         self.assertIn("player.INF_SendPrisonerResponse(message)", callback)

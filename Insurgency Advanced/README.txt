@@ -49,7 +49,8 @@ Captured AI are removed from their old group, switched to CIV if configured
 (otherwise explicitly unaffiliated), and have AI, movement and weapon controls
 disabled. This uses native restraint controls, not a custom surrender animation.
 Capture drops carried guns, launchers and sidearms through the native inventory
-manager, including weapons stored in carried inventory. Grenades, explosives,
+manager, including weapons stored in carried inventory, into one pile about 2 m
+beside the body so they stay clear of the medical UI. Grenades, explosives,
 ammunition, medical supplies and other non-weapon equipment stay on the body.
 Busy inventory operations retry; the prisoner stays restrained throughout.
 Once conscious and disarmed, a prisoner on foot is requested to stand and use
@@ -87,14 +88,18 @@ automatic initial default, or an explicit probability from 0 to 1.
 Dialogue currently has twelve refusal lines and four helpful lines. The
 questioner's reliable owner RPC shows their response; successful intel follows
 the existing shared map/hint system. No reward is consumed before intel startup.
-Captured prisoners' native damage callbacks distinguish direct fatal shooting
-or explosion damage from bleed-outs; pre-capture wounds and bleeding deaths
-do not trigger execution accountability. Each death is processed once on the
-server. Any resulting rebuke names the responsible player and uses the existing
-reliable owner notification path for every connected player. Visual effects
-inherit native replication; direct penalty damage affects only the offender,
-not bystanders. Verify fatal shooting, explosions, bleed-outs, duplicate damage
-callbacks and notifications on a listen host and dedicated server.
+Captured prisoners' native damage callbacks treat any injury attributed to a player
+after capture as abuse, whatever the damage type, except bleeding; pre-capture
+wounds and bleeding do not count. A burst of hits is one offence: each prisoner has
+a 3 second cooldown. Every offence shows all connected players a warning naming the
+responsible player, through the existing reliable owner notification path; the
+warning replaces any hint already on screen. A 30% roll additionally strikes the
+offender with lightning (more severe wording); the other 70% get an ominous
+warning only. Visual effects inherit native replication; direct penalty damage
+affects only the offender, not bystanders. Damage that is not attributed to a
+player is logged (rate limited) so a missed attack type can be found. Verify
+shooting, melee, explosions, repeated hits and notifications on a listen host and
+dedicated server.
 Prisoner flags are replicated for current clients and JIP, not saved to disk.
 This is runtime capture, not a persistent prisoner roster or extraction task.
 Capturing records the original managed spawn source before detaching the AI.

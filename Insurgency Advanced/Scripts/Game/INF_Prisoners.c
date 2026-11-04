@@ -46,7 +46,9 @@ class INF_PrisonerComponent : ScriptComponent
 	protected float m_fNextLoiterAttempt;
 	protected float m_fNextACESurrenderAttempt;
 	protected SCR_CharacterDamageManagerComponent m_DamageManager;
-	protected bool m_bDeathHandled;
+	protected float m_fNextPenaltyAt;
+	protected float m_fNextIgnoredLog;
+	protected static const float PENALTY_COOLDOWN_MS = 3000;
 	protected float m_fCleanupRadius = -1;
 	protected float m_fCleanupDelay;
 	protected float m_fDistantSince = -1;
@@ -269,33 +271,40 @@ class INF_PrisonerComponent : ScriptComponent
 		player.INF_SendPrisonerResponse(INF_PrisonerDialogue.Reply(helpful));
 	}
 
+	// Any player-attributed injury after capture counts, not only the killing blow; a burst of hits is one offence.
 	protected void OnCapturedDamage(notnull BaseDamageContext context)
 	{
-		if (!Replication.IsServer() || !m_bCaptured || m_bDeathHandled || !m_DamageManager.IsDestroyed())
+		if (!Replication.IsServer() || !m_bCaptured)
 			return;
-		m_bDeathHandled = true;
-		int killerID;
+		float now = GetGame().GetWorld().GetWorldTime();
+		if (now < m_fNextPenaltyAt)
+			return;
+		int attackerID;
 		if (context.instigator)
-			killerID = context.instigator.GetInstigatorPlayerID();
-		if (context.damageValue <= 0 || killerID <= 0
-			|| (context.damageType != EDamageType.KINETIC && context.damageType != EDamageType.EXPLOSIVE
-			&& context.damageType != EDamageType.FRAGMENTATION && context.damageType != EDamageType.PROCESSED_FRAGMENTATION))
+			attackerID = context.instigator.GetInstigatorPlayerID();
+		if (context.damageValue <= 0 || attackerID <= 0 || context.damageType == EDamageType.BLEEDING)
 		{
-			Print(string.Format("[INF_Prisoners] Prisoner died; no player penalty (damage %1, type %2, killer player %3).", context.damageValue, typename.EnumToString(EDamageType, context.damageType), killerID));
+			// Bleeding is the one exception; other ignored damage is logged to spot an attack that slips through.
+			if (now >= m_fNextIgnoredLog && context.damageType != EDamageType.BLEEDING)
+			{
+				m_fNextIgnoredLog = now + 5000;
+				Print(string.Format("[INF_Prisoners] Prisoner damage not attributed to a player (damage %1, type %2, attacker player %3).", context.damageValue, typename.EnumToString(EDamageType, context.damageType), attackerID));
+			}
 			return;
 		}
 		PlayerManager players = GetGame().GetPlayerManager();
-		IEntity offender = players.GetPlayerControlledEntity(killerID);
+		IEntity offender = players.GetPlayerControlledEntity(attackerID);
 		if (!offender)
 		{
-			Print(string.Format("[INF_Prisoners] Prisoner died; killer player %1 has no controlled entity.", killerID), LogLevel.WARNING);
+			Print(string.Format("[INF_Prisoners] Prisoner injured; attacker player %1 has no controlled entity.", attackerID), LogLevel.WARNING);
 			return;
 		}
 		SCR_CharacterDamageManagerComponent damage = SCR_CharacterDamageManagerComponent.Cast(offender.FindComponent(SCR_CharacterDamageManagerComponent));
 		if (!damage || damage.IsDestroyed())
 			return;
+		m_fNextPenaltyAt = now + PENALTY_COOLDOWN_MS;
 
-		string offenderName = players.GetPlayerName(killerID);
+		string offenderName = players.GetPlayerName(attackerID);
 		if (Math.RandomFloat01() >= 0.30)
 		{
 			BroadcastPrisonerWarning(string.Format("The Flying Spaghetti Monster saw what %1 did to a prisoner. He is watching, and His patience is not endless.", offenderName));
@@ -318,7 +327,7 @@ class INF_PrisonerComponent : ScriptComponent
 		}
 		// Native lightning visuals and thunder, but lethal damage only to the offender.
 		damage.Kill(Instigator.CreateInstigator(null));
-		BroadcastPrisonerWarning(string.Format("The Flying Spaghetti Monster is displeased with %1 for killing a prisoner. R'amen.", offenderName));
+		BroadcastPrisonerWarning(string.Format("The Flying Spaghetti Monster is displeased with %1 for harming a prisoner. R'amen.", offenderName));
 	}
 
 	protected void BroadcastPrisonerWarning(string message)
@@ -428,6 +437,9 @@ class INF_PrisonerComponent : ScriptComponent
 		array<IEntity> items = {};
 		inventory.GetItems(items);
 		bool foundWeapon;
+		// Single pile ~2 m beside the body so items stay out of the medical UI's reach.
+		vector pilePos = GetOwner().GetOrigin() + GetOwner().GetTransformAxis(0) * 2;
+		pilePos[1] = GetGame().GetWorld().GetSurfaceY(pilePos[0], pilePos[2]) + 0.1;
 		foreach (IEntity item : items)
 		{
 			if (!item)
@@ -448,9 +460,6 @@ class INF_PrisonerComponent : ScriptComponent
 				WarnHandling("Prisoner weapon drop is not ready; retrying while the prisoner remains restrained.");
 				continue;
 			}
-			// Single pile ~2 m beside the body so items stay out of the medical UI's reach.
-			vector pilePos = GetOwner().GetOrigin() + GetOwner().GetTransformAxis(0) * 2;
-			pilePos[1] = GetGame().GetWorld().GetSurfaceY(pilePos[0], pilePos[2]) + 0.1;
 			item.SetOrigin(pilePos);
 			Physics itemPhysics = item.GetPhysics();
 			if (itemPhysics)
