@@ -77,7 +77,7 @@ class INF_MortarBatteries
 	static const float SPREAD_RADIUS = 100;
 	static const float SMOKE_SPREAD_RADIUS = 150;
 	static const float ILLUMINATION_SPREAD_RADIUS = 225;
-	static const float COOLDOWN_MS = 180000;
+	static const float COOLDOWN_MS = 300000;
 	static const float FIRST_FIRE_DELAY_MS = 10000;
 	// Random time from the AI first knowing of an enemy to the fire mission being ordered.
 	static const float DECISION_DELAY_MIN_MS = 20000;

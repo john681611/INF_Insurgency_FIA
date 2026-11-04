@@ -590,7 +590,7 @@ missions skip this. The salvo has two stages; between them is a random 8-20s pau
 the AI watch the fall of shot, and the second stage picks its aim the same way as the first,
 from the position and knowledge the AI have then, so an imperfect picture still gives a
 wider spread. If every enemy is lost by then the battery ceases fire. The cooldown is about
-3 minutes (+-30%) and takes no orders at all: knowledge is only tracked, and any new
+5 minutes (+-30%) and takes no orders at all: knowledge is only tracked, and any new
 report starts its decision delay once the cooldown is over. If the enemy was never lost,
 the next mission is ordered at once when the cooldown ends, with no decision delay; if it
 was lost in between, the decision delay applies. Ammo comes from the mortar's artillery usage
