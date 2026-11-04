@@ -556,13 +556,17 @@ class INF_PrisonerComponent : ScriptComponent
 		vector before = item.GetOrigin();
 		item.SetOrigin(position);
 		item.Update();
+		// Dedicated servers stream entities to clients by position; a teleport must tell replication or clients keep showing the old spot.
+		RplComponent replication = RplComponent.Cast(item.FindComponent(RplComponent));
+		if (replication)
+			replication.ForceNodeMovement(before);
 		Physics itemPhysics = item.GetPhysics();
 		if (itemPhysics)
 		{
 			itemPhysics.SetVelocity(vector.Zero);
 			itemPhysics.SetActive(ActiveState.ACTIVE);
 		}
-		Print(string.Format("[INF_Prisoners] Moved dropped weapon to the pile (attempt %1): %2 from %3 to %4, body at %5, physics %6.", attempt + 1, item.GetPrefabData().GetPrefabName(), before, item.GetOrigin(), GetOwner().GetOrigin(), itemPhysics != null));
+		Print(string.Format("[INF_Prisoners] Moved dropped weapon to the pile (attempt %1): %2 from %3 to %4, body at %5, physics %6, replication %7.", attempt + 1, item.GetPrefabData().GetPrefabName(), before, item.GetOrigin(), GetOwner().GetOrigin(), itemPhysics != null, replication != null));
 		GetGame().GetCallqueue().CallLater(VerifyPiled, 1500, false, item, attempt);
 	}
 

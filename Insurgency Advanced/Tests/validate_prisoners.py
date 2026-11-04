@@ -130,6 +130,7 @@ class Prisoners(unittest.TestCase):
         self.assertNotIn("DeleteEntity", drop)
         self.assertIn("if (!foundWeapon && m_aDroppedWeapons.IsEmpty())", drop)
         self.assertIn("MoveDroppedToPile()", drop)
+        self.assertIn("ForceNodeMovement(before)", method(SOURCE, "void MoveToPile(", "protected void"))
         self.assertIn("item.GetParent()", method(SOURCE, "void MoveDroppedToPile(", "protected void"))
         self.assertIn("class INF_PrisonerDropCallback : ScriptedInventoryOperationCallback", SOURCE)
         self.assertIn("m_Prisoner.INF_OnWeaponDropped(m_Item)", SOURCE)
