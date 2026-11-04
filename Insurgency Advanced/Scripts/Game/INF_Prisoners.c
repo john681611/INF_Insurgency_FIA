@@ -274,21 +274,33 @@ class INF_PrisonerComponent : ScriptComponent
 		if (!Replication.IsServer() || !m_bCaptured || m_bDeathHandled || !m_DamageManager.IsDestroyed())
 			return;
 		m_bDeathHandled = true;
-		if (context.damageValue <= 0 || !context.instigator)
+		int killerID;
+		if (context.instigator)
+			killerID = context.instigator.GetInstigatorPlayerID();
+		if (context.damageValue <= 0 || killerID <= 0
+			|| (context.damageType != EDamageType.KINETIC && context.damageType != EDamageType.EXPLOSIVE
+			&& context.damageType != EDamageType.FRAGMENTATION && context.damageType != EDamageType.PROCESSED_FRAGMENTATION))
+		{
+			Print(string.Format("[INF_Prisoners] Prisoner died; no player penalty (damage %1, type %2, killer player %3).", context.damageValue, typename.EnumToString(EDamageType, context.damageType), killerID));
 			return;
-		if (context.damageType != EDamageType.KINETIC && context.damageType != EDamageType.EXPLOSIVE
-			&& context.damageType != EDamageType.FRAGMENTATION && context.damageType != EDamageType.PROCESSED_FRAGMENTATION)
-			return;
-		int killerID = context.instigator.GetInstigatorPlayerID();
-		if (killerID <= 0)
-			return;
+		}
 		PlayerManager players = GetGame().GetPlayerManager();
 		IEntity offender = players.GetPlayerControlledEntity(killerID);
 		if (!offender)
+		{
+			Print(string.Format("[INF_Prisoners] Prisoner died; killer player %1 has no controlled entity.", killerID), LogLevel.WARNING);
 			return;
+		}
 		SCR_CharacterDamageManagerComponent damage = SCR_CharacterDamageManagerComponent.Cast(offender.FindComponent(SCR_CharacterDamageManagerComponent));
-		if (!damage || damage.IsDestroyed() || Math.RandomFloat01() >= 0.30)
+		if (!damage || damage.IsDestroyed())
 			return;
+
+		string offenderName = players.GetPlayerName(killerID);
+		if (Math.RandomFloat01() >= 0.30)
+		{
+			BroadcastPrisonerWarning(string.Format("The Flying Spaghetti Monster saw what %1 did to a prisoner. He is watching, and His patience is not endless.", offenderName));
+			return;
+		}
 
 		Resource lightning = Resource.Load("{6AA19CB200000520}Prefabs/Effects/Pastafarian/PrisonerRebuke.et");
 		if (!lightning)
@@ -306,8 +318,13 @@ class INF_PrisonerComponent : ScriptComponent
 		}
 		// Native lightning visuals and thunder, but lethal damage only to the offender.
 		damage.Kill(Instigator.CreateInstigator(null));
-		string message = string.Format("The Flying Spaghetti Monster is displeased with %1 for killing a prisoner. R'amen.", players.GetPlayerName(killerID));
+		BroadcastPrisonerWarning(string.Format("The Flying Spaghetti Monster is displeased with %1 for killing a prisoner. R'amen.", offenderName));
+	}
+
+	protected void BroadcastPrisonerWarning(string message)
+	{
 		Print("[INF_Prisoners] " + message);
+		PlayerManager players = GetGame().GetPlayerManager();
 		array<int> recipients = {};
 		players.GetPlayers(recipients);
 		foreach (int playerID : recipients)
