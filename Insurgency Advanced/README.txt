@@ -644,6 +644,18 @@ at full strength or as survivors under the zone's defender-memory rules, despawn
 zone, and the zone cannot be captured while any guard is alive. Defences are not capture
 objectives, cache candidates or camp influence. A guard group that cannot find a spot away
 from players keeps the defence's previous survivor count for the next activation.
+Streaming: defence compositions are removed when far from players and spawned back on
+approach. The proximity loop checks every defence each step (squared distances only) and
+queues the work on dedicated spawn/despawn gates 500 ms apart (separate from the AI gates, so
+they never delay AI), nearest first. A defence despawns once the nearest player is over
+4000 m away for the zone deactivation delay (immediately if no player has ever been near it),
+and respawns inside 3000 m; the gap prevents flapping. It never despawns while its owner zone
+is active, and a queued despawn is cancelled if a player arrives. At start and whenever the
+server empties, every defence over 3000 m from a friendly base spawn point (not personal
+spawn points) is despawned at once. Fully destroyed defences are retired for good (dropped
+from the roster and saved file); a damaged one returns repaired. Camps are not affected. The
+Game Master camera does not count as a player. A respawn that keeps failing is dropped
+after three attempts.
 Zone vehicles prefer road placement, then try up to 32 open-ground positions
 inside the zone with up to four headings per position. Open-ground placement
 does not require a road; it retains player distance, concealment, exclusions,

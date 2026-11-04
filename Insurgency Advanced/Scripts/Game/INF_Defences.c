@@ -13,6 +13,12 @@ class INF_Defence
 	int m_iActiveSize;
 	int m_iRememberedAI = -1;
 	float m_fRememberedAt = -1;
+	IEntity m_Entity;
+	bool m_bDespawned;
+	float m_fIdleSince = -1;
+	bool m_bSeenNear;
+	bool m_bQueued;
+	int m_iSpawnFailures;
 }
 
 // A slot to place a defence in: a live slot entity, or a baked slot (no entity) when the world has none at runtime.
@@ -41,6 +47,11 @@ class INF_Defences
 	static const int MAX_SITES = 256;
 	static const int TILE_SIZE = 400;
 	static const int SCAN_BUDGET_MS = 10;
+	// Streaming: despawn beyond DESPAWN_DISTANCE (for the zone deactivation delay), respawn inside SPAWN_DISTANCE; the gap stops flapping.
+	static const float DESPAWN_DISTANCE = 4000;
+	static const float SPAWN_DISTANCE = 3000;
+	static const float OWN_SPAWN_RADIUS = 30;
+	static const int MAX_SPAWN_FAILURES = 3;
 	static const float MIN_FROM_STATIC_SITE = 250;
 	static const float GUARD_RADIUS = 15;
 	static const float DEFEND_RADIUS = 25;
@@ -65,6 +76,8 @@ class INF_Defences
 	protected ref array<vector> m_Avoid = {};
 	protected vector m_vMin;
 	protected vector m_vMax;
+	protected float m_fResumedAt;
+	protected bool m_bPaused;
 	protected int m_iOwnerRejects;
 	protected int m_iSpacingRejects;
 	protected int m_iFlatSeen;
@@ -110,6 +123,8 @@ class INF_Defences
 	void Stop()
 	{
 		GetGame().GetCallqueue().Remove(ScanTick);
+		GetGame().GetCallqueue().Remove(RespawnQueued);
+		GetGame().GetCallqueue().Remove(DespawnQueued);
 	}
 
 	// The slot type is the folder under Slotted/, e.g. slotroadmedium; world slots are matched on it.
@@ -356,6 +371,7 @@ class INF_Defences
 		}
 		Log(string.Format("Placed %1 defences (%2 on road slots, %3 on small flat slots) from %4 viable of %5 free slots, target %6 percent (%7 rejected for spacing, %8 with no zone in range).",
 			m_Sites.Count(), m_Sites.Count() - flat, flat, candidates.Count(), slots.Count(), m_Config.m_iPercent, m_iSpacingRejects, m_iOwnerRejects));
+		SweepToBases("start");
 	}
 
 	protected bool TryPlace(INF_SlotCandidate slot)
@@ -469,6 +485,7 @@ class INF_Defences
 			return null;
 		}
 		INF_Defence defence = new INF_Defence();
+		defence.m_Entity = entity;
 		defence.m_Composition = composition;
 		defence.m_vPosition = entity.GetOrigin();
 		vector angles = entity.GetYawPitchRoll();
@@ -546,6 +563,7 @@ class INF_Defences
 				m_Sites.Insert(saved);
 		}
 		Log(string.Format("Restored %1 of %2 saved defences.", m_Sites.Count(), loaded.Count()));
+		SweepToBases("start");
 	}
 
 	protected static IEntity SpawnAt(Resource resource, vector position, float yaw)
@@ -557,30 +575,291 @@ class INF_Defences
 		return GetGame().SpawnEntityPrefab(resource, GetGame().GetWorld(), params);
 	}
 
-	protected bool Restore(INF_Defence defence)
+	protected IEntity SpawnComposition(INF_Defence defence)
 	{
 		Resource resource = Resource.Load(defence.m_Composition);
 		if (!resource || !resource.IsValid())
 		{
 			Fail("Saved defence composition cannot load, skipping: " + defence.m_Composition);
-			return false;
+			return null;
 		}
 		IEntity entity = SpawnAt(resource, defence.m_vPosition, defence.m_fYaw);
 		if (!entity)
 		{
 			Fail("Saved defence could not be respawned: " + defence.m_sKey);
-			return false;
+			return null;
 		}
 		if (!INF_ForestCamps.PrepareComposition(entity))
 		{
 			SCR_EntityHelper.DeleteEntityAndChildren(entity);
-			return false;
+			return null;
 		}
-		defence.m_bFlat = SlotType(defence.m_Composition) == FLAT_SLOT;
 		// The slot is not re-resolved on restore, so tell the slot manager it is taken (GM placement would otherwise stack).
+		SetSlotOccupant(defence.m_vPosition, entity);
+		defence.m_Entity = entity;
+		return entity;
+	}
+
+	protected static void SetSlotOccupant(vector position, IEntity entity)
+	{
 		SCR_CompositionSlotManagerComponent slotManager = SCR_CompositionSlotManagerComponent.GetInstance();
 		if (slotManager)
-			slotManager.SetOccupant(defence.m_vPosition, entity);
+			slotManager.SetOccupant(position, entity);
+	}
+
+	// Streams defences out and back in by player distance. Runs from the proximity loop; the whole roster is checked each
+	// time (a few squared distances per defence), and the actual spawns and despawns are queued through staggered gates
+	// like the AI ones, so the loop never waits for them.
+	void Maintain(array<vector> players, float now, bool serverEmpty)
+	{
+		if (!Replication.IsServer() || !m_Zones || m_Sites.IsEmpty())
+			return;
+		if (serverEmpty)
+		{
+			SweepToBases("server empty");
+			m_bPaused = true;
+			return;
+		}
+		// Nobody has a body (everyone on the respawn screen): not evidence the map is empty, so pause and restart the idle timers.
+		if (players.IsEmpty())
+		{
+			m_bPaused = true;
+			return;
+		}
+		if (m_bPaused)
+		{
+			m_bPaused = false;
+			m_fResumedAt = now;
+		}
+		array<INF_Defence> due = {};
+		array<float> distances = {};
+		for (int index = m_Sites.Count() - 1; index >= 0; index--)
+			MaintainOne(m_Sites[index], players, now, due, distances);
+		// Nearest first, so what a player is about to meet appears first.
+		while (!due.IsEmpty())
+		{
+			int nearest;
+			for (int next = 1; next < due.Count(); next++)
+			{
+				if (distances[next] < distances[nearest])
+					nearest = next;
+			}
+			INF_Defence defence = due[nearest];
+			due.Remove(nearest);
+			distances.Remove(nearest);
+			nearest = 0;
+			defence.m_bQueued = true;
+			GetGame().GetCallqueue().CallLater(RespawnQueued, INF_StaggerGate.DefenceSpawns().Reserve(), false, defence);
+		}
+	}
+
+	protected void RespawnQueued(INF_Defence defence)
+	{
+		defence.m_bQueued = false;
+		if (m_Sites.Find(defence) < 0 || !defence.m_bDespawned)
+			return;
+		// The player may have left again while this waited in the queue.
+		INF_BlockPresence presence = m_Zones.GetPresence();
+		if (presence && NearestSq(presence.m_AllPlayers, defence.m_vPosition) > SPAWN_DISTANCE * SPAWN_DISTANCE)
+			return;
+		if (Respawn(defence))
+			return;
+		// A transient failure (resource not ready) is retried on later passes; only a persistent one drops the defence.
+		defence.m_iSpawnFailures++;
+		if (defence.m_iSpawnFailures >= MAX_SPAWN_FAILURES)
+			Retire(defence);
+	}
+
+	protected void DespawnQueued(INF_Defence defence)
+	{
+		defence.m_bQueued = false;
+		if (m_Sites.Find(defence) < 0 || defence.m_bDespawned || !defence.m_Entity || IsOwnerActive(defence))
+			return;
+		// A player may have arrived while this waited in the queue.
+		INF_BlockPresence presence = m_Zones.GetPresence();
+		if (presence && !presence.m_AllPlayers.IsEmpty() && NearestSq(presence.m_AllPlayers, defence.m_vPosition) <= DESPAWN_DISTANCE * DESPAWN_DISTANCE)
+		{
+			defence.m_fIdleSince = -1;
+			return;
+		}
+		Despawn(defence);
+	}
+
+	// Unbudgeted: at start and when the server empties nobody is watching, so everything beyond SPAWN_DISTANCE of a base
+	// spawn point goes at once and the slower player-distance streaming only handles the rest of the session.
+	void SweepToBases(string reason)
+	{
+		if (!Replication.IsServer() || !m_Zones || m_Sites.IsEmpty())
+			return;
+		array<vector> bases = {};
+		INF_SpawnProtection.BasePositions(bases);
+		// Spawn points built into a defence would anchor that defence to itself.
+		for (int index = bases.Count() - 1; index >= 0; index--)
+		{
+			foreach (INF_Defence own : m_Sites)
+			{
+				if (vector.DistanceSqXZ(own.m_vPosition, bases[index]) < OWN_SPAWN_RADIUS * OWN_SPAWN_RADIUS)
+				{
+					bases.Remove(index);
+					break;
+				}
+			}
+		}
+		if (bases.IsEmpty())
+		{
+			Fail("No base spawn points found; skipping the " + reason + " defence sweep.");
+			return;
+		}
+		int despawned;
+		int retired;
+		for (int site = m_Sites.Count() - 1; site >= 0; site--)
+		{
+			INF_Defence defence = m_Sites[site];
+			if (defence.m_bDespawned || defence.m_bQueued || IsOwnerActive(defence) || NearestSq(bases, defence.m_vPosition) <= SPAWN_DISTANCE * SPAWN_DISTANCE)
+				continue;
+			if (!defence.m_Entity || FullyDestroyed(defence.m_Entity))
+			{
+				Retire(defence);
+				retired++;
+			}
+			else
+			{
+				Despawn(defence);
+				despawned++;
+			}
+		}
+		if (despawned > 0 || retired > 0)
+			Log(string.Format("Sweep (%1): despawned %2, retired %3 of %4 defences beyond %5 m of a base.", reason, despawned, retired, m_Sites.Count() + retired, SPAWN_DISTANCE));
+	}
+
+	protected void Despawn(INF_Defence defence)
+	{
+		SetSlotOccupant(defence.m_vPosition, null);
+		SCR_EntityHelper.DeleteEntityAndChildren(defence.m_Entity);
+		defence.m_Entity = null;
+		defence.m_bDespawned = true;
+		defence.m_fIdleSince = -1;
+	}
+
+	// Decides what this defence needs; spawns of despawned ones are collected for nearest-first queueing, despawns are queued here.
+	protected void MaintainOne(INF_Defence defence, array<vector> players, float now, array<INF_Defence> due, array<float> distances)
+	{
+		if (defence.m_bQueued)
+			return;
+		float nearestSq = NearestSq(players, defence.m_vPosition);
+		if (defence.m_bDespawned)
+		{
+			if (nearestSq <= SPAWN_DISTANCE * SPAWN_DISTANCE)
+			{
+				due.Insert(defence);
+				distances.Insert(nearestSq);
+			}
+			return;
+		}
+		// A live owner zone means its guards are out; never pull the composition from under them.
+		if (nearestSq <= DESPAWN_DISTANCE * DESPAWN_DISTANCE || IsOwnerActive(defence))
+		{
+			defence.m_fIdleSince = -1;
+			defence.m_bSeenNear = true;
+			return;
+		}
+		if (!defence.m_Entity)
+		{
+			Retire(defence);
+			return;
+		}
+		// The delay only covers a player coming back (respawn); a defence nobody has been near since start can go at once.
+		if (defence.m_bSeenNear)
+		{
+			if (defence.m_fIdleSince < m_fResumedAt)
+			{
+				defence.m_fIdleSince = now;
+				return;
+			}
+			if (now - defence.m_fIdleSince < INF_BlockRules.DESPAWN_DELAY_MS)
+				return;
+		}
+		if (FullyDestroyed(defence.m_Entity))
+		{
+			Retire(defence);
+			return;
+		}
+		defence.m_bQueued = true;
+		GetGame().GetCallqueue().CallLater(DespawnQueued, INF_StaggerGate.DefenceDespawns().Reserve(), false, defence);
+	}
+
+	protected bool Respawn(INF_Defence defence)
+	{
+		if (!SpawnComposition(defence))
+			return false;
+		defence.m_bDespawned = false;
+		defence.m_iSpawnFailures = 0;
+		defence.m_bSeenNear = true;
+		defence.m_fIdleSince = -1;
+		return true;
+	}
+
+	// Destroyed defences are not brought back: dropped from the roster, the owner zone and the saved file.
+	protected void Retire(INF_Defence defence)
+	{
+		if (defence.m_Entity)
+		{
+			SetSlotOccupant(defence.m_vPosition, null);
+			SCR_EntityHelper.DeleteEntityAndChildren(defence.m_Entity);
+			defence.m_Entity = null;
+		}
+		INS_AmbientPatrolZoneState owner = m_Zones.GetZone(defence.m_sOwnerKey);
+		if (owner)
+			owner.m_aINFDefences.RemoveItem(defence);
+		m_Sites.RemoveItem(defence);
+		if (!Save())
+			Print("[INF_Defences] Cannot save the defence roster after retiring " + defence.m_sKey + ".", LogLevel.ERROR);
+	}
+
+	protected bool IsOwnerActive(INF_Defence defence)
+	{
+		INS_AmbientPatrolZoneState owner = m_Zones.GetZone(defence.m_sOwnerKey);
+		return owner && owner.m_bActive;
+	}
+
+	protected static float NearestSq(array<vector> players, vector position)
+	{
+		float best = 1e18;
+		foreach (vector player : players)
+			best = Math.Min(best, vector.DistanceSqXZ(player, position));
+		return best;
+	}
+
+	protected static bool FullyDestroyed(IEntity entity)
+	{
+		int total;
+		int intact;
+		CountDamageable(entity, total, intact);
+		return total > 0 && intact == 0;
+	}
+
+	protected static void CountDamageable(IEntity entity, out int total, out int intact)
+	{
+		DamageManagerComponent damage = DamageManagerComponent.Cast(entity.FindComponent(DamageManagerComponent));
+		if (damage)
+		{
+			total++;
+			if (damage.GetState() != EDamageState.DESTROYED)
+				intact++;
+		}
+		IEntity child = entity.GetChildren();
+		while (child)
+		{
+			CountDamageable(child, total, intact);
+			child = child.GetSibling();
+		}
+	}
+
+	protected bool Restore(INF_Defence defence)
+	{
+		if (!SpawnComposition(defence))
+			return false;
+		defence.m_bFlat = SlotType(defence.m_Composition) == FLAT_SLOT;
 		INS_AmbientPatrolZoneState owner = m_Zones.GetZone(defence.m_sOwnerKey);
 		if (!owner)
 		{

@@ -89,9 +89,29 @@ class INF_HeaderSettings
 class INF_StaggerGate
 {
 	static const int GAP_MS = 2000;
+	// Defence compositions are far cheaper than AI groups, so their own gates space them much closer.
+	static const int DEFENCE_GAP_MS = 500;
 	protected static ref INF_StaggerGate s_Spawns = new INF_StaggerGate();
 	protected static ref INF_StaggerGate s_Despawns = new INF_StaggerGate();
+	protected static ref INF_StaggerGate s_DefenceSpawns = new INF_StaggerGate(DEFENCE_GAP_MS);
+	protected static ref INF_StaggerGate s_DefenceDespawns = new INF_StaggerGate(DEFENCE_GAP_MS);
 	protected float m_fNextAt;
+	protected int m_iGap = GAP_MS;
+
+	void INF_StaggerGate(int gap = GAP_MS)
+	{
+		m_iGap = gap;
+	}
+
+	static INF_StaggerGate DefenceSpawns()
+	{
+		return s_DefenceSpawns;
+	}
+
+	static INF_StaggerGate DefenceDespawns()
+	{
+		return s_DefenceDespawns;
+	}
 
 	static INF_StaggerGate Spawns()
 	{
@@ -107,7 +127,7 @@ class INF_StaggerGate
 	{
 		float now = GetGame().GetWorld().GetWorldTime();
 		float at = Math.Max(now, m_fNextAt);
-		m_fNextAt = at + GAP_MS;
+		m_fNextAt = at + m_iGap;
 		return (int)(at - now);
 	}
 
@@ -120,6 +140,33 @@ class INF_StaggerGate
 class INF_SpawnProtection
 {
 	static const float RADIUS = 150;
+
+	static bool IsBase(SCR_SpawnPoint point, string factionKey)
+	{
+		// Personal spawn points follow a player and are not a base.
+		return point && point.IsSpawnPointEnabled() && point.GetFactionKey() == factionKey && !SCR_PlayerSpawnPoint.Cast(point);
+	}
+
+	// Positions of the enabled friendly base spawn points.
+	static void BasePositions(notnull array<vector> positions)
+	{
+		BaseGameMode mode = GetGame().GetGameMode();
+		if (!mode)
+			return;
+		INS_AmbientPatrolManager patrols = INS_AmbientPatrolManager.Cast(mode.FindComponent(INS_AmbientPatrolManager));
+		if (!patrols)
+			return;
+		Faction faction = patrols.INF_GetPlayerFaction();
+		array<SCR_SpawnPoint> points = SCR_SpawnPoint.GetSpawnPoints();
+		if (!faction || !points)
+			return;
+		string factionKey = faction.GetFactionKey();
+		foreach (SCR_SpawnPoint point : points)
+		{
+			if (IsBase(point, factionKey))
+				positions.Insert(point.GetOrigin());
+		}
+	}
 
 	// Hostile AI never spawn near an enabled friendly spawn point, such as a player-built base.
 	static bool Contains(vector pos)
@@ -139,11 +186,11 @@ class INF_SpawnProtection
 		string factionKey = faction.GetFactionKey();
 		foreach (SCR_SpawnPoint point : points)
 		{
-			// Personal spawn points follow a player and are not a base.
-			if (!point || !point.IsSpawnPointEnabled() || point.GetFactionKey() != factionKey || SCR_PlayerSpawnPoint.Cast(point))
-				continue;
-			if (vector.DistanceSqXZ(pos, point.GetOrigin()) <= RADIUS * RADIUS)
-				return true;
+			if (IsBase(point, factionKey))
+			{
+				if (vector.DistanceSqXZ(pos, point.GetOrigin()) <= RADIUS * RADIUS)
+					return true;
+			}
 		}
 		return false;
 	}
@@ -1464,6 +1511,8 @@ modded class INS_AmbientPatrolManager
 			zoneVehicles.INF_MaintainZoneVehicles(presence);
 		if (m_INFMortars)
 			m_INFMortars.Maintain(this, presence, INF_GetMortarConfig());
+		if (m_INFDefences)
+			m_INFDefences.Maintain(presence.m_AllPlayers, now, presence.m_PlayerIDs.IsEmpty());
 		array<INS_AmbientPatrolZoneState> activeZones = {};
 		activeZones.Copy(m_INFZoneStates.GetActiveZones());
 		foreach (INS_AmbientPatrolZoneState state : activeZones)

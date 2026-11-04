@@ -140,6 +140,43 @@ class DefencePlacement(unittest.TestCase):
         self.assertIn("config.m_iPercent <= 0", defence("void Begin("))
 
 
+class DefenceStreaming(unittest.TestCase):
+    def test_streaming_uses_hysteresis_and_the_zone_deactivation_delay(self):
+        self.assertIn("DESPAWN_DISTANCE = 4000", DEFENCES)
+        self.assertIn("SPAWN_DISTANCE = 3000", DEFENCES)
+        body = method_body(DEFENCES, "protected void MaintainOne")
+        self.assertIn("INF_BlockRules.DESPAWN_DELAY_MS", body)
+        self.assertIn("IsOwnerActive(defence)", body)
+        self.assertIn("FullyDestroyed(defence.m_Entity)", body)
+
+    def test_the_loop_checks_the_whole_roster_and_only_queues_the_work(self):
+        body = method_body(DEFENCES, "void Maintain(")
+        self.assertNotIn("System.GetTickCount", body)
+        self.assertIn("MaintainOne(m_Sites[index]", body)
+        self.assertIn("CallLater(RespawnQueued, INF_StaggerGate.DefenceSpawns().Reserve()", body)
+        self.assertIn("CallLater(DespawnQueued, INF_StaggerGate.DefenceDespawns().Reserve()", method_body(DEFENCES, "protected void MaintainOne"))
+        self.assertNotIn("Respawn(", body)
+        self.assertNotIn("Despawn(", body)
+        self.assertIn("m_INFDefences.Maintain(presence.m_AllPlayers, now, presence.m_PlayerIDs.IsEmpty())", GRID)
+
+    def test_queued_despawn_rechecks_for_a_player_who_arrived_while_waiting(self):
+        body = method_body(DEFENCES, "protected void DespawnQueued")
+        self.assertIn("DESPAWN_DISTANCE * DESPAWN_DISTANCE", body)
+        self.assertIn("IsOwnerActive(defence)", body)
+
+    def test_start_and_empty_server_sweep_everything_far_from_a_base(self):
+        sweep = method_body(DEFENCES, "void SweepToBases(")
+        self.assertIn("INF_SpawnProtection.BasePositions(bases)", sweep)
+        self.assertIn("SPAWN_DISTANCE * SPAWN_DISTANCE", sweep)
+        self.assertNotIn("CallLater", sweep)
+        self.assertIn('SweepToBases("server empty")', method_body(DEFENCES, "void Maintain("))
+        self.assertEqual(DEFENCES.count('SweepToBases("start")'), 2)
+
+    def test_respawn_shares_the_restore_spawn_path(self):
+        self.assertIn("SpawnComposition(defence)", method_body(DEFENCES, "protected bool Respawn"))
+        self.assertIn("SpawnComposition(defence)", method_body(DEFENCES, "protected bool Restore"))
+
+
 class DefenceOwnership(unittest.TestCase):
     def test_owner_is_the_nearest_activatable_zone_in_range_with_room(self):
         body = defence("INS_AmbientPatrolZoneState FindOwner(")
@@ -212,13 +249,14 @@ class DefencePersistence(unittest.TestCase):
         self.assertNotIn("DeleteFile", DEFENCES)
 
     def test_restore_respawns_at_the_saved_transform(self):
-        body = defence("protected bool Restore(")
+        body = defence("protected IEntity SpawnComposition(")
         self.assertIn("SpawnAt(resource, defence.m_vPosition, defence.m_fYaw)", body)
         spawn = defence("protected static IEntity SpawnAt(")
         self.assertIn("Math3D.AnglesToMatrix(Vector(yaw, 0, 0), params.Transform)", spawn)
         self.assertIn("params.Transform[3] = position", spawn)
-        self.assertIn("SetOccupant(defence.m_vPosition, entity)", body)
+        self.assertIn("SetSlotOccupant(defence.m_vPosition, entity)", body)
         self.assertNotIn("SCR_SiteSlotEntity", body)
+        self.assertIn("SpawnComposition(defence)", defence("protected bool Restore("))
 
     def test_restore_reassigns_a_missing_owner_zone(self):
         body = defence("protected bool Restore(")
