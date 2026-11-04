@@ -553,20 +553,25 @@ class INF_PrisonerComponent : ScriptComponent
 		position[0] = position[0] + Math.Cos(angle) * radius;
 		position[2] = position[2] + Math.Sin(angle) * radius;
 		position[1] = GetGame().GetWorld().GetSurfaceY(position[0], position[2]) + 0.1;
+		vector before = item.GetOrigin();
 		item.SetOrigin(position);
+		item.Update();
 		Physics itemPhysics = item.GetPhysics();
 		if (itemPhysics)
 		{
 			itemPhysics.SetVelocity(vector.Zero);
 			itemPhysics.SetActive(ActiveState.ACTIVE);
 		}
-		Print(string.Format("[INF_Prisoners] Moved dropped weapon to the pile (attempt %1).", attempt + 1));
+		Print(string.Format("[INF_Prisoners] Moved dropped weapon to the pile (attempt %1): %2 from %3 to %4, body at %5, physics %6.", attempt + 1, item.GetPrefabData().GetPrefabName(), before, item.GetOrigin(), GetOwner().GetOrigin(), itemPhysics != null));
 		GetGame().GetCallqueue().CallLater(VerifyPiled, 1500, false, item, attempt);
 	}
 
 	protected void VerifyPiled(IEntity item, int attempt)
 	{
-		if (!item || item.GetParent())
+		if (!item)
+			return;
+		Print(string.Format("[INF_Prisoners] Dropped weapon check: at %1, %2 m from the pile, %3 m from the body, parent %4.", item.GetOrigin(), vector.DistanceXZ(item.GetOrigin(), m_vPile), vector.DistanceXZ(item.GetOrigin(), GetOwner().GetOrigin()), item.GetParent() != null));
+		if (item.GetParent())
 			return;
 		if (vector.DistanceXZ(item.GetOrigin(), m_vPile) <= 1.5)
 			return;
