@@ -427,7 +427,17 @@ class INF_PrisonerComponent : ScriptComponent
 				continue;
 			foundWeapon = true;
 			if (!inventory.TryRemoveItemFromInventory(item))
+			{
 				WarnHandling("Prisoner weapon drop is not ready; retrying while the prisoner remains restrained.");
+				continue;
+			}
+			// Single pile ~2 m beside the body so items stay out of the medical UI's reach.
+			vector pilePos = GetOwner().GetOrigin() + GetOwner().GetTransformAxis(0) * 2;
+			pilePos[1] = GetGame().GetWorld().GetSurfaceY(pilePos[0], pilePos[2]) + 0.1;
+			item.SetOrigin(pilePos);
+			Physics itemPhysics = item.GetPhysics();
+			if (itemPhysics)
+				itemPhysics.SetVelocity(vector.Zero);
 		}
 		// Native inventory operations may finish later; verify empty on the next tick.
 		if (!foundWeapon)
