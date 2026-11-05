@@ -48,9 +48,11 @@ or dead targets. The interacting player must be conscious, on foot and nearby.
 Captured AI are removed from their old group, switched to CIV if configured
 (otherwise explicitly unaffiliated), and have AI, movement and weapon controls
 disabled. This uses native restraint controls, not a custom surrender animation.
-Capture drops carried guns, launchers and sidearms through the native inventory
-manager, including weapons stored in carried inventory, into one pile about 2 m
-beside the body so they stay clear of the medical UI. Grenades, explosives,
+Capture removes carried guns, launchers and sidearms through the native inventory
+manager, including weapons stored in carried inventory, and spawns a clean copy of
+each in one pile about 2 m beside the body (a spawn replicates its position to every
+client; moving the dropped item did not on a dedicated server). Attachments and loaded
+ammo are not kept. The pile keeps clear of the medical UI. Grenades, explosives,
 ammunition, medical supplies and other non-weapon equipment stay on the body.
 Busy inventory operations retry; the prisoner stays restrained throughout.
 Once conscious and disarmed, a prisoner on foot is requested to stand and use

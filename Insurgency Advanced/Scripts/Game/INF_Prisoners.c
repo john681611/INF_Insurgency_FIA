@@ -33,16 +33,23 @@ class INF_PrisonerComponentClass : ScriptComponentClass
 {
 }
 
-// Tells the prisoner when the server has finished taking a weapon out of the inventory, so it can be moved to the pile.
+// Records one weapon being deleted from the prisoner's inventory; a clean copy is spawned at the pile once the server has finished.
 class INF_PrisonerDropCallback : ScriptedInventoryOperationCallback
 {
-	INF_PrisonerComponent m_Prisoner;
 	IEntity m_Item;
+	ResourceName m_Prefab;
+	float m_fLength;
+	bool m_bDone;
+	bool m_bFailed;
 
 	override protected void OnComplete()
 	{
-		if (m_Prisoner)
-			m_Prisoner.INF_OnWeaponDropped(m_Item);
+		m_bDone = true;
+	}
+
+	override protected void OnFailed()
+	{
+		m_bFailed = true;
 	}
 }
 
@@ -54,13 +61,14 @@ class INF_PrisonerComponent : ScriptComponent
 	[RplProp()]
 	protected bool m_bQuestioned;
 	protected bool m_bWeaponsDropped;
-	protected ref array<IEntity> m_aDroppedWeapons = {};
-	protected ref array<ref INF_PrisonerDropCallback> m_aDropCallbacks = {};
+	protected ref array<ref INF_PrisonerDropCallback> m_aPendingDrops = {};
 	protected vector m_vPile;
 	protected bool m_bPileSet;
 	protected static const float PILE_SCATTER_SMALL = 0.10;
 	protected static const float PILE_SCATTER_LARGE = 0.30;
 	protected static const float PILE_LARGE_ITEM = 0.5;
+	// Spawned a little above the ground so PlaceOnGround's downward trace starts clear of the surface.
+	protected static const float PILE_SPAWN_HEIGHT = 0.3;
 	protected ELoiteringType m_PrisonerLoiter = ELoiteringType.NONE;
 	protected float m_fNextHandlingWarning;
 	protected float m_fNextLoiterAttempt;
@@ -479,7 +487,7 @@ class INF_PrisonerComponent : ScriptComponent
 			m_vPile[1] = GetGame().GetWorld().GetSurfaceY(m_vPile[0], m_vPile[2]) + 0.1;
 			m_bPileSet = true;
 		}
-		MoveDroppedToPile();
+		CollectFinishedDrops();
 		foreach (IEntity item : items)
 		{
 			if (!item)
@@ -495,55 +503,63 @@ class INF_PrisonerComponent : ScriptComponent
 				&& type != EWeaponType.WT_FRAGGRENADE && type != EWeaponType.WT_SMOKEGRENADE)
 				continue;
 			foundWeapon = true;
-			if (m_aDroppedWeapons.Find(item) >= 0)
+			if (IsDropPending(item))
 				continue;
-			// On a dedicated server the removal completes later; the callback moves the item once the server has actually dropped it.
+			// The deletion completes later on a dedicated server; the copy is only spawned once the callback reports success.
 			INF_PrisonerDropCallback callback = new INF_PrisonerDropCallback();
-			callback.m_Prisoner = this;
 			callback.m_Item = item;
-			if (!inventory.TryRemoveItemFromInventory(item, null, callback))
+			callback.m_Prefab = item.GetPrefabData().GetPrefabName();
+			vector mins;
+			vector maxs;
+			item.GetBounds(mins, maxs);
+			callback.m_fLength = Math.Max(maxs[0] - mins[0], Math.Max(maxs[1] - mins[1], maxs[2] - mins[2]));
+			if (!inventory.TryDeleteItem(item, callback))
 			{
 				WarnHandling("Prisoner weapon drop is not ready; retrying while the prisoner remains restrained.");
 				continue;
 			}
-			m_aDropCallbacks.Insert(callback);
-			m_aDroppedWeapons.Insert(item);
+			m_aPendingDrops.Insert(callback);
 		}
-		// Native inventory operations may finish later; verify empty (and every drop moved) on the next tick.
-		if (!foundWeapon && m_aDroppedWeapons.IsEmpty())
+		// Native inventory operations may finish later; verify empty (and every copy spawned) on the next tick.
+		if (!foundWeapon && m_aPendingDrops.IsEmpty())
 			m_bWeaponsDropped = true;
 	}
 
-	// Called by the removal callback (or the polling fallback below) once the item is free of the inventory.
-	void INF_OnWeaponDropped(IEntity item)
+	protected bool IsDropPending(IEntity item)
 	{
-		if (!item || m_aDroppedWeapons.Find(item) < 0)
-			return;
-		m_aDroppedWeapons.RemoveItem(item);
-		MoveToPile(item, 0);
+		foreach (INF_PrisonerDropCallback pending : m_aPendingDrops)
+		{
+			if (pending.m_Item == item)
+				return true;
+		}
+		return false;
 	}
 
-	protected void MoveDroppedToPile()
+	// Handled here rather than inside the callback, which must not be released while it is still running.
+	protected void CollectFinishedDrops()
 	{
-		for (int index = m_aDroppedWeapons.Count() - 1; index >= 0; index--)
+		for (int index = m_aPendingDrops.Count() - 1; index >= 0; index--)
 		{
-			IEntity item = m_aDroppedWeapons[index];
-			if (item && item.GetParent())
+			INF_PrisonerDropCallback pending = m_aPendingDrops[index];
+			if (!pending.m_bDone && !pending.m_bFailed)
 				continue;
-			m_aDroppedWeapons.Remove(index);
-			if (item)
-				MoveToPile(item, 0);
+			m_aPendingDrops.Remove(index);
+			if (pending.m_bDone)
+				SpawnAtPile(pending.m_Prefab, pending.m_fLength);
 		}
 	}
 
+	// A clean copy is spawned at the pile instead of moving the dropped item: a spawn replicates its position to every client,
+	// whereas moving an already-replicated item did not reach clients on a dedicated server. Attachments and loaded ammo are not kept.
 	// Small items land 5-10 cm from the pile centre and rifle-sized ones 15-30 cm, so nothing sits exactly on top of another.
-	// The move is verified later because on a dedicated server the engine can still be placing a freshly dropped item.
-	protected void MoveToPile(IEntity item, int attempt)
+	protected void SpawnAtPile(ResourceName prefab, float length)
 	{
-		vector mins;
-		vector maxs;
-		item.GetBounds(mins, maxs);
-		float length = Math.Max(maxs[0] - mins[0], Math.Max(maxs[1] - mins[1], maxs[2] - mins[2]));
+		Resource resource = Resource.Load(prefab);
+		if (!resource || !resource.IsValid())
+		{
+			WarnHandling("Dropped prisoner weapon prefab cannot load: " + prefab);
+			return;
+		}
 		float maxRadius = PILE_SCATTER_SMALL;
 		if (length >= PILE_LARGE_ITEM)
 			maxRadius = PILE_SCATTER_LARGE;
@@ -552,39 +568,22 @@ class INF_PrisonerComponent : ScriptComponent
 		vector position = m_vPile;
 		position[0] = position[0] + Math.Cos(angle) * radius;
 		position[2] = position[2] + Math.Sin(angle) * radius;
-		position[1] = GetGame().GetWorld().GetSurfaceY(position[0], position[2]) + 0.1;
-		vector before = item.GetOrigin();
-		item.SetOrigin(position);
-		item.Update();
-		// Dedicated servers stream entities to clients by position; a teleport must tell replication or clients keep showing the old spot.
-		RplComponent replication = RplComponent.Cast(item.FindComponent(RplComponent));
-		if (replication)
-			replication.ForceNodeMovement(before);
-		Physics itemPhysics = item.GetPhysics();
-		if (itemPhysics)
+		position[1] = GetGame().GetWorld().GetSurfaceY(position[0], position[2]) + PILE_SPAWN_HEIGHT;
+		EntitySpawnParams params = new EntitySpawnParams();
+		params.TransformMode = ETransformMode.WORLD;
+		Math3D.AnglesToMatrix(Vector(Math.RandomFloat(0, 360), 0, 0), params.Transform);
+		params.Transform[3] = position;
+		IEntity copy = GetGame().SpawnEntityPrefab(resource, GetGame().GetWorld(), params);
+		if (!copy)
 		{
-			itemPhysics.SetVelocity(vector.Zero);
-			itemPhysics.SetActive(ActiveState.ACTIVE);
-		}
-		Print(string.Format("[INF_Prisoners] Moved dropped weapon to the pile (attempt %1): %2 from %3 to %4, body at %5, physics %6, replication %7.", attempt + 1, item.GetPrefabData().GetPrefabName(), before, item.GetOrigin(), GetOwner().GetOrigin(), itemPhysics != null, replication != null));
-		GetGame().GetCallqueue().CallLater(VerifyPiled, 1500, false, item, attempt);
-	}
-
-	protected void VerifyPiled(IEntity item, int attempt)
-	{
-		if (!item)
-			return;
-		Print(string.Format("[INF_Prisoners] Dropped weapon check: at %1, %2 m from the pile, %3 m from the body, parent %4.", item.GetOrigin(), vector.DistanceXZ(item.GetOrigin(), m_vPile), vector.DistanceXZ(item.GetOrigin(), GetOwner().GetOrigin()), item.GetParent() != null));
-		if (item.GetParent())
-			return;
-		if (vector.DistanceXZ(item.GetOrigin(), m_vPile) <= 1.5)
-			return;
-		if (attempt >= 2)
-		{
-			WarnHandling("Dropped prisoner weapon did not stay in the pile.");
+			WarnHandling("Dropped prisoner weapon copy failed to spawn: " + prefab);
 			return;
 		}
-		MoveToPile(item, attempt + 1);
+		// Lays the item flat on whatever surface is below it (roads, concrete, objects) instead of leaving it upright or hovering.
+		InventoryItemComponent inventoryItem = InventoryItemComponent.Cast(copy.FindComponent(InventoryItemComponent));
+		if (inventoryItem)
+			inventoryItem.PlaceOnGround();
+		Print(string.Format("[INF_Prisoners] Spawned dropped weapon at the pile: %1 at %2, body at %3.", prefab, copy.GetOrigin(), GetOwner().GetOrigin()));
 	}
 
 	protected void StopPrisonerLoiter(CharacterControllerComponent controller)

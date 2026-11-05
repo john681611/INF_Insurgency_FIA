@@ -121,20 +121,25 @@ class Prisoners(unittest.TestCase):
         drop = method(SOURCE, "void DropCarriedWeapons(", "void StopPrisonerLoiter(")
         for text in ("!Replication.IsServer()", "!m_bCaptured", "m_bWeaponsDropped",
                      "inventory.GetItems(items)", "weapon.GetWeaponType()",
-                     "inventory.TryRemoveItemFromInventory(item, null, callback)", "WarnHandling"):
+                     "inventory.TryDeleteItem(item, callback)", "WarnHandling"):
             self.assertIn(text, drop)
         for kind in ("RIFLE", "SNIPERRIFLE", "MACHINEGUN", "HANDGUN",
                      "ROCKETLAUNCHER",                      "GRENADELAUNCHER", "AUTOCANNON",
                                           "FRAGGRENADE", "SMOKEGRENADE"):
                                  self.assertIn("EWeaponType.WT_" + kind, drop)
         self.assertNotIn("DeleteEntity", drop)
-        self.assertIn("if (!foundWeapon && m_aDroppedWeapons.IsEmpty())", drop)
-        self.assertIn("MoveDroppedToPile()", drop)
-        self.assertIn("ForceNodeMovement(before)", method(SOURCE, "void MoveToPile(", "protected void"))
-        self.assertIn("item.GetParent()", method(SOURCE, "void MoveDroppedToPile(", "protected void"))
+        self.assertIn("if (!foundWeapon && m_aPendingDrops.IsEmpty())", drop)
+        self.assertIn("CollectFinishedDrops()", drop)
+        # Moving an already-replicated item did not reach clients on a dedicated server; a spawn does.
+        self.assertNotIn("SetOrigin", drop)
         self.assertIn("class INF_PrisonerDropCallback : ScriptedInventoryOperationCallback", SOURCE)
-        self.assertIn("m_Prisoner.INF_OnWeaponDropped(m_Item)", SOURCE)
-        self.assertIn("DistanceXZ(item.GetOrigin(), m_vPile)", method(SOURCE, "void VerifyPiled(", "protected void"))
+        finished = method(SOURCE, "void CollectFinishedDrops(", "protected void")
+        self.assertIn("pending.m_bDone", finished)
+        self.assertIn("SpawnAtPile(pending.m_Prefab, pending.m_fLength)", finished)
+        spawn = method(SOURCE, "void SpawnAtPile(", "protected void")
+        self.assertIn("GetGame().SpawnEntityPrefab(resource, GetGame().GetWorld(), params)", spawn)
+        self.assertIn("params.Transform[3] = position", spawn)
+        self.assertIn("inventoryItem.PlaceOnGround()", spawn)
         capture = method(SOURCE, "void Capture(", "void Question(")
         self.assertLess(capture.index("m_bCaptured = true"), capture.index("DropCarriedWeapons()"))
         self.assertLess(capture.index("DropCarriedWeapons()"), capture.index("ApplyRestraints()"))
