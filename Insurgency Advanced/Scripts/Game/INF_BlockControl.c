@@ -297,7 +297,7 @@ class INF_ActivationPolicy
 	{
 		int limit = pressure.m_Limit;
 		float elapsed = now - pressure.m_ObservedAt - PRESSURE_HOLD_MS;
-		while (elapsed >= PRESSURE_STEP_MS limit > 3)
+		while (elapsed >= PRESSURE_STEP_MS && limit > 3)
 		{
 			limit = LowerTier(limit);
 			elapsed -= PRESSURE_STEP_MS;
