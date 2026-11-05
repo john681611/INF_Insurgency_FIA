@@ -77,7 +77,7 @@ class ReviewRegressions(unittest.TestCase):
                       method_body(AI, "protected bool INF_IsConcealedSpawn("))
         attack = method_body(AI, "protected bool INF_GridAttackPositionSafe(")
         self.assertIn("pos[1] <= 0.5 || INF_BuildingGrid.IsSpawnBlocked(pos)", attack)
-        self.assertIn("vector.DistanceSqXZ(pos, player) < 250000", attack)
+        self.assertIn("vector.DistanceSqXZ(pos, player) < 90000", attack)
         self.assertIn("INF_BlockRules.IsConcealed(pos, players, 1.5)", attack)
         self.assertIn("INF_BlockRules.IsConcealed(pos, players, 3)",
                       method_body(VEHICLES, "protected bool INF_ZoneHidden("))

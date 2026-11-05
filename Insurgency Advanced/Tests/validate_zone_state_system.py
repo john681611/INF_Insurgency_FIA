@@ -175,7 +175,7 @@ class ZoneArchitecture(unittest.TestCase):
         self.assertIn("empty + tangent * lateralOffset", attack)
         self.assertIn("CallLater(INF_SpawnAttackSquad", attack)
         self.assertLess(attack.index("m_INFLaunchGate.Reserve()"), attack.index(".AttackStarted("))
-        self.assertIn("activeAttacks < Math.Min(m_iMaxConcurrentCounterAttacks, 2)", attack)
+        self.assertIn("activeAttacks >= Math.Min(m_iMaxConcurrentCounterAttacks, 2)", attack)
 
     def test_registered_zone_markers_match_objective_registry(self):
         markers = (SCRIPTS / "INF_GarrisonMapAreas.c").read_text()

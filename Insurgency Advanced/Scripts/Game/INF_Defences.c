@@ -57,6 +57,8 @@ class INF_Defences
 	static const float DEFEND_RADIUS = 25;
 	static const int FLAT_MIN_GUARDS = 2;
 	static const int FLAT_MAX_GUARDS = 4;
+	// Roaming AI a zone keeps before its guards stop being drawn from it.
+	static const int MIN_ROAMING = 6;
 	// Minimum distance between small flat defences, so they don't cluster.
 	static const float FLAT_SPACING = 100;
 	// Small flat slots hold the sandbag, nest and bunker defences (the larger flat slots hold base content such as helipads).

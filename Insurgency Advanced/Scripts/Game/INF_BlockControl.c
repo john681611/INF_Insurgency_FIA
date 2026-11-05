@@ -288,14 +288,16 @@ class INF_ActivationPolicy
 			return 10;
 		if (limit > 6)
 			return 6;
-		return 4;
+		if (limit > 4)
+			return 4;
+		return 3;
 	}
 
 	static int RetainedLimit(INF_ActivationPressure pressure, float now)
 	{
 		int limit = pressure.m_Limit;
 		float elapsed = now - pressure.m_ObservedAt - PRESSURE_HOLD_MS;
-		while (elapsed >= PRESSURE_STEP_MS && limit > 4)
+		while (elapsed >= PRESSURE_STEP_MS limit > 3)
 		{
 			limit = LowerTier(limit);
 			elapsed -= PRESSURE_STEP_MS;
@@ -386,14 +388,16 @@ class INF_ActivationPolicy
 	static int ZoneLimit(int players)
 	{
 		if (players <= 1)
-			return 4;
+			return 3;
 		if (players == 2)
+			return 4;
+		if (players == 3)
 			return 6;
-		if (players <= 4)
+		if (players == 4)
 			return 10;
 		if (players <= 8)
 			return 18;
-		return 32;
+		return INF_BlockRules.MAX_BLOCKS;
 	}
 
 	void Collect(IEntity owner, INF_BlockPresence presence = null)
@@ -518,7 +522,7 @@ class INF_ActivationPolicy
 
 class INF_BlockRules
 {
-	static const int MAX_BLOCKS = 32;
+	static const int MAX_BLOCKS = 20;
 	static const float EVICTION_PROTECTION_RADIUS = 200;
 	static const float MIN_GRID_SPAWN_DISTANCE = 200;
 	static const int DENSE_GRID_BUILDINGS = 4;

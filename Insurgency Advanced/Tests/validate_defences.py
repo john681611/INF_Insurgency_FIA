@@ -282,14 +282,27 @@ class DefencePersistence(unittest.TestCase):
 class DefenceGuards(unittest.TestCase):
     def test_guards_join_the_plan_so_budget_and_reservation_include_them(self):
         body = grid("override protected void ActivateZone(")
-        plan = body.index("INF_BuildingGrid.Plan(limitAI")
         append = body.index("INF_Defences.AppendGuards(")
+        plan = body.index("INF_BuildingGrid.Plan(limitAI - fromZone")
         group_count = body.index("state.m_iGroupCount = state.m_aINFPlan.Count()")
         planned = body.index("state.m_iINFPlannedAI += planned")
         make_room = body.index("INF_MakeRoom(state)")
         consume = body.index("INF_Defences.ConsumeMemory(state)")
-        self.assertTrue(plan < append < group_count < planned < make_room < consume)
+        self.assertTrue(append < plan < group_count < planned < make_room < consume)
         self.assertIn("m_iINFDefenceGuards", body)
+
+    def test_guards_are_drawn_from_the_zone_only_above_the_roaming_minimum(self):
+        body = grid("override protected void ActivateZone(")
+        self.assertIn("Math.Min(Math.Max(limitAI - INF_Defences.MIN_ROAMING, 0), guardAI)", body)
+        self.assertIn("static const int MIN_ROAMING = 6;", DEFENCES)
+
+        def split(zone, guards):
+            taken = min(max(zone - 6, 0), guards)
+            return zone - taken, guards - taken
+
+        self.assertEqual(split(8, 4), (6, 2))
+        self.assertEqual(split(2, 4), (2, 4))
+        self.assertEqual(split(16, 4), (12, 0))
 
     def test_guards_spawn_at_the_defence_and_saved_positions_only_index_ordinary_groups(self):
         body = grid("override protected void ActivateZone(")

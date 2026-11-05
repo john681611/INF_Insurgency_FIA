@@ -327,7 +327,7 @@ cannot activate zones themselves. Fast-only travel still overrides this retained
 allowance with the two-zone forward corridor. The global budget stays unchanged.
 Nearby active building/camp blocks consume these local slots.
 There is no independent garrison source. The shared 128 grid-AI ceiling and
-32 active-grid-block ceiling remain unchanged. Counterattacks retain their own
+20 active-grid-block ceiling remain unchanged. Counterattacks retain their own
 concurrency limits and shared AI reservations; they do not consume a zone slot.
 Grid counterattack targets also require current engagement relevance, preventing
 high flyovers and fast-only drive-throughs from triggering attacks behind them.
@@ -369,9 +369,9 @@ Legacy mode without the building grid, existing field-threat patrols, ambient
 vehicle routes and civilians retain their separate activation/budget rules.
 
 Activation priority and capture
-Building-grid mode allows up to 32 active building blocks, with 128 intended AI
+Building-grid mode allows up to 20 active building blocks, with 128 intended AI
 shared with counterattacks. Every block reserves at least four AI, so the
-128-AI budget is reached at or before the block cap (32 four-person blocks).
+block cap (20) is reached before the 128-AI budget unless blocks average over 6 AI.
 Larger allocations and counterattacks reduce the number of blocks that fit.
 Candidates are processed nearest
 first, measuring distance to the nearest living controlled player. When a
@@ -611,9 +611,9 @@ Acceptance checks in the intended mission/server
     Former garrison buildings follow ordinary capture and one-shot counterattack
     rules, with no suppression from legacy garrison-cleared saves.
 22. Test nearby groups of 1, 2, 3, 4, 5, 8 and 9 living players: local zone
-    limits must be 4, 6, 10, 10, 18, 18 and 32, sharing building/camp slots.
+    limits must be 3, 4, 6, 10, 18, 18 and 20, sharing building/camp slots.
     Split into groups more than 200m apart and confirm independent coverage
-    under the unchanged 128 grid-AI and 32-grid-block caps. Keep combatants near
+    under the unchanged 128 grid-AI and 20-grid-block caps. Keep combatants near
     players while splitting: protected troops must remain, even above a local cap.
 23. Drive at least 50km/h for 20 continuous seconds: only then should the
     fast-only group use the two-zone forward corridor. Short bursts must not

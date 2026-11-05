@@ -1199,9 +1199,19 @@ modded class INS_AmbientPatrolManager
 				}
 				limitAI = Math.Min(fullAI, state.m_iINFRememberedAI);
 			}
-			INF_BuildingGrid.Plan(limitAI,
-				INF_BuildingGrid.Buckets(m_aGroupPrefabs, m_aINFGroupBuckets), state.m_aINFPlan);
+			// Guards come out of the zone's own AI while at least MIN_ROAMING stay free; the rest are additional.
+			state.m_aINFPlan.Clear();
 			INF_Defences.AppendGuards(state, m_iINFDefenceGuards, activationTime);
+			array<int> guardPlan = {};
+			guardPlan.Copy(state.m_aINFPlan);
+			int guardAI = 0;
+			foreach (int guardSize : guardPlan)
+				guardAI += guardSize;
+			int fromZone = Math.Min(Math.Max(limitAI - INF_Defences.MIN_ROAMING, 0), guardAI);
+			INF_BuildingGrid.Plan(limitAI - fromZone,
+				INF_BuildingGrid.Buckets(m_aGroupPrefabs, m_aINFGroupBuckets), state.m_aINFPlan);
+			foreach (int guard : guardPlan)
+				state.m_aINFPlan.Insert(guard);
 			state.m_iGroupCount = state.m_aINFPlan.Count();
 			state.m_iINFPlannedAI = 0;
 			foreach (int planned : state.m_aINFPlan)
@@ -2110,14 +2120,13 @@ modded class INS_CounterAttackManager
 				continue;
 			INS_CounterAttackZone zone = INF_GetGridTarget(cell);
 			bool nearby = INF_BlockRules.Nearest(zone.m_vCenter, players) <= 300;
-			if (cell.m_iINFAttackAttempts >= 3)
+			if (cell.m_iINFAttackAttempts >= INF_ATTACK_MAX_ATTEMPTS)
 			{
 				patrols.INF_GetZoneStates().ResolvePendingAttack(cell, nearby);
 				if (!nearby)
 					patrols.INF_ResetAbandonedZone(cell);
 				continue;
 			}
-			cell.m_iINFAttackAttempts++;
 			cell.m_fINFAttackRetryAt = now + 5000;
 			bool contested = zone.m_fINFNextAttackAt > now;
 			foreach (INS_CounterAttackSquad active : m_aActiveSquads)
@@ -2125,13 +2134,16 @@ modded class INS_CounterAttackManager
 				if (active.m_bActive && vector.DistanceSqXZ(active.m_Zone.m_vCenter, zone.m_vCenter) <= 90000)
 					contested = true;
 			}
-			if (m_bEnabled && nearby && !contested && activeAttacks < Math.Min(m_iMaxConcurrentCounterAttacks, 2)
-				&& INF_TrySpawnAttack(zone, patrols, players, now))
+			// Waiting behind another attack must not use up attempts, or the zone is secured while hostiles are still nearby.
+			if (m_bEnabled && nearby && (contested || activeAttacks >= Math.Min(m_iMaxConcurrentCounterAttacks, 2)))
+				continue;
+			cell.m_iINFAttackAttempts++;
+			if (m_bEnabled && nearby && INF_TrySpawnAttack(zone, patrols, players, now))
 			{
 				activeAttacks++;
 				continue;
 			}
-			if (cell.m_iINFAttackAttempts >= 3)
+			if (cell.m_iINFAttackAttempts >= INF_ATTACK_MAX_ATTEMPTS)
 			{
 				patrols.INF_GetZoneStates().ResolvePendingAttack(cell, nearby);
 				if (!nearby)
@@ -2140,6 +2152,7 @@ modded class INS_CounterAttackManager
 		}
 	}
 
+	protected static const int INF_ATTACK_MAX_ATTEMPTS = 12;
 	protected ref array<INS_CounterAttackSquad> m_aINFDespawning = {};
 	protected INF_StaggerGate m_INFLaunchGate = INF_StaggerGate.Spawns();
 	protected INF_StaggerGate m_INFDespawnGate = INF_StaggerGate.Despawns();
@@ -2152,8 +2165,15 @@ modded class INS_CounterAttackManager
 		selected.m_iINFTotalAI = 0;
 		foreach (int planned : selected.m_aINFPlan)
 			selected.m_iINFTotalAI += planned;
-		vector spawn = FindSpawnPosition(selected.m_vCenter, m_fSpawnDistance);
-		if (spawn == vector.Zero || !INF_GridAttackPositionSafe(spawn, players))
+		vector spawn;
+		for (int tries = 0; tries < 4; tries++)
+		{
+			spawn = FindSpawnPosition(selected.m_vCenter, m_fSpawnDistance);
+			if (spawn != vector.Zero && INF_GridAttackPositionSafe(spawn, players))
+				break;
+			spawn = vector.Zero;
+		}
+		if (spawn == vector.Zero)
 			return false;
 		vector empty;
 		if (!SCR_WorldTools.FindEmptyTerrainPosition(empty, spawn, 10, 2, 2)
@@ -2222,7 +2242,7 @@ modded class INS_CounterAttackManager
 			return false;
 		foreach (vector player : players)
 		{
-			if (vector.DistanceSqXZ(pos, player) < 250000)
+			if (vector.DistanceSqXZ(pos, player) < 90000)
 				return false;
 		}
 		return INF_BlockRules.IsConcealed(pos, players, 1.5);

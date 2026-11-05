@@ -34,7 +34,7 @@ class Capture:
         if distance <= 300 and spawn_ok:
             self.pending = False
             self.active = True
-        elif self.attempts >= 3:
+        elif self.attempts >= 12:
             self.pending = False
             self.permanent = self.cleared = distance <= 300
 
@@ -47,7 +47,7 @@ class CounterattackCaptureFlow(unittest.TestCase):
                 zone = Capture()
                 zone.capture(roll, chance)
                 outcomes.append(zone.pending)
-                for now in (5000, 10000, 15000, 20000):
+                for now in range(5000, 65000, 5000):
                     zone.tick(now, 300)
                 self.assertEqual(zone.rolls, 1)
                 self.assertTrue(zone.permanent)
@@ -67,23 +67,24 @@ class CounterattackCaptureFlow(unittest.TestCase):
             zone.tick(now, 300)
             self.assertEqual(zone.attempts, attempts)
             self.assertTrue(zone.pending)
-        zone.tick(15000, 300)
-        self.assertEqual(zone.attempts, 3)
+        for now in range(15000, 65000, 5000):
+            zone.tick(now, 300)
+        self.assertEqual(zone.attempts, 12)
         self.assertTrue(zone.permanent)
         self.assertFalse(zone.pending)
         self.assertIn("cell.m_fINFAttackRetryAt = now + 5000", GRID)
-        self.assertIn("cell.m_iINFAttackAttempts >= 3", GRID)
+        self.assertIn("cell.m_iINFAttackAttempts >= INF_ATTACK_MAX_ATTEMPTS", GRID)
         self.assertIn("m_fINFNextAttackStepAt = now + 5000", GRID)
 
     def test_presence_boundary_and_absence_count(self):
         for distance, secure in ((0, True), (300, True), (300.01, False), (1000, False)):
             zone = Capture()
             zone.capture(0)
-            for now in (5000, 10000, 15000):
+            for now in range(5000, 65000, 5000):
                 zone.tick(now, distance)
             self.assertEqual(zone.permanent, secure)
             self.assertEqual(zone.cleared, secure)
-            self.assertEqual(zone.attempts, 3)
+            self.assertEqual(zone.attempts, 12)
         self.assertIn("INF_BlockRules.Nearest(zone.m_vCenter, players) <= 300", GRID)
         self.assertIn("INF_ResetAbandonedZone(cell)", GRID)
         reset = GRID.split("void INF_ResetAbandonedZone(", 1)[1].split("bool INF_MakeRoomForBudget", 1)[0]
@@ -92,7 +93,7 @@ class CounterattackCaptureFlow(unittest.TestCase):
         self.assertIn("state.m_bReadyToRespawn = true", reset)
 
     def test_successful_spawn_stays_orange_without_timeout_security(self):
-        for attempt in (1, 2, 3):
+        for attempt in (1, 2, 12):
             zone = Capture()
             zone.capture(0)
             for number in range(1, attempt + 1):
