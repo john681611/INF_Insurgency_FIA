@@ -671,7 +671,7 @@ class INF_PrisonerComponent : ScriptComponent
 		m_fNextLoiterAttempt = now + 5000;
 		SCR_LoiterCustomAnimData data = SCR_LoiterCustomAnimData.Default;
 		if (m_PrisonerLoiter == ELoiteringType.SMOKING)
-			data = SCR_LoiterCustomAnimData.CreateInstance(itemPreset: SCR_ELoiterItemID.CIGAR);
+			data = SCR_LoiterCustomAnimData.CreateInstance(itemPreset: SCR_EAnimationItemID.CIGAR);
 		vector transform[4];
 		GetOwner().GetWorldTransform(transform);
 		character.StartLoitering(null, m_PrisonerLoiter, false, false, false, transform, true, data);
