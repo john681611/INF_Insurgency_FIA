@@ -54,6 +54,12 @@ class INF_Defences
 	static const int MAX_SPAWN_FAILURES = 3;
 	static const float MIN_FROM_STATIC_SITE = 250;
 	static const float GUARD_RADIUS = 15;
+	static const float GUARD_MIN_PLAYER_DISTANCE = 60;
+	// A guard group spawned farther than this from its defence runs to it.
+	static const float GUARD_RUN_DISTANCE = 40;
+	// Run-ins may spawn in uncaptured neighbouring cells within this distance of their zone, trying this many cells.
+	static const float RUN_IN_CELL_RADIUS = 600;
+	static const int RUN_IN_CELL_TRIES = 6;
 	static const float DEFEND_RADIUS = 25;
 	static const int FLAT_MIN_GUARDS = 2;
 	static const int FLAT_MAX_GUARDS = 4;

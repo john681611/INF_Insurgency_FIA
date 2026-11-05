@@ -280,6 +280,14 @@ class DefencePersistence(unittest.TestCase):
 
 
 class DefenceGuards(unittest.TestCase):
+    def test_wiped_out_zones_do_not_hold_activation_slots(self):
+        helper = grid("bool INF_CountsTowardLimit(")
+        self.assertIn("state.m_iINFPendingGroups > 0 || !state.m_bEverHadLiving || INF_BlockRules.HasMembers(", helper)
+        self.assertIn("INF_CountsTowardLimit(state, presence)", grid("void INF_CountActivationZones("))
+        room = grid("bool INF_MakeRoomForBudget(")
+        self.assertIn("if (INF_CountsTowardLimit(state, presence))\n\t\t\t\tactive++;", room)
+        self.assertIn("INF_CountsTowardLimit(existing, presence)", room)
+
     def test_guards_join_the_plan_so_budget_and_reservation_include_them(self):
         body = grid("override protected void ActivateZone(")
         append = body.index("INF_Defences.AppendGuards(")
@@ -335,7 +343,32 @@ class DefenceGuards(unittest.TestCase):
     def test_guard_spawn_does_not_force_the_cell_containment_rule(self):
         body = grid("protected vector INF_FindDefenceGuardPosition(")
         self.assertNotIn("INF_BuildingGrid.Contains", body)
-        self.assertIn("INF_BlockRules.MIN_GRID_SPAWN_DISTANCE", body)
+        self.assertIn("INF_Defences.GUARD_MIN_PLAYER_DISTANCE", body)
+        self.assertNotIn("INF_IsConcealedSpawn", body)
+        self.assertIn("static const float GUARD_MIN_PLAYER_DISTANCE = 60;", DEFENCES)
+
+    def test_run_ins_prefer_neighbouring_uncaptured_cells_then_the_ring(self):
+        body = grid("override protected vector FindSafeSpawnPosition(")
+        self.assertLess(body.index("INF_FindNeighbourCellPosition(state, players)"),
+                        body.index("INF_FindReinforcementPosition(state.m_vCenter"))
+        self.assertIn("if (neighbour != vector.Zero)", body)
+        donor = grid("protected vector INF_FindNeighbourCellPosition(")
+        self.assertIn("!cell.m_bINFMarkedCleared && !cell.m_bINFPermanent", donor)
+        self.assertNotIn("m_bActive", donor)
+        self.assertIn("RUN_IN_CELL_RADIUS + INF_BuildingGrid.SIZE - vector.DistanceXZ(option.m_vCenter, state.m_vCenter)", donor)
+        self.assertIn("static const float RUN_IN_CELL_RADIUS = 600;", DEFENCES)
+
+    def test_guards_without_a_close_spot_spawn_out_and_walk_to_their_defence(self):
+        body = grid("override protected void SpawnGroupAt(")
+        self.assertIn("agent.m_bINFInbound = vector.DistanceSqXZ(pos, guardedDefence.m_vPosition) >", body)
+        self.assertNotIn("m_bINFRunToPost", GRID)
+        self.assertIn("static const float GUARD_RUN_DISTANCE = 40;", DEFENCES)
+        body = grid("override protected void SpawnGroupAt(")
+        self.assertIn("if (!guardedDefence || pos == vector.Zero)", body)
+        self.assertLess(body.index("INF_FindDefenceGuardPosition(guardedDefence)"),
+                        body.index("FindSafeSpawnPosition(queuedPos, state)"))
+        self.assertIn("agent.m_INFDefence = guardedDefence;", body)
+        self.assertIn("INF_DefendPosition, 1500", body)
 
     def test_spawn_queue_maps_the_plan_index_to_its_defence(self):
         body = grid("protected void INF_SpawnQueued(")

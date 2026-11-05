@@ -95,7 +95,9 @@ class InitialDefenderRecovery(unittest.TestCase):
             self.assertEqual(within, expected_protection)
         self.assertIn("INF_BuildingGrid.Contains(state.m_vCenter, attacker)",
                       method_body(STATE, "void CheckRetake("))
-        self.assertIn("INF_BuildingGrid.Contains(state.m_vCenter, empty)",
+        self.assertIn("INF_BuildingGrid.Contains(cellCenter, empty)",
+                      method_body(GRID, "protected bool INF_CellSpawnValid("))
+        self.assertIn("INF_CellSpawnValid(empty, state.m_vCenter",
                       method_body(GRID, "override protected vector FindSafeSpawnPosition("))
 
     def test_player_capture_is_circular_100m_with_unchanged_fifteen_second_hold(self):
@@ -308,7 +310,9 @@ class InitialDefenderRecovery(unittest.TestCase):
         settled = method_body(STATE, "bool ReinforcementsSettled(")
         self.assertIn("agent.m_fINFInboundDeadline = now + 120000", settled)
         self.assertIn("now >= agent.m_fINFInboundDeadline", settled)
-        self.assertIn("vector.DistanceSqXZ(soldier, state.m_vCenter) <= 40000", settled)
+        self.assertIn("float arrivalSq = 40000;", settled)
+        self.assertIn("destination = agent.m_INFDefence.m_vPosition;", settled)
+        self.assertIn("vector.DistanceSqXZ(soldier, destination) <= arrivalSq", settled)
         self.assertIn("state.m_bINFInboundWaiting = waiting", settled)
         self.assertIn("NotifyChanged(state)", settled)
         self.assertNotIn("Delete", settled)

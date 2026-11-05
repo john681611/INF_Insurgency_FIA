@@ -39,7 +39,7 @@ class SingleDefenderSystem(unittest.TestCase):
         self.assertNotIn("INS_GarrisonManager", INTEL)
         self.assertNotIn("INS_GarrisonManager", PRESENCE)
         self.assertNotIn("modded class INS_ZoneState", PRESENCE)
-        self.assertIn("patrols.INF_CountActivationZones(this)", PRESENCE)
+        self.assertIn("patrols.INF_CountActivationZones(this, presence)", PRESENCE)
         self.assertIn("patrols.INF_CollectCaptureObjectives(zones, camps)", INTEL)
         self.assertNotIn("addingGarrison", GRID)
 

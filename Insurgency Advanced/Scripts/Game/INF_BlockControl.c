@@ -487,7 +487,7 @@ class INF_ActivationPolicy
 			m_Groups.Insert(group);
 		}
 		if (patrols)
-			patrols.INF_CountActivationZones(this);
+			patrols.INF_CountActivationZones(this, presence);
 	}
 
 	int GetGroup(vector center, float radius)

@@ -312,9 +312,17 @@ class INF_ZoneStateSystem
 				agent.m_fINFInboundDeadline = now + 120000;
 			bool arrived = living.IsEmpty() && (agent.m_fINFInboundDeadline >= 0
 				|| now >= state.m_fINFSpawnReadyAt + 30000);
+			// Inbound groups have arrived once near their destination: the zone for roamers, the defence for guards.
+			vector destination = state.m_vCenter;
+			float arrivalSq = 40000;
+			if (agent.m_INFDefence)
+			{
+				destination = agent.m_INFDefence.m_vPosition;
+				arrivalSq = INF_Defences.GUARD_RUN_DISTANCE * INF_Defences.GUARD_RUN_DISTANCE;
+			}
 			foreach (vector soldier : living)
 			{
-				if (vector.DistanceSqXZ(soldier, state.m_vCenter) <= 40000)
+				if (vector.DistanceSqXZ(soldier, destination) <= arrivalSq)
 					arrived = true;
 			}
 			if (arrived || (agent.m_fINFInboundDeadline >= 0 && now >= agent.m_fINFInboundDeadline))

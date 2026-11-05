@@ -156,7 +156,7 @@ class RuntimeEfficiency(unittest.TestCase):
         self.assertLess(scan, budget.index("SoldiersDistant("))
         self.assertLess(scan, budget.index("GetPresence(false, true)"))
         self.assertIn("INF_ReservedGridAI()", budget[:fast])
-        self.assertIn("INF_CountActivationZones(policy)", budget[:fast])
+        self.assertIn("INF_CountActivationZones(policy, presence)", budget[:fast])
         self.assertIn("SortZonesByDistance(possible, presence.m_Players, true)", budget)
 
     def test_preliminary_checks_share_groups_but_destruction_checks_are_direct(self):

@@ -1272,13 +1272,82 @@ modded class INS_AmbientPatrolManager
 		return false;
 	}
 
+	// The normal in-cell rules, shared by a zone's own spawn and by neighbouring cells used for run-ins.
+	protected bool INF_CellSpawnValid(vector empty, vector cellCenter, array<vector> players, float minDistance)
+	{
+		float playerDistance = INF_BlockRules.Nearest(empty, players);
+		if (!INF_BuildingGrid.Contains(cellCenter, empty) || empty[1] <= 0.5
+			|| INF_SpawnProtection.Contains(empty) || playerDistance < minDistance)
+			return false;
+		return playerDistance >= m_fMinSpawnDistFromPlayer || INF_IsConcealedSpawn(empty, players);
+	}
+
+	protected float INF_GridMinSpawnDistance(INS_AmbientPatrolZoneState state)
+	{
+		if (state.m_iINFBuildings >= INF_BlockRules.DENSE_GRID_BUILDINGS)
+			return INF_BlockRules.MIN_DENSE_GRID_SPAWN_DISTANCE;
+		return INF_BlockRules.MIN_GRID_SPAWN_DISTANCE;
+	}
+
+	// Run-ins prefer a spot that a neighbouring uncaptured cell could use for a normal spawn, whether or not it is active.
+	protected vector INF_FindNeighbourCellPosition(INS_AmbientPatrolZoneState state, array<vector> players)
+	{
+		array<INS_AmbientPatrolZoneState> neighbours = {};
+		int reach = Math.Ceil(INF_Defences.RUN_IN_CELL_RADIUS / INF_BuildingGrid.SIZE);
+		for (int dx = -reach; dx <= reach; dx++)
+		{
+			for (int dz = -reach; dz <= reach; dz++)
+			{
+				if (dx == 0 && dz == 0)
+					continue;
+				vector probe = state.m_vCenter + Vector(dx * INF_BuildingGrid.SIZE, 0, dz * INF_BuildingGrid.SIZE);
+				INS_AmbientPatrolZoneState cell = m_INFZoneStates.GetCell(probe);
+				if (cell && !cell.m_bINFMarkedCleared && !cell.m_bINFPermanent
+					&& vector.DistanceSqXZ(cell.m_vCenter, state.m_vCenter) <= INF_Defences.RUN_IN_CELL_RADIUS * INF_Defences.RUN_IN_CELL_RADIUS)
+					neighbours.Insert(cell);
+			}
+		}
+		for (int tried = 0; tried < INF_Defences.RUN_IN_CELL_TRIES && !neighbours.IsEmpty(); tried++)
+		{
+			// Weighted random: nearer cells are likelier, so the run in is shorter without always using the same cell.
+			array<float> weights = {};
+			float total = 0;
+			foreach (INS_AmbientPatrolZoneState option : neighbours)
+			{
+				float weight = INF_Defences.RUN_IN_CELL_RADIUS + INF_BuildingGrid.SIZE - vector.DistanceXZ(option.m_vCenter, state.m_vCenter);
+				weights.Insert(weight);
+				total += weight;
+			}
+			float roll = Math.RandomFloat(0, total);
+			int pick = neighbours.Count() - 1;
+			foreach (int index, float candidateWeight : weights)
+			{
+				roll -= candidateWeight;
+				if (roll <= 0)
+				{
+					pick = index;
+					break;
+				}
+			}
+			INS_AmbientPatrolZoneState donor = neighbours[pick];
+			neighbours.Remove(pick);
+			float minDistance = INF_GridMinSpawnDistance(donor);
+			for (int i = 0; i < 6; i++)
+			{
+				vector attempt = donor.m_vCenter + Vector(Math.RandomFloat(-49, 49), 0, Math.RandomFloat(-49, 49));
+				vector empty;
+				if (SCR_WorldTools.FindEmptyTerrainPosition(empty, attempt, 5, 2, 2) && INF_CellSpawnValid(empty, donor.m_vCenter, players, minDistance))
+					return empty;
+			}
+		}
+		return vector.Zero;
+	}
+
 	override protected vector FindSafeSpawnPosition(vector candidate, INS_AmbientPatrolZoneState state)
 	{
 		if (!state.m_bINFBuildingCell)
 			return super.FindSafeSpawnPosition(candidate, state);
-		float minDistance = INF_BlockRules.MIN_GRID_SPAWN_DISTANCE;
-		if (state.m_iINFBuildings >= INF_BlockRules.DENSE_GRID_BUILDINGS)
-			minDistance = INF_BlockRules.MIN_DENSE_GRID_SPAWN_DISTANCE;
+		float minDistance = INF_GridMinSpawnDistance(state);
 		array<vector> players = m_INFZoneStates.GetPresence(false, true).m_AllPlayers;
 		for (int i = 0; i < 24; i++)
 		{
@@ -1286,16 +1355,12 @@ modded class INS_AmbientPatrolManager
 			if (i > 0)
 				attempt = state.m_vCenter + Vector(Math.RandomFloat(-49, 49), 0, Math.RandomFloat(-49, 49));
 			vector empty;
-			if (!SCR_WorldTools.FindEmptyTerrainPosition(empty, attempt, 5, 2, 2))
-				continue;
-			float playerDistance = INF_BlockRules.Nearest(empty, players);
-			if (!INF_BuildingGrid.Contains(state.m_vCenter, empty) || empty[1] <= 0.5
-				|| INF_SpawnProtection.Contains(empty) || playerDistance < minDistance)
-				continue;
-			if (playerDistance < m_fMinSpawnDistFromPlayer && !INF_IsConcealedSpawn(empty, players))
-				continue;
-			return empty;
+			if (SCR_WorldTools.FindEmptyTerrainPosition(empty, attempt, 5, 2, 2) && INF_CellSpawnValid(empty, state.m_vCenter, players, minDistance))
+				return empty;
 		}
+		vector neighbour = INF_FindNeighbourCellPosition(state, players);
+		if (neighbour != vector.Zero)
+			return neighbour;
 		return INF_FindReinforcementPosition(state.m_vCenter, players, minDistance);
 	}
 
@@ -1328,7 +1393,8 @@ modded class INS_AmbientPatrolManager
 	// Defence guards stand at their defence, which may be outside the zone cell; the cell-containment rule does not apply.
 	protected vector INF_FindDefenceGuardPosition(INF_Defence defence)
 	{
-		float minDistance = INF_BlockRules.MIN_GRID_SPAWN_DISTANCE;
+		// Guards appear on their defence and man it at once, so they may spawn far closer to players than roaming groups.
+		float minDistance = INF_Defences.GUARD_MIN_PLAYER_DISTANCE;
 		array<vector> players = m_INFZoneStates.GetPresence(false, true).m_AllPlayers;
 		for (int attempt = 0; attempt < 16; attempt++)
 		{
@@ -1336,10 +1402,7 @@ modded class INS_AmbientPatrolManager
 			vector empty;
 			if (!SCR_WorldTools.FindEmptyTerrainPosition(empty, candidate, 5, 2, 2) || empty[1] <= 0.5 || INF_SpawnProtection.Contains(empty))
 				continue;
-			float playerDistance = INF_BlockRules.Nearest(empty, players);
-			if (playerDistance < minDistance)
-				continue;
-			if (playerDistance < m_fMinSpawnDistFromPlayer && !INF_IsConcealedSpawn(empty, players))
+			if (INF_BlockRules.Nearest(empty, players) < minDistance)
 				continue;
 			return empty;
 		}
@@ -1357,10 +1420,12 @@ modded class INS_AmbientPatrolManager
 			return;
 		INF_Defence guardedDefence = state.m_INFSpawnDefence;
 		state.m_INFSpawnDefence = null;
+		vector queuedPos = pos;
 		if (guardedDefence)
 			pos = INF_FindDefenceGuardPosition(guardedDefence);
-		else
-			pos = FindSafeSpawnPosition(pos, state);
+		// No spot near the defence: spawn out like a roaming group; the defend order walks the guards in.
+		if (!guardedDefence || pos == vector.Zero)
+			pos = FindSafeSpawnPosition(queuedPos, state);
 		IEntity entity;
 		int members = state.m_iINFSpawnSize;
 		if (pos != vector.Zero && members > 0)
@@ -1375,6 +1440,7 @@ modded class INS_AmbientPatrolManager
 		{
 			agent = new INS_PatrolAgent(entity, guardedDefence.m_vPosition, INF_Defences.GUARD_RADIUS);
 			agent.m_INFDefence = guardedDefence;
+			agent.m_bINFInbound = vector.DistanceSqXZ(pos, guardedDefence.m_vPosition) > INF_Defences.GUARD_RUN_DISTANCE * INF_Defences.GUARD_RUN_DISTANCE;
 		}
 		else
 		{
@@ -1447,7 +1513,15 @@ modded class INS_AmbientPatrolManager
 		return m_INFMortars && m_INFMortars.BindPrisonerCleanup(group, prisoner);
 	}
 
-	void INF_CountActivationZones(INF_ActivationPolicy policy)
+	// A zone whose defenders have all died stays active for capture but no longer holds an activation slot.
+	bool INF_CountsTowardLimit(INS_AmbientPatrolZoneState state, INF_BlockPresence presence = null)
+	{
+		if (!state.m_bActive)
+			return false;
+		return state.m_iINFPendingGroups > 0 || !state.m_bEverHadLiving || INF_BlockRules.HasMembers(state.m_aAgents, presence);
+	}
+
+	void INF_CountActivationZones(INF_ActivationPolicy policy, INF_BlockPresence presence = null)
 	{
 		foreach (INF_ActivationGroup group : policy.m_Groups)
 			group.m_Active = 0;
@@ -1455,7 +1529,7 @@ modded class INS_AmbientPatrolManager
 			return;
 		foreach (INS_AmbientPatrolZoneState state : m_INFZoneStates.GetActiveZones())
 		{
-			if (state.m_bActive)
+			if (INF_CountsTowardLimit(state, presence))
 				policy.Count(state.m_vCenter, m_fActivationRadius);
 		}
 	}
@@ -1469,7 +1543,7 @@ modded class INS_AmbientPatrolManager
 			if (stateGroup < 0 || (policy.m_Groups[stateGroup].m_Active <= policy.m_Groups[stateGroup].m_Limit
 				&& policy.m_Groups[stateGroup].Allows(state.m_vCenter, m_fActivationRadius)))
 				continue;
-			if (state.m_bActive && !presence.Occupied(state.m_vCenter)
+			if (INF_CountsTowardLimit(state, presence) && !presence.Occupied(state.m_vCenter)
 				&& (state.m_bINFMarkedCleared || !state.INF_IsCapturing())
 				&& INF_BlockRules.SoldiersDistant(state.m_aAgents, presence.m_Players, INF_BlockRules.EVICTION_PROTECTION_RADIUS, presence))
 				possible.Insert(state);
@@ -1554,7 +1628,7 @@ modded class INS_AmbientPatrolManager
 				state.m_fINFDistantSince = -1;
 		}
 		INF_ActivationPolicy policy = presence.ActivationPolicy(GetOwner());
-		INF_CountActivationZones(policy);
+		INF_CountActivationZones(policy, presence);
 		if (!m_bJIPPause)
 			INF_TrimActivationZones(policy, presence);
 		if (m_bJIPPause || presence.m_Players.IsEmpty())
@@ -1643,7 +1717,7 @@ modded class INS_AmbientPatrolManager
 				policy = m_INFDecisionPolicy;
 			else
 				policy = presence.ActivationPolicy(GetOwner());
-			INF_CountActivationZones(policy);
+			INF_CountActivationZones(policy, presence);
 			targetGroup = policy.GetGroup(center, activationRadius);
 			if (targetGroup < 0 || !policy.m_Groups[targetGroup].Allows(center, activationRadius))
 				return false;
@@ -1657,7 +1731,7 @@ modded class INS_AmbientPatrolManager
 		int active = 0;
 		foreach (INS_AmbientPatrolZoneState state : m_INFZoneStates.GetActiveZones())
 		{
-			if (state.m_bActive)
+			if (INF_CountsTowardLimit(state, presence))
 				active++;
 		}
 		if (reserved + required <= INF_BuildingGrid.ACTIVE_BUDGET
@@ -1667,7 +1741,7 @@ modded class INS_AmbientPatrolManager
 		array<INS_AmbientPatrolZoneState> possible = {};
 		foreach (INS_AmbientPatrolZoneState existing : m_INFZoneStates.GetActiveZones())
 		{
-			if (existing.m_bActive && !presence.Occupied(existing.m_vCenter)
+			if (INF_CountsTowardLimit(existing, presence) && !presence.Occupied(existing.m_vCenter)
 				&& (existing.m_bINFMarkedCleared || !existing.INF_IsCapturing())
 				&& (INF_BlockRules.CapturerOccupied(center, presence) || INF_BlockRules.Nearest(existing.m_vCenter, presence.m_Players) > candidateDistance)
 				&& INF_BlockRules.SoldiersDistant(existing.m_aAgents, presence.m_Players, INF_BlockRules.EVICTION_PROTECTION_RADIUS, presence))

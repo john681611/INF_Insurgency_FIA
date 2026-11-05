@@ -77,7 +77,7 @@ class IntegratedSites(unittest.TestCase):
     def test_no_random_nav_probe_during_activation(self):
         spawn = GRID.split("override protected void SpawnGroupAt", 1)[1].split(
             "protected void INF_TrimActivationZones", 1)[0]
-        self.assertIn("pos = FindSafeSpawnPosition(pos, state)", spawn)
+        self.assertIn("pos = FindSafeSpawnPosition(queuedPos, state)", spawn)
         self.assertNotIn("InfantryPosition(state.m_INFCamp)", spawn)
         self.assertNotIn("ValidateNavigation", spawn)
         nav = CAMP.split("static int NavigationTilesReady", 1)[1].split("static int ValidateNavigation", 1)[0]
