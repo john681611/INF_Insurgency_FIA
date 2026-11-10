@@ -616,7 +616,7 @@ in the territory snapshot (format 3; formats 1 and 2 still load) with an "office
 assigned" flag, so a restart keeps the same officers and never re-rolls once they are all
 down; a persisted mission that predates officers gets them when it next starts. A clean
 mission end deletes the snapshot like all other territory.
-An officer zone has a gold map border, a squad of four that
+An officer zone has a gold, thicker map border, a squad of four that
 is additional to the zone's AI budget, and tripled mortar and vehicle chances (capped at
 100). The squad is an ordinary defence-guard group around an
 internal post (the camp, or the building nearest the zone centre), so it spawns, is

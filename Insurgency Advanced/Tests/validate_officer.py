@@ -64,7 +64,7 @@ class Officers(unittest.TestCase):
         self.assertIn("Math.Min(100, chance * CHANCE_MULTIPLIER)", OFFICERS)
         self.assertIn("Color.FromRGBA(255, 200, 40, 255)", MAP)
         self.assertIn("state.m_bINFOfficer);", MAP)
-        self.assertNotIn("m_fWidth = Math.Clamp(m_fActualRadius * 0.02", MAP)
+        self.assertIn("border.m_fWidth = Math.Clamp(m_fActualRadius * 0.02, 1.5, 5)", MAP)
 
     def test_intel_odds_and_captured_or_dead_officer_is_gone(self):
         self.assertIn("chance = INF_Officers.QUESTION_CHANCE", PRISONERS)

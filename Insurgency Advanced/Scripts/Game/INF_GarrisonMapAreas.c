@@ -87,9 +87,12 @@ modded class SCR_MapDotCircleHandler
 		LineDrawCommand border = new LineDrawCommand();
 		border.m_iColor = Color.FromRGBA(base.R() * 255 * 0.7, base.G() * 255 * 0.7, base.B() * 255 * 0.7, 255).PackToInt();
 		border.m_fWidth = Math.Clamp(m_fActualRadius * 0.01, 0.75, 3);
-		// Officer zones are outlined in gold whatever state the fill shows.
+		// Officer zones keep a thicker gold border whatever state the fill shows.
 		if (area.INF_IsOfficer())
+		{
 			border.m_iColor = Color.FromRGBA(255, 200, 40, 255).PackToInt();
+			border.m_fWidth = Math.Clamp(m_fActualRadius * 0.02, 1.5, 5);
+		}
 		border.m_Vertices = new array<float>();
 		border.m_Vertices.Copy(fill.m_Vertices);
 		border.m_Vertices.Insert(fill.m_Vertices[0]);
