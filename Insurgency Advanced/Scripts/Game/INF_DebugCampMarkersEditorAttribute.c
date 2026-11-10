@@ -10,7 +10,7 @@ class INF_DebugCampMarkersEditorAttribute : SCR_BaseEditorAttribute
 		SCR_EditorManagerEntity editor = manager.GetManager();
 		if (!editor || !editor.HasMode(EEditorMode.EDIT))
 			return null;
-		INS_IntelManager intel = INS_IntelManager.Cast(m_GameMode.FindComponent(INS_IntelManager));
+		INS_IntelManager intel = INF_ZoneEditorContext.Intel(m_GameMode);
 		if (!intel)
 			return null;
 		return SCR_BaseEditorAttributeVar.CreateBool(intel.INF_GetDebugMarkersForPlayer(editor.GetPlayerID(), true));
@@ -23,7 +23,7 @@ class INF_DebugCampMarkersEditorAttribute : SCR_BaseEditorAttribute
 			return;
 		if (!INF_ZoneEditorContext.Grid(m_GameMode))
 			return;
-		INS_IntelManager intel = INS_IntelManager.Cast(m_GameMode.FindComponent(INS_IntelManager));
+		INS_IntelManager intel = INF_ZoneEditorContext.Intel(m_GameMode);
 		if (intel)
 			intel.INF_SetDebugMarkersForPlayer(playerID, true, var.GetBool());
 	}
@@ -41,7 +41,7 @@ class INF_DebugCacheMarkersEditorAttribute : SCR_BaseEditorAttribute
 		SCR_EditorManagerEntity editor = manager.GetManager();
 		if (!editor || !editor.HasMode(EEditorMode.EDIT))
 			return null;
-		INS_IntelManager intel = INS_IntelManager.Cast(m_GameMode.FindComponent(INS_IntelManager));
+		INS_IntelManager intel = INF_ZoneEditorContext.Intel(m_GameMode);
 		if (!intel)
 			return null;
 		return SCR_BaseEditorAttributeVar.CreateBool(intel.INF_GetDebugMarkersForPlayer(editor.GetPlayerID(), false));
@@ -54,7 +54,7 @@ class INF_DebugCacheMarkersEditorAttribute : SCR_BaseEditorAttribute
 			return;
 		if (!INF_ZoneEditorContext.Grid(m_GameMode))
 			return;
-		INS_IntelManager intel = INS_IntelManager.Cast(m_GameMode.FindComponent(INS_IntelManager));
+		INS_IntelManager intel = INF_ZoneEditorContext.Intel(m_GameMode);
 		if (intel)
 			intel.INF_SetDebugMarkersForPlayer(playerID, false, var.GetBool());
 	}
@@ -71,7 +71,7 @@ modded class INS_DebugCacheMarkersEditorAttribute
 		SCR_EditorManagerEntity editor = manager.GetManager();
 		if (!editor || !editor.HasMode(EEditorMode.EDIT))
 			return null;
-		INS_IntelManager intel = INS_IntelManager.Cast(m_GameMode.FindComponent(INS_IntelManager));
+		INS_IntelManager intel = INF_ZoneEditorContext.Intel(m_GameMode);
 		if (!intel)
 			return null;
 		return SCR_BaseEditorAttributeVar.CreateBool(intel.INF_GetDebugMarkersForPlayer(editor.GetPlayerID(), false));
@@ -87,7 +87,7 @@ modded class INS_DebugCacheMarkersEditorAttribute
 			super.WriteVariable(item, var, manager, playerID);
 			return;
 		}
-		INS_IntelManager intel = INS_IntelManager.Cast(m_GameMode.FindComponent(INS_IntelManager));
+		INS_IntelManager intel = INF_ZoneEditorContext.Intel(m_GameMode);
 		if (intel)
 			intel.INF_SetDebugMarkersForPlayer(playerID, false, var.GetBool());
 	}

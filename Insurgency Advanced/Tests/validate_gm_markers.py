@@ -176,7 +176,7 @@ class GMMarkerContracts(unittest.TestCase):
         self.assertIn('"[DBG CAMP %1]"', source)
         self.assertIn('"[DBG CACHE %1]"', source)
         refresh = source.split("protected void INF_RefreshDebugMarkers()", 1)[1].split(
-            "bool INF_GetDebugCampMarkers()", 1)[0]
+            "bool INF_GetDebugMarkersForPlayer(", 1)[0]
         self.assertIn("m_aINFDebugSubscribers", refresh)
         self.assertIn("controller.INF_GetDebugMarkerLayers() == 0", refresh)
         self.assertIn("INF_SendDebugMarkerSnapshot(controller", refresh)

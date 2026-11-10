@@ -355,11 +355,6 @@ class INF_ForestCamps
 		return vector.Dot(normal, vector.Up) >= 0.9781476;
 	}
 
-	static bool ValidateFootprint(INF_ForestCampSite site, bool reserveRewardSlot = false)
-	{
-		return FootprintFailure(site, reserveRewardSlot) == 0;
-	}
-
 	// 0=valid, 1=terrain/water/slope, 2=obstructed layout.
 	static int FootprintFailure(INF_ForestCampSite site, bool reserveRewardSlot = false, bool ignoreOwnCache = false)
 	{
@@ -896,9 +891,7 @@ class INF_ForestCamps
 		SCR_SpawnPoint spawn = SCR_SpawnPoint.Cast(entity);
 		if (spawn)
 			spawn.SetSpawnPointEnabled_S(true);
-		PersistenceSystem persistence = PersistenceSystem.GetInstance();
-		if (persistence)
-			persistence.StopTracking(entity, true);
+		INF_Persistence.Untrack(entity);
 		IEntity child = entity.GetChildren();
 		while (child)
 		{
@@ -1096,9 +1089,7 @@ class INF_ForestCamps
 			Print("[INF_ForestCamps] Camp vehicle service spawn failed: " + site.m_Key, LogLevel.ERROR);
 			return;
 		}
-		PersistenceSystem persistence = PersistenceSystem.GetInstance();
-		if (persistence)
-			persistence.StopTracking(service, true);
+		INF_Persistence.Untrack(service);
 		site.m_Service = service;
 	}
 

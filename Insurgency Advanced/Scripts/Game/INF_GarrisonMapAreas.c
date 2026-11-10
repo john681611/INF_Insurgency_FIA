@@ -87,12 +87,9 @@ modded class SCR_MapDotCircleHandler
 		LineDrawCommand border = new LineDrawCommand();
 		border.m_iColor = Color.FromRGBA(base.R() * 255 * 0.7, base.G() * 255 * 0.7, base.B() * 255 * 0.7, 255).PackToInt();
 		border.m_fWidth = Math.Clamp(m_fActualRadius * 0.01, 0.75, 3);
-		// Officer zones keep a thicker gold border whatever state the fill shows.
+		// Officer zones are outlined in gold whatever state the fill shows.
 		if (area.INF_IsOfficer())
-		{
 			border.m_iColor = Color.FromRGBA(255, 200, 40, 255).PackToInt();
-			border.m_fWidth = Math.Clamp(m_fActualRadius * 0.02, 1.5, 5);
-		}
 		border.m_Vertices = new array<float>();
 		border.m_Vertices.Copy(fill.m_Vertices);
 		border.m_Vertices.Insert(fill.m_Vertices[0]);
@@ -278,7 +275,7 @@ modded class INS_GarrisonManager
 		}
 		INF_RemoveStaleAreas();
 
-		INS_AmbientPatrolManager patrols = INS_AmbientPatrolManager.Cast(GetOwner().FindComponent(INS_AmbientPatrolManager));
+		INS_AmbientPatrolManager patrols = INF_ZoneEditorContext.Patrols(GetOwner());
 		if (patrols)
 			INF_BindZoneStates(patrols.INF_GetZoneStates());
 		if (!m_INFDirtyAreas.IsEmpty() && !m_bINFAreaUpdateQueued)
@@ -441,8 +438,7 @@ modded class INS_GarrisonManager
 				appearance = INF_EGarrisonMapState.INBOUND;
 			else if (state.m_bActive)
 				appearance = INF_EGarrisonMapState.ACTIVE;
-			area.INF_SetZoneState(state.m_vCenter, INF_BuildingGrid.HALF, appearance, true, state.m_iINFTargetAI,
-				state.m_bINFOfficer && !state.m_bINFPermanent && !state.m_bINFMarkedCleared);
+			area.INF_SetZoneState(state.m_vCenter, INF_BuildingGrid.HALF, appearance, true, state.m_iINFTargetAI, state.m_bINFOfficer);
 			m_INFDirtyAreas.Remove(key);
 			processed++;
 		}
@@ -493,7 +489,7 @@ modded class INS_GarrisonManager
 
 	protected bool INF_UsesBlockControl()
 	{
-		INS_AmbientPatrolManager patrols = INS_AmbientPatrolManager.Cast(GetOwner().FindComponent(INS_AmbientPatrolManager));
+		INS_AmbientPatrolManager patrols = INF_ZoneEditorContext.Patrols(GetOwner());
 		return patrols && patrols.INF_UsesBuildingGrid();
 	}
 

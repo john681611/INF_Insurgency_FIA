@@ -77,8 +77,6 @@ class ForestCampPlacement(unittest.TestCase):
         self.assertIn(":reward-vegetation-v1", index)
         self.assertIn("Math.AbsFloat(ground - baseHeight) > 0.65", CAMP)
         self.assertIn("vector.Dot(normal, vector.Up) >= 0.9781476", CAMP)
-        self.assertIn("static bool ValidateFootprint", CAMP)
-        self.assertIn("return FootprintFailure(site, reserveRewardSlot) == 0", CAMP)
 
     def test_search_logs_rejection_stage_without_forced_fallback(self):
         for name in ("SpatialRejects", "TerrainRejects", "ClearanceRejects",

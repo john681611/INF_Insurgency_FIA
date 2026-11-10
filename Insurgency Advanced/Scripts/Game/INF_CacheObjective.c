@@ -231,7 +231,7 @@ modded class INS_IntelManager
 		m_bINFObjectiveUpdateQueued = false;
 		if (!Replication.IsServer() || m_bINFMissionEnded)
 			return;
-		INS_AmbientPatrolManager patrols = INS_AmbientPatrolManager.Cast(GetOwner().FindComponent(INS_AmbientPatrolManager));
+		INS_AmbientPatrolManager patrols = INF_ZoneEditorContext.Patrols(GetOwner());
 		bool discoveryReady = !patrols || patrols.INF_AreCampsReady();
 		if (m_bINFCacheObjective)
 		{
@@ -323,7 +323,7 @@ modded class INS_IntelManager
 			if (!destroyed)
 				return false;
 		}
-		INS_AmbientPatrolManager patrols = INS_AmbientPatrolManager.Cast(GetOwner().FindComponent(INS_AmbientPatrolManager));
+		INS_AmbientPatrolManager patrols = INF_ZoneEditorContext.Patrols(GetOwner());
 		if (patrols && !patrols.INF_AreCampsReady())
 			return false;
 		if (m_iINFMissionEndMode == INF_EMissionEndMode.CACHES)
@@ -426,16 +426,6 @@ modded class INS_IntelManager
 			m_bINFDebugRefreshQueued = true;
 			GetGame().GetCallqueue().CallLater(INF_RefreshDebugMarkers, 2000, false);
 		}
-	}
-
-	bool INF_GetDebugCampMarkers()
-	{
-		return INF_GetDebugMarkersForPlayer(SCR_PlayerController.GetLocalPlayerId(), true);
-	}
-
-	void INF_SetDebugCampMarkers(bool value)
-	{
-		INF_SetDebugMarkersForPlayer(SCR_PlayerController.GetLocalPlayerId(), true, value);
 	}
 
 	bool INF_GetDebugMarkersForPlayer(int playerId, bool camps)
@@ -1045,7 +1035,7 @@ modded class INS_IntelManager
 		IEntity standIn = INF_SpawnCacheStandIn(cacheEntity);
 		super.OnCacheDestroyed(cacheEntity);
 		INF_SpawnCacheExplosion(explosionPos, standIn);
-		INS_AmbientPatrolManager patrols = INS_AmbientPatrolManager.Cast(GetOwner().FindComponent(INS_AmbientPatrolManager));
+		INS_AmbientPatrolManager patrols = INF_ZoneEditorContext.Patrols(GetOwner());
 		if (patrols && patrols.INF_GetZoneStates())
 			patrols.INF_GetZoneStates().CacheDestroyed(cacheEntity);
 
@@ -1067,7 +1057,6 @@ modded class INS_IntelManager
 		if (!Replication.IsServer())
 			return;
 		ResourceName grenade = "{645C73791ECA1698}Prefabs/Weapons/Grenades/Grenade_RGD5.et";
-		ResourceName shell81 = "{38BAE094333E31BF}Prefabs/Weapons/Ammo/Ammo_Shell_81mm_HE_M821.et";
 		ResourceName shell82 = "{98EC9C526AFBA282}Prefabs/Weapons/Ammo/Ammo_Shell_82mm_HE_O832DU.et";
 		ResourceName demoBlock = "{33CBDE73AB48172A}Prefabs/Weapons/Explosives/DemoBlock_M112/DemoBlock_M112.et";
 		ResourceName fuelBlast = "{8BC4C95E01FC9BD3}Prefabs/Weapons/Warheads/Explosions/Explosion_Fuel_Large.et";

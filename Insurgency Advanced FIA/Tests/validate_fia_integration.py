@@ -52,7 +52,7 @@ class AdvancedFIAIntegration(unittest.TestCase):
     def test_preserves_footprint_and_runtime_composition_safeguards(self):
         self.assertIn("m_fINFCampFootprintRadius 9", (ROOT / MODE).read_text())
         source = (ADVANCED / "Scripts" / "Game" / "INF_ForestCamps.c").read_text()
-        self.assertIn("spawn.SetSpawnPointEnabled_S(false)", source)
+        self.assertIn("spawn.SetSpawnPointEnabled_S(true)", source)
         self.assertIn("SCR_AIGroup.Cast(entity)", source)
         self.assertIn("if (!PrepareComposition(child))", source)
 

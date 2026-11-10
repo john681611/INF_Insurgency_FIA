@@ -12,13 +12,13 @@ class INF_Officers
 
 	static bool Active(INS_AmbientPatrolZoneState state)
 	{
-		return state.m_bINFOfficer && state.m_bINFOfficerAlive && state.m_INFOfficerPost;
+		return state.m_bINFOfficer && state.m_INFOfficerPost;
 	}
 
-	// Mortar and vehicle rolls are tripled (capped at 100) in a zone that still holds its officer.
+	// Mortar and vehicle rolls are tripled (capped at 100) in a zone that holds an officer.
 	static int Boost(int chance, INS_AmbientPatrolZoneState zone)
 	{
-		if (chance <= 0 || !zone.m_bINFOfficer || !zone.m_bINFOfficerAlive)
+		if (chance <= 0 || !zone.m_bINFOfficer)
 			return chance;
 		return Math.Min(100, chance * CHANCE_MULTIPLIER);
 	}
@@ -32,13 +32,7 @@ class INF_Officers
 			if (state.m_iGroupCount > 0 && !state.m_bINFPermanent)
 				pool.Insert(state);
 		}
-		for (int i = pool.Count() - 1; i > 0; i--)
-		{
-			int j = Math.RandomInt(0, i + 1);
-			INS_AmbientPatrolZoneState swap = pool[i];
-			pool[i] = pool[j];
-			pool[j] = swap;
-		}
+		INF_ArrayHelper<INS_AmbientPatrolZoneState>.Shuffle(pool);
 		int count = Math.Min(pool.Count(), Math.Max(1, pool.Count() / ZONES_PER_OFFICER));
 		for (int k = 0; k < count; k++)
 			chosen.Insert(pool[k]);
@@ -123,9 +117,7 @@ class INF_Officers
 				SCR_EntityHelper.DeleteEntityAndChildren(entity);
 			return;
 		}
-		PersistenceSystem persistence = PersistenceSystem.GetInstance();
-		if (persistence)
-			persistence.StopTracking(entity, true);
+		INF_Persistence.Untrack(entity);
 		group.AddAgent(agent);
 		INF_PrisonerComponent prisoner = INF_PrisonerComponent.Find(entity);
 		if (!prisoner)

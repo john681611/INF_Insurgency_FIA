@@ -429,7 +429,7 @@ class ZoneVehicles(unittest.TestCase):
     def test_runtime_state_is_not_persisted(self):
         self.assertNotIn("FileSerializer", SOURCE)
         self.assertNotIn("SaveSites", SOURCE)
-        self.assertIn("persistence.StopTracking(entity, true)", SOURCE)
+        self.assertIn("INF_Persistence.Untrack(entity)", SOURCE)
         self.assertIn("persistence.StopTracking(member, true)", SOURCE)
         self.assertIn("persistence.StopTracking(group, true)", SOURCE)
 

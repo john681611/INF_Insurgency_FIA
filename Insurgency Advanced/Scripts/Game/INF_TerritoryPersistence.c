@@ -2,8 +2,8 @@ class INF_TerritorySnapshot
 {
 	int m_Generation;
 	ref map<string, string> m_Cells = new map<string, string>();
-	// Officer zone keys; the value is whether the officer is still alive.
-	ref map<string, bool> m_Officers = new map<string, bool>();
+	// Officer zone keys; a killed or captured officer is removed.
+	ref array<string> m_Officers = {};
 }
 
 // Alternate complete snapshots so a failed write cannot destroy the last good save.
@@ -82,12 +82,9 @@ class INF_TerritoryPersistence
 		for (int o = 0; valid && o < officerCount; o++)
 		{
 			string officerKey;
-			int alive;
-			valid = file.Read(officerKey) && file.Read(alive);
-			valid = valid && ValidCellKey(officerKey) && (alive == 0 || alive == 1)
-				&& !result.m_Officers.Contains(officerKey);
+			valid = file.Read(officerKey) && ValidCellKey(officerKey) && !result.m_Officers.Contains(officerKey);
 			if (valid)
-				result.m_Officers.Set(officerKey, alive == 1);
+				result.m_Officers.Insert(officerKey);
 		}
 		valid = valid && file.Read(complete) && complete == "COMPLETE";
 		file.Close();
@@ -151,26 +148,21 @@ class INF_TerritoryPersistence
 		return m_Ready && m_State.m_Officers.Contains(key);
 	}
 
-	bool IsOfficerAlive(string key)
-	{
-		return IsOfficer(key) && m_State.m_Officers.Get(key);
-	}
-
 	void AddOfficer(string key)
 	{
 		if (!m_Ready || m_State.m_Officers.Contains(key))
 			return;
-		m_State.m_Officers.Set(key, true);
+		m_State.m_Officers.Insert(key);
 		m_Dirty = true;
 	}
 
-	bool OfficerDown(string key)
+	// A dead or captured officer leaves the saved set: his zone is ordinary again.
+	void RemoveOfficer(string key)
 	{
-		if (!IsOfficerAlive(key))
-			return false;
-		m_State.m_Officers.Set(key, false);
+		if (!IsOfficer(key))
+			return;
+		m_State.m_Officers.RemoveItem(key);
 		m_Dirty = true;
-		return true;
 	}
 
 	// Saved grid cells that no longer have a qualifying building keep their green marker only.
@@ -246,12 +238,9 @@ class INF_TerritoryPersistence
 		}
 		if (success)
 			success = file.Write(m_State.m_Officers.Count());
-		foreach (string officerKey, bool officerAlive : m_State.m_Officers)
+		foreach (string officerKey : m_State.m_Officers)
 		{
-			int aliveFlag = 0;
-			if (officerAlive)
-				aliveFlag = 1;
-			if (!file.Write(officerKey) || !file.Write(aliveFlag))
+			if (!file.Write(officerKey))
 				success = false;
 		}
 		if (success)
@@ -266,9 +255,9 @@ class INF_TerritoryPersistence
 			WriteFailure("Territory snapshot write/verification failed; retaining previous snapshot and retrying.");
 			return;
 		}
-		foreach (string verifiedOfficer, bool verifiedAlive : m_State.m_Officers)
+		foreach (string verifiedOfficer : m_State.m_Officers)
 		{
-			if (!verified.m_Officers.Contains(verifiedOfficer) || verified.m_Officers.Get(verifiedOfficer) != verifiedAlive)
+			if (!verified.m_Officers.Contains(verifiedOfficer))
 			{
 				WriteFailure("Territory snapshot officers failed verification; retaining previous snapshot and retrying.");
 				return;

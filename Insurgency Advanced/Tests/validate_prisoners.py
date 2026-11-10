@@ -156,7 +156,7 @@ class Prisoners(unittest.TestCase):
         self.assertIn("CanPlayLoiterAnimation(m_PrisonerLoiter)", pose)
         self.assertIn("ELoiteringType.LOITERING", pose)
         self.assertIn("ELoiteringType.SMOKING", pose)
-        self.assertIn("SCR_ELoiterItemID.CIGAR", pose)
+        self.assertIn("SCR_EAnimationItemID.CIGAR", pose)
         self.assertIn("false, false, false, transform, true, data", pose)
         self.assertIn("StopPrisonerLoiter(controller)", pose)
         self.assertNotRegex(pose, r"\b(?:FullHeal|SetHealth|SetUnconscious|ActivateAI)\s*\(")

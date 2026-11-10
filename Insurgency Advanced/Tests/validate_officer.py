@@ -31,14 +31,16 @@ class Officers(unittest.TestCase):
             self.assertIn(text, OFFICERS)
         select = method_body(OFFICERS, "static void Select(")
         self.assertIn("Math.Max(1, pool.Count() / ZONES_PER_OFFICER)", select)
-        self.assertIn("Math.RandomInt(0, i + 1)", select)
+        self.assertIn("INF_ArrayHelper<INS_AmbientPatrolZoneState>.Shuffle(pool)", select)
         self.assertIn("!state.m_bINFPermanent", select)
 
     def test_selection_is_saved_and_restored_once_the_registry_is_complete(self):
         assign = method_body(ZONES, "void AssignOfficers(")
         self.assertIn("!m_Persistence.HasOfficers()", assign)
         self.assertIn("m_Persistence.AddOfficer(", assign)
-        self.assertIn("m_Persistence.IsOfficerAlive(key)", assign)
+        self.assertIn("m_Persistence.IsOfficer(key)", assign)
+        self.assertIn("m_Persistence.RemoveOfficer(key)", method_body(ZONES, "void OfficerDown("))
+        self.assertIn("state.m_bINFOfficer = false", method_body(ZONES, "void OfficerDown("))
         self.assertLess(GRID.index("RestorePermanentCamps()"), GRID.index("AssignOfficers("))
         self.assertIn("file.Write(2)", PERSISTENCE)
         self.assertIn("version == 1 || version == 2", PERSISTENCE)
@@ -49,7 +51,7 @@ class Officers(unittest.TestCase):
         self.assertLess(guards.index("INF_Officers.AppendPost("), guards.index("foreach (INF_Defence defence"))
         self.assertIn("guardAI -= guardPlan[0]", GRID)
         spawn = method_body(GRID, "override protected void SpawnGroupAt(")
-        self.assertIn("guardedDefence.m_bOfficerPost && state.m_bINFOfficerAlive", spawn)
+        self.assertIn("guardedDefence.m_bOfficerPost && state.m_bINFOfficer)", spawn)
         self.assertIn("INF_Officers.SpawnInto(", spawn)
         self.assertIn("m_bOfficerPost", DEFENCES)
         self.assertIn("INF_Officers.HasRememberedSquad(", DEFENCES)
@@ -59,7 +61,8 @@ class Officers(unittest.TestCase):
         self.assertIn("INF_Officers.Boost(m_iINFZoneVehicleChance, zone)", VEHICLES)
         self.assertIn("Math.Min(100, chance * CHANCE_MULTIPLIER)", OFFICERS)
         self.assertIn("Color.FromRGBA(255, 200, 40, 255)", MAP)
-        self.assertIn("state.m_bINFOfficer && !state.m_bINFPermanent && !state.m_bINFMarkedCleared", MAP)
+        self.assertIn("state.m_bINFOfficer);", MAP)
+        self.assertNotIn("m_fWidth = Math.Clamp(m_fActualRadius * 0.02", MAP)
 
     def test_intel_odds_and_captured_or_dead_officer_is_gone(self):
         self.assertIn("chance = INF_Officers.QUESTION_CHANCE", PRISONERS)

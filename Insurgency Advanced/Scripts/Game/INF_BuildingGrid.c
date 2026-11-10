@@ -153,7 +153,7 @@ class INF_SpawnProtection
 		BaseGameMode mode = GetGame().GetGameMode();
 		if (!mode)
 			return;
-		INS_AmbientPatrolManager patrols = INS_AmbientPatrolManager.Cast(mode.FindComponent(INS_AmbientPatrolManager));
+		INS_AmbientPatrolManager patrols = INF_ZoneEditorContext.Patrols(mode);
 		if (!patrols)
 			return;
 		Faction faction = patrols.INF_GetPlayerFaction();
@@ -174,7 +174,7 @@ class INF_SpawnProtection
 		BaseGameMode mode = GetGame().GetGameMode();
 		if (!mode)
 			return false;
-		INS_AmbientPatrolManager patrols = INS_AmbientPatrolManager.Cast(mode.FindComponent(INS_AmbientPatrolManager));
+		INS_AmbientPatrolManager patrols = INF_ZoneEditorContext.Patrols(mode);
 		if (!patrols)
 			return false;
 		Faction faction = patrols.INF_GetPlayerFaction();
@@ -476,9 +476,7 @@ class INF_BuildingGrid
 		// OnInit queues expansion; trim the instance roster before queued members spawn.
 		group.m_aUnitPrefabSlots.Resize(members);
 		group.SetMaxUnitsToSpawn(members);
-		PersistenceSystem persistence = PersistenceSystem.GetInstance();
-		if (persistence)
-			persistence.StopTracking(entity, true);
+		INF_Persistence.Untrack(entity);
 		return entity;
 	}
 }
@@ -526,7 +524,6 @@ modded class INS_AmbientPatrolZoneState
 	INF_Defence m_INFSpawnDefence;
 	// Officer zones: flagged at mission start (saved), the post is where the officer's squad stands.
 	bool m_bINFOfficer;
-	bool m_bINFOfficerAlive = true;
 	ref INF_Defence m_INFOfficerPost;
 
 	bool INF_IsCapturing()
@@ -619,11 +616,6 @@ modded class INS_AmbientPatrolManager
 
 	[Attribute("{5117311FB822FD1F}Prefabs/Characters/Factions/OPFOR/USSR_Army/Character_USSR_Officer.et", UIWidgets.ResourceNamePicker, "Officer character. About one zone or camp in 50 (at least one) holds an officer with an extra squad of four, a gold map border, and tripled mortar and vehicle chances. Empty disables officers.", "et", category: "Officers")]
 	protected ResourceName m_sINFOfficerPrefab;
-
-	ResourceName INF_GetOfficerPrefab()
-	{
-		return m_sINFOfficerPrefab;
-	}
 
 	[Attribute("15", UIWidgets.Slider, "Percentage of viable defence positions (road slots for barricades and checkpoints, small flat slots for sandbags, nests and bunkers) that receive a defence at a fresh mission start, then saved and restored. Zero disables defences.", "0 100 5", category: "Defences")]
 	protected int m_iINFDefencePercent = 15;
@@ -743,7 +735,7 @@ modded class INS_AmbientPatrolManager
 		INS_AmbientVehicleManager vehicles = INS_AmbientVehicleManager.Cast(GetOwner().FindComponent(INS_AmbientVehicleManager));
 		if (vehicles)
 			vehicles.INF_ApplyHeaderSettings(params);
-		INS_IntelManager intel = INS_IntelManager.Cast(GetOwner().FindComponent(INS_IntelManager));
+		INS_IntelManager intel = INF_ZoneEditorContext.Intel(GetOwner());
 		if (intel)
 			intel.INF_ApplyHeaderSettings(params);
 	}
@@ -907,7 +899,7 @@ modded class INS_AmbientPatrolManager
 		}
 		m_INFForestCamps = new INF_ForestCamps(this);
 		INF_ForestCampRewards.BeginDiscovery();
-		INS_IntelManager intel = INS_IntelManager.Cast(GetOwner().FindComponent(INS_IntelManager));
+		INS_IntelManager intel = INF_ZoneEditorContext.Intel(GetOwner());
 		if (!intel)
 		{
 			m_sINFStartupFailure = "Mission initialisation is blocked: intel manager missing. An administrator needs to check the server log.";
@@ -979,7 +971,7 @@ modded class INS_AmbientPatrolManager
 		m_sINFStartupStatus = status;
 		m_bINFStartupBlocked = blocked;
 		Replication.BumpMe();
-		INS_IntelManager intel = INS_IntelManager.Cast(GetOwner().FindComponent(INS_IntelManager));
+		INS_IntelManager intel = INF_ZoneEditorContext.Intel(GetOwner());
 		if (intel)
 			intel.INF_QueueCampaignObjectives();
 	}
@@ -1463,7 +1455,7 @@ modded class INS_AmbientPatrolManager
 			agent = new INS_PatrolAgent(entity, state.m_vCenter, state.m_fRadius);
 			agent.m_bINFInbound = !INF_BuildingGrid.Contains(state.m_vCenter, pos);
 		}
-		if (guardedDefence && guardedDefence.m_bOfficerPost && state.m_bINFOfficerAlive)
+		if (guardedDefence && guardedDefence.m_bOfficerPost && state.m_bINFOfficer)
 			INF_Officers.SpawnInto(entity, pos, m_sINFOfficerPrefab, INF_BuildingGrid.Key(state.m_vCenter));
 		state.m_aAgents.Insert(agent);
 		m_INFZoneStates.InvalidatePresence();
@@ -1955,15 +1947,6 @@ modded class INS_AmbientPatrolManager
 		}
 	}
 
-	void INF_CollectMapZones(out array<INS_AmbientPatrolZoneState> zones)
-	{
-		foreach (INS_AmbientPatrolZoneState state : m_aZones)
-		{
-			if (state && state.m_iGroupCount > 0)
-				zones.Insert(state);
-		}
-	}
-
 	void INF_CollectCaptureObjectives(map<string, bool> zones, map<string, bool> camps)
 	{
 		foreach (INS_AmbientPatrolZoneState state : m_aZones)
@@ -2036,7 +2019,7 @@ modded class INS_CounterAttackManager
 	// Wakes the shared zone loop; the attack work itself runs from INF_StepAttacks.
 	void INF_ScheduleGridAttacks()
 	{
-		INS_AmbientPatrolManager patrols = INS_AmbientPatrolManager.Cast(GetOwner().FindComponent(INS_AmbientPatrolManager));
+		INS_AmbientPatrolManager patrols = INF_ZoneEditorContext.Patrols(GetOwner());
 		if (!Replication.IsServer() || m_bINFGridStopped || !patrols || !patrols.INF_GetZoneStates())
 			return;
 		patrols.INF_GetZoneStates().WakeLoop();
@@ -2085,7 +2068,7 @@ modded class INS_CounterAttackManager
 
 	override void OnGameModeStart()
 	{
-		INS_AmbientPatrolManager patrols = INS_AmbientPatrolManager.Cast(GetOwner().FindComponent(INS_AmbientPatrolManager));
+		INS_AmbientPatrolManager patrols = INF_ZoneEditorContext.Patrols(GetOwner());
 		if (!patrols || !patrols.INF_UsesBuildingGrid())
 		{
 			super.OnGameModeStart();
@@ -2124,7 +2107,7 @@ modded class INS_CounterAttackManager
 
 	override void SetCounterAttackInterval(float seconds)
 	{
-		INS_AmbientPatrolManager patrols = INS_AmbientPatrolManager.Cast(GetOwner().FindComponent(INS_AmbientPatrolManager));
+		INS_AmbientPatrolManager patrols = INF_ZoneEditorContext.Patrols(GetOwner());
 		if (!patrols || !patrols.INF_UsesBuildingGrid())
 		{
 			super.SetCounterAttackInterval(seconds);
@@ -2155,7 +2138,7 @@ modded class INS_CounterAttackManager
 
 	override protected void CounterAttackTick()
 	{
-		INS_AmbientPatrolManager patrols = INS_AmbientPatrolManager.Cast(GetOwner().FindComponent(INS_AmbientPatrolManager));
+		INS_AmbientPatrolManager patrols = INF_ZoneEditorContext.Patrols(GetOwner());
 		if (!patrols || !patrols.INF_UsesBuildingGrid())
 		{
 			super.CounterAttackTick();
@@ -2168,7 +2151,7 @@ modded class INS_CounterAttackManager
 	// Returns true while the loop is still needed.
 	bool INF_StepAttacks()
 	{
-		INS_AmbientPatrolManager patrols = INS_AmbientPatrolManager.Cast(GetOwner().FindComponent(INS_AmbientPatrolManager));
+		INS_AmbientPatrolManager patrols = INF_ZoneEditorContext.Patrols(GetOwner());
 		if (!Replication.IsServer() || m_bINFGridStopped || !patrols || !patrols.INF_UsesBuildingGrid()
 			|| !patrols.INF_GetZoneStates())
 			return false;
@@ -2416,7 +2399,7 @@ modded class INS_CounterAttackManager
 
 	override protected void MonitorTick()
 	{
-		INS_AmbientPatrolManager patrols = INS_AmbientPatrolManager.Cast(GetOwner().FindComponent(INS_AmbientPatrolManager));
+		INS_AmbientPatrolManager patrols = INF_ZoneEditorContext.Patrols(GetOwner());
 		if (!patrols || !patrols.INF_UsesBuildingGrid())
 		{
 			super.MonitorTick();
@@ -2508,7 +2491,7 @@ modded class INS_CounterAttackManager
 			if (remaining.m_bActive && remaining.m_Zone == zone)
 				return;
 		}
-		INS_AmbientPatrolManager patrols = INS_AmbientPatrolManager.Cast(GetOwner().FindComponent(INS_AmbientPatrolManager));
+		INS_AmbientPatrolManager patrols = INF_ZoneEditorContext.Patrols(GetOwner());
 		if (patrols && patrols.INF_GetZoneStates())
 		{
 			if (!zone.m_bINFDefeated)
@@ -2534,36 +2517,6 @@ modded class INS_CounterAttackManager
 				return true;
 			}
 		}
-		return false;
-	}
-
-	bool INF_HasCounterAttackInArea(vector center, float radius)
-	{
-		INS_AmbientPatrolManager patrols = INS_AmbientPatrolManager.Cast(GetOwner().FindComponent(INS_AmbientPatrolManager));
-		if (patrols && patrols.INF_UsesBuildingGrid() && patrols.INF_GetZoneStates())
-		{
-			INS_AmbientPatrolZoneState cell = patrols.INF_GetZoneStates().GetCell(center);
-			if (cell && (cell.m_bINFAttackPending || cell.m_bINFAttackActive)
-				&& vector.DistanceSqXZ(center, cell.m_vCenter) < 1)
-				return true;
-		}
-		foreach (INS_CounterAttackSquad squad : m_aActiveSquads)
-		{
-			if (!squad || !squad.m_bActive || !squad.m_Zone)
-				continue;
-
-			if (squad.m_Zone.m_INFCell)
-			{
-				if (vector.DistanceSqXZ(center, squad.m_Zone.m_vCenter) < 1)
-					return true;
-				continue;
-			}
-
-			float coverage = radius + squad.m_Zone.m_fRadius;
-			if (vector.DistanceSqXZ(center, squad.m_Zone.m_vCenter) <= coverage * coverage)
-				return true;
-		}
-
 		return false;
 	}
 }

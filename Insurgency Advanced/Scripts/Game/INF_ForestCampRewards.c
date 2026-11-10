@@ -438,7 +438,7 @@ modded class INS_CacheSpawnManager
 	{
 		if (Replication.IsServer())
 		{
-			INS_AmbientPatrolManager patrols = INS_AmbientPatrolManager.Cast(GetOwner().FindComponent(INS_AmbientPatrolManager));
+			INS_AmbientPatrolManager patrols = INF_ZoneEditorContext.Patrols(GetOwner());
 			if (patrols && patrols.INF_UsesBuildingGrid())
 				INF_ForestCampRewards.BeginDiscovery();
 			else
@@ -493,13 +493,7 @@ modded class INS_CacheSpawnManager
 					unique.Insert(candidate);
 			}
 			all = unique;
-			for (int i = all.Count() - 1; i > 0; i--)
-			{
-				int j = Math.RandomInt(0, i + 1);
-				vector temp = all[i];
-				all[i] = all[j];
-				all[j] = temp;
-			}
+			INF_ArrayHelper<vector>.Shuffle(all);
 			int count = Math.Min(m_iCacheCount, all.Count());
 			if (count < m_iCacheCount)
 				Print(string.Format("[INF_ForestCampRewards] Only %1 unique cache candidates available for %2 requested caches.", count, m_iCacheCount), LogLevel.WARNING);

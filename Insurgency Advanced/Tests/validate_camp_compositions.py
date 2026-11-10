@@ -46,7 +46,7 @@ class CampCompositions(unittest.TestCase):
         self.assertIn("return false", prepare)
         self.assertIn("spawn.SetSpawnPointEnabled_S(true)", prepare)
         self.assertNotIn("SetFaction(", prepare)
-        self.assertIn("persistence.StopTracking(entity, true)", prepare)
+        self.assertIn("INF_Persistence.Untrack(entity)", prepare)
         self.assertIn("if (!PrepareComposition(child))", prepare)
         self.assertIn("child.GetSibling()", prepare)
 

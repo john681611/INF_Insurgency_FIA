@@ -42,14 +42,26 @@ class INF_ZoneVehicleLimitEditorAttribute : INF_ZoneVehicleSettingEditorAttribut
 
 class INF_ZoneEditorContext
 {
-	static INS_AmbientPatrolManager Grid(IEntity mode)
+	static INS_AmbientPatrolManager Patrols(IEntity mode)
 	{
 		if (!mode)
 			return null;
-		INS_AmbientPatrolManager patrols = INS_AmbientPatrolManager.Cast(mode.FindComponent(INS_AmbientPatrolManager));
+		return INS_AmbientPatrolManager.Cast(mode.FindComponent(INS_AmbientPatrolManager));
+	}
+
+	static INS_AmbientPatrolManager Grid(IEntity mode)
+	{
+		INS_AmbientPatrolManager patrols = Patrols(mode);
 		if (patrols && patrols.INF_UsesBuildingGrid())
 			return patrols;
 		return null;
+	}
+
+	static INS_IntelManager Intel(IEntity mode)
+	{
+		if (!mode)
+			return null;
+		return INS_IntelManager.Cast(mode.FindComponent(INS_IntelManager));
 	}
 }
 

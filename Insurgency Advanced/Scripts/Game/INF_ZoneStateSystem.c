@@ -244,20 +244,24 @@ class INF_ZoneStateSystem
 			if (!m_Persistence.IsOfficer(key))
 				continue;
 			state.m_bINFOfficer = true;
-			state.m_bINFOfficerAlive = m_Persistence.IsOfficerAlive(key);
 			state.m_INFOfficerPost = INF_Officers.CreatePost(state);
 			NotifyChanged(state);
 		}
 		FlushPermanent();
 	}
 
+	// The zone becomes ordinary: no squad post, no boosts, no gold border.
 	void OfficerDown(string key)
 	{
 		INS_AmbientPatrolZoneState state = m_Cells.Get(key);
 		if (state)
-			state.m_bINFOfficerAlive = false;
-		if (m_Persistence.OfficerDown(key))
-			FlushPermanent();
+		{
+			state.m_bINFOfficer = false;
+			state.m_INFOfficerPost = null;
+			NotifyChanged(state);
+		}
+		m_Persistence.RemoveOfficer(key);
+		FlushPermanent();
 	}
 
 	void Start(IEntity owner)
@@ -285,7 +289,7 @@ class INF_ZoneStateSystem
 			return;
 		INF_BlockPresence presence = StepCapture();
 		bool keepAlive = !m_Candidates.IsEmpty() && !presence.m_PlayerIDs.IsEmpty();
-		INS_AmbientPatrolManager patrols = INS_AmbientPatrolManager.Cast(m_Owner.FindComponent(INS_AmbientPatrolManager));
+		INS_AmbientPatrolManager patrols = INF_ZoneEditorContext.Patrols(m_Owner);
 		if (patrols && patrols.INF_StepProximity())
 			keepAlive = true;
 		INS_CounterAttackManager attacks = INS_CounterAttackManager.Cast(m_Owner.FindComponent(INS_CounterAttackManager));

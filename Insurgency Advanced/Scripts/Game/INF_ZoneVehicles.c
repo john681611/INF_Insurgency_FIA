@@ -769,9 +769,7 @@ modded class INS_AmbientVehicleManager
 			Print("[INF_ZoneVehicles] Vehicle spawn failed.", LogLevel.ERROR);
 			return;
 		}
-		PersistenceSystem persistence = PersistenceSystem.GetInstance();
-		if (persistence)
-			persistence.StopTracking(entity, true);
+		INF_Persistence.Untrack(entity);
 		SCR_BaseCompartmentManagerComponent compartments = SCR_BaseCompartmentManagerComponent.Cast(entity.FindComponent(SCR_BaseCompartmentManagerComponent));
 		array<BaseCompartmentSlot> slots = {};
 		if (compartments)

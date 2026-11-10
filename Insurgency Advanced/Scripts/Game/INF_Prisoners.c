@@ -147,7 +147,7 @@ class INF_PrisonerComponent : ScriptComponent
 		INS_FieldThreatManager threats = INS_FieldThreatManager.Cast(mode.FindComponent(INS_FieldThreatManager));
 		if (threats && threats.INF_BindPrisonerCleanup(group, this))
 			return;
-		INS_AmbientPatrolManager patrols = INS_AmbientPatrolManager.Cast(mode.FindComponent(INS_AmbientPatrolManager));
+		INS_AmbientPatrolManager patrols = INF_ZoneEditorContext.Patrols(mode);
 		if (patrols && patrols.INF_BindPrisonerCleanup(group, this))
 			return;
 		Print("[INF_Prisoners] Prisoner has no managed spawn source; preserving it rather than inventing cleanup rules.", LogLevel.WARNING);
@@ -264,10 +264,6 @@ class INF_PrisonerComponent : ScriptComponent
 		bool helpful = intel && intel.INF_HasQuestioningIntel() && Math.RandomFloat01() < INF_Officers.SEARCH_CHANCE;
 		if (helpful)
 			intel.AddIntelAndBroadcast(1, playerID);
-		if (helpful)
-			Respond(user, "The officer carried orders that point to a weapons cache. Check your map.");
-		else
-			Respond(user, "The officer's papers hold nothing useful.");
 	}
 
 	protected bool IsUsableBy(IEntity user)

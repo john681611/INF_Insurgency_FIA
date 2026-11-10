@@ -106,9 +106,6 @@ class CounterattackCaptureFlow(unittest.TestCase):
 
     def test_green_requires_permanence_and_pending_is_orange(self):
         self.assertIn("state.m_bINFAttackPending || state.m_bINFAttackActive", MAP)
-        lookup = GRID.split("bool INF_HasCounterAttackInArea", 1)[1]
-        self.assertIn("cell.m_bINFAttackPending || cell.m_bINFAttackActive", lookup)
-        self.assertIn("patrols.INF_GetZoneStates().GetCell(center)", lookup)
         self.assertLess(MAP.index("if (state.m_bINFAttackPending ||"), MAP.index("else if (state.m_bINFPermanent)"))
 
     def test_disabled_attacks_secure_immediately_and_aborts_keep_attempt_count(self):

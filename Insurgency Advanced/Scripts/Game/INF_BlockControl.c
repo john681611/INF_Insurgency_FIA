@@ -37,7 +37,7 @@ class INF_BlockPresence
 		IEntity mode = GetGame().GetGameMode();
 		INS_AmbientPatrolManager patrols;
 		if (mode)
-			patrols = INS_AmbientPatrolManager.Cast(mode.FindComponent(INS_AmbientPatrolManager));
+			patrols = INF_ZoneEditorContext.Patrols(mode);
 		if (patrols && patrols.INF_GetZoneStates())
 			return patrols.INF_GetZoneStates().GetPresence(false, fresh).m_AllPlayers;
 		INF_BlockPresence presence = new INF_BlockPresence();
@@ -50,7 +50,7 @@ class INF_BlockPresence
 		IEntity mode = GetGame().GetGameMode();
 		if (!mode || !Replication.IsServer())
 			return;
-		INS_AmbientPatrolManager patrols = INS_AmbientPatrolManager.Cast(mode.FindComponent(INS_AmbientPatrolManager));
+		INS_AmbientPatrolManager patrols = INF_ZoneEditorContext.Patrols(mode);
 		if (patrols && patrols.INF_GetZoneStates())
 			patrols.INF_GetZoneStates().InvalidatePresence();
 	}
@@ -98,7 +98,7 @@ class INF_BlockPresence
 		m_EnemyCells.Clear();
 		m_GroupPositions.Clear();
 		array<SCR_AIGroup> groups = {};
-		INS_AmbientPatrolManager patrols = INS_AmbientPatrolManager.Cast(owner.FindComponent(INS_AmbientPatrolManager));
+		INS_AmbientPatrolManager patrols = INF_ZoneEditorContext.Patrols(owner);
 		if (patrols)
 			patrols.INF_CollectGroups(groups);
 		INS_CounterAttackManager attacks = INS_CounterAttackManager.Cast(owner.FindComponent(INS_CounterAttackManager));
@@ -403,7 +403,7 @@ class INF_ActivationPolicy
 	void Collect(IEntity owner, INF_BlockPresence presence = null)
 	{
 		m_Groups.Clear();
-		INS_AmbientPatrolManager patrols = INS_AmbientPatrolManager.Cast(owner.FindComponent(INS_AmbientPatrolManager));
+		INS_AmbientPatrolManager patrols = INF_ZoneEditorContext.Patrols(owner);
 		array<ref INF_ActivationPlayer> pending = {};
 		array<int> ids = {};
 		if (presence)

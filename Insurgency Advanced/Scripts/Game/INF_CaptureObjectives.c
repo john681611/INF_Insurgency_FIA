@@ -36,7 +36,7 @@ class INF_MissionEndModeEditorAttribute : SCR_BaseEditorAttribute
 			return null;
 		if (!INF_ZoneEditorContext.Grid(m_GameMode))
 			return null;
-		INS_IntelManager intel = INS_IntelManager.Cast(m_GameMode.FindComponent(INS_IntelManager));
+		INS_IntelManager intel = INF_ZoneEditorContext.Intel(m_GameMode);
 		if (!intel)
 			return null;
 		return SCR_BaseEditorAttributeVar.CreateInt(intel.INF_GetMissionEndMode());
@@ -49,7 +49,7 @@ class INF_MissionEndModeEditorAttribute : SCR_BaseEditorAttribute
 			return;
 		if (!INF_ZoneEditorContext.Grid(m_GameMode))
 			return;
-		INS_IntelManager intel = INS_IntelManager.Cast(m_GameMode.FindComponent(INS_IntelManager));
+		INS_IntelManager intel = INF_ZoneEditorContext.Intel(m_GameMode);
 		if (intel)
 			intel.INF_SetMissionEndMode(var.GetInt());
 	}

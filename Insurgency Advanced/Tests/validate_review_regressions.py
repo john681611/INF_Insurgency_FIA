@@ -148,7 +148,7 @@ class ReviewRegressions(unittest.TestCase):
                         self.assertTrue(active)
                 self.assertEqual(reserved, sum(results))
                 self.assertEqual(active, any(results))
-        queue = AI.split("protected void INF_SpawnQueued(", 1)[1].split("void INF_CollectMapZones", 1)[0]
+        queue = AI.split("protected void INF_SpawnQueued(", 1)[1].split("void INF_CollectCaptureObjectives", 1)[0]
         self.assertIn("state.m_iINFPendingGroups--", queue)
         self.assertIn("state.m_iINFReservedAI -= state.m_iINFSpawnSize", queue)
         self.assertIn("state.m_iINFPendingGroups == 0 && state.m_aAgents.IsEmpty()", queue)
