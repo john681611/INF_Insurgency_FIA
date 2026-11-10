@@ -87,6 +87,12 @@ modded class SCR_MapDotCircleHandler
 		LineDrawCommand border = new LineDrawCommand();
 		border.m_iColor = Color.FromRGBA(base.R() * 255 * 0.7, base.G() * 255 * 0.7, base.B() * 255 * 0.7, 255).PackToInt();
 		border.m_fWidth = Math.Clamp(m_fActualRadius * 0.01, 0.75, 3);
+		// Officer zones keep a thicker gold border whatever state the fill shows.
+		if (area.INF_IsOfficer())
+		{
+			border.m_iColor = Color.FromRGBA(255, 200, 40, 255).PackToInt();
+			border.m_fWidth = Math.Clamp(m_fActualRadius * 0.02, 1.5, 5);
+		}
 		border.m_Vertices = new array<float>();
 		border.m_Vertices.Copy(fill.m_Vertices);
 		border.m_Vertices.Insert(fill.m_Vertices[0]);
@@ -123,6 +129,14 @@ class INF_GarrisonMapArea : SCR_MapMarkerDotCircle
 	[RplProp(onRplName: "INF_ApplyAppearance")]
 	protected int m_iINFBudget;
 
+	[RplProp(onRplName: "INF_ApplyAppearance")]
+	protected bool m_bINFOfficer;
+
+	bool INF_IsOfficer()
+	{
+		return m_bINFOfficer;
+	}
+
 	bool INF_IsSquare()
 	{
 		return m_bINFSquare;
@@ -143,9 +157,9 @@ class INF_GarrisonMapArea : SCR_MapMarkerDotCircle
 		}
 	}
 
-	void INF_SetZoneState(vector center, float radius, INF_EGarrisonMapState state, bool square = false, int budget = 0)
+	void INF_SetZoneState(vector center, float radius, INF_EGarrisonMapState state, bool square = false, int budget = 0, bool officer = false)
 	{
-		if (m_vPos == center && m_fINFZoneRadius == radius && m_eINFState == state && m_bINFSquare == square && m_iINFBudget == budget)
+		if (m_vPos == center && m_fINFZoneRadius == radius && m_eINFState == state && m_bINFSquare == square && m_iINFBudget == budget && m_bINFOfficer == officer)
 			return;
 
 		SetOrigin(center);
@@ -154,6 +168,7 @@ class INF_GarrisonMapArea : SCR_MapMarkerDotCircle
 		m_eINFState = state;
 		m_bINFSquare = square;
 		m_iINFBudget = budget;
+		m_bINFOfficer = officer;
 		INF_ApplyAppearance();
 		Replication.BumpMe();
 	}
@@ -426,7 +441,8 @@ modded class INS_GarrisonManager
 				appearance = INF_EGarrisonMapState.INBOUND;
 			else if (state.m_bActive)
 				appearance = INF_EGarrisonMapState.ACTIVE;
-			area.INF_SetZoneState(state.m_vCenter, INF_BuildingGrid.HALF, appearance, true, state.m_iINFTargetAI);
+			area.INF_SetZoneState(state.m_vCenter, INF_BuildingGrid.HALF, appearance, true, state.m_iINFTargetAI,
+				state.m_bINFOfficer && !state.m_bINFPermanent && !state.m_bINFMarkedCleared);
 			m_INFDirtyAreas.Remove(key);
 			processed++;
 		}

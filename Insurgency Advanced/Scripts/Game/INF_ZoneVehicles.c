@@ -683,7 +683,7 @@ modded class INS_AmbientVehicleManager
 		if (m_INFZoneVehicleRolls.Contains(key))
 			return;
 		m_INFZoneVehicleRolls.Set(key, true);
-		bool win = m_bINFZoneVehicleWinCarried || Math.RandomInt(0, 100) < m_iINFZoneVehicleChance;
+		bool win = m_bINFZoneVehicleWinCarried || Math.RandomInt(0, 100) < INF_Officers.Boost(m_iINFZoneVehicleChance, zone);
 		if (!win)
 			return;
 		array<vector> players = patrols.INF_GetZoneStates().GetPresence(false, true).m_AllPlayers;

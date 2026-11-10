@@ -243,8 +243,8 @@ class ReplicationAndCacheVictory(unittest.TestCase):
     def test_private_rpc_results_stay_private_and_persistent_state_is_not_rpc_only(self):
         self.assertEqual(CONTROLLER.count("RplRcver.Owner"), 2)
         self.assertNotIn("RplRcver.Broadcast", CONTROLLER)
-        for field in ("m_bCaptured", "m_bQuestioned"):
-            self.assertRegex(PRISONERS, r"\[RplProp[^\]]*\]\s+protected bool " + field)
+        for kind, field in (("bool", "m_bCaptured"), ("int", "m_iQuestions"), ("bool", "m_bOfficer")):
+            self.assertRegex(PRISONERS, r"\[RplProp[^\]]*\]\s+protected " + kind + " " + field)
         self.assertRegex(REWARDS, r"\[RplProp\(\)\]\s+protected bool m_bUnavailable")
         self.assertRegex(REWARDS, r"\[RplProp\(\)\]\s+protected string m_sSiteID")
 

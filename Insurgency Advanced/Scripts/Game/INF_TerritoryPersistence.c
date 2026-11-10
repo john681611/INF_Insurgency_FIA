@@ -2,6 +2,8 @@ class INF_TerritorySnapshot
 {
 	int m_Generation;
 	ref map<string, string> m_Cells = new map<string, string>();
+	// Officer zone keys; the value is whether the officer is still alive.
+	ref map<string, bool> m_Officers = new map<string, bool>();
 }
 
 // Alternate complete snapshots so a failed write cannot destroy the last good save.
@@ -62,7 +64,7 @@ class INF_TerritoryPersistence
 		INF_TerritorySnapshot result = new INF_TerritorySnapshot();
 		bool valid = file.Read(magic) && file.Read(version) && file.Read(world)
 			&& file.Read(result.m_Generation) && file.Read(count);
-		valid = valid && magic == "INF_TERRITORY" && version == 1
+		valid = valid && magic == "INF_TERRITORY" && (version == 1 || version == 2)
 			&& world == GetGame().GetWorldFile() && result.m_Generation > 0
 			&& count >= 0 && count <= 100000;
 		for (int i = 0; valid && i < count; i++)
@@ -73,6 +75,19 @@ class INF_TerritoryPersistence
 				&& camp.Length() <= 160 && !result.m_Cells.Contains(key);
 			if (valid)
 				result.m_Cells.Set(key, camp);
+		}
+		int officerCount;
+		if (valid && version >= 2)
+			valid = file.Read(officerCount) && officerCount >= 0 && officerCount <= 100000;
+		for (int o = 0; valid && o < officerCount; o++)
+		{
+			string officerKey;
+			int alive;
+			valid = file.Read(officerKey) && file.Read(alive);
+			valid = valid && ValidCellKey(officerKey) && (alive == 0 || alive == 1)
+				&& !result.m_Officers.Contains(officerKey);
+			if (valid)
+				result.m_Officers.Set(officerKey, alive == 1);
 		}
 		valid = valid && file.Read(complete) && complete == "COMPLETE";
 		file.Close();
@@ -124,6 +139,38 @@ class INF_TerritoryPersistence
 	bool HasCell(string key)
 	{
 		return m_Ready && m_State.m_Cells.Contains(key);
+	}
+
+	bool HasOfficers()
+	{
+		return m_State.m_Officers.Count() > 0;
+	}
+
+	bool IsOfficer(string key)
+	{
+		return m_Ready && m_State.m_Officers.Contains(key);
+	}
+
+	bool IsOfficerAlive(string key)
+	{
+		return IsOfficer(key) && m_State.m_Officers.Get(key);
+	}
+
+	void AddOfficer(string key)
+	{
+		if (!m_Ready || m_State.m_Officers.Contains(key))
+			return;
+		m_State.m_Officers.Set(key, true);
+		m_Dirty = true;
+	}
+
+	bool OfficerDown(string key)
+	{
+		if (!IsOfficerAlive(key))
+			return false;
+		m_State.m_Officers.Set(key, false);
+		m_Dirty = true;
+		return true;
 	}
 
 	// Saved grid cells that no longer have a qualifying building keep their green marker only.
@@ -189,7 +236,7 @@ class INF_TerritoryPersistence
 			return;
 		}
 		int generation = m_State.m_Generation + 1;
-		bool success = file.Write("INF_TERRITORY") && file.Write(1)
+		bool success = file.Write("INF_TERRITORY") && file.Write(2)
 			&& file.Write(GetGame().GetWorldFile()) && file.Write(generation)
 			&& file.Write(m_State.m_Cells.Count());
 		foreach (string key, string camp : m_State.m_Cells)
@@ -198,15 +245,34 @@ class INF_TerritoryPersistence
 				success = false;
 		}
 		if (success)
+			success = file.Write(m_State.m_Officers.Count());
+		foreach (string officerKey, bool officerAlive : m_State.m_Officers)
+		{
+			int aliveFlag = 0;
+			if (officerAlive)
+				aliveFlag = 1;
+			if (!file.Write(officerKey) || !file.Write(aliveFlag))
+				success = false;
+		}
+		if (success)
 			success = file.Write("COMPLETE");
 		file.Close();
 		INF_TerritorySnapshot verified;
 		if (success)
 			verified = ReadSlot(slot);
-		if (!verified || verified.m_Generation != generation || verified.m_Cells.Count() != m_State.m_Cells.Count())
+		if (!verified || verified.m_Generation != generation || verified.m_Cells.Count() != m_State.m_Cells.Count()
+			|| verified.m_Officers.Count() != m_State.m_Officers.Count())
 		{
 			WriteFailure("Territory snapshot write/verification failed; retaining previous snapshot and retrying.");
 			return;
+		}
+		foreach (string verifiedOfficer, bool verifiedAlive : m_State.m_Officers)
+		{
+			if (!verified.m_Officers.Contains(verifiedOfficer) || verified.m_Officers.Get(verifiedOfficer) != verifiedAlive)
+			{
+				WriteFailure("Territory snapshot officers failed verification; retaining previous snapshot and retrying.");
+				return;
+			}
 		}
 		foreach (string savedKey, string savedCamp : m_State.m_Cells)
 		{

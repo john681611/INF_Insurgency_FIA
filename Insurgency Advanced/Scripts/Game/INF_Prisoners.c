@@ -1,7 +1,24 @@
 class INF_PrisonerDialogue
 {
-	static string Reply(bool helpful)
+	static string Reply(bool helpful, bool officer = false)
 	{
+		if (officer)
+		{
+			array<string> officerHelpful = {
+				"Very well. The orders came through my hands. I will show you where to look.",
+				"You have made your point. Our stores are kept where the road bends.",
+				"I will tell you what I know, but you did not hear it from me."
+			};
+			array<string> officerRefusals = {
+				"I outrank everything you can ask me.",
+				"You will get nothing from me. Ask again if you enjoy disappointment.",
+				"Name, rank and a firm refusal. That is all I have for you.",
+				"Those orders were above even my clearance. Irritating, is it not?"
+			};
+			if (helpful)
+				return officerHelpful[Math.RandomInt(0, officerHelpful.Count())];
+			return officerRefusals[Math.RandomInt(0, officerRefusals.Count())];
+		}
 		array<string> helpfulLines = {
 				"All right. There is a weapons stash. I will show you the area.",
 				"We moved supplies through there. That should help narrow your search.",
@@ -59,7 +76,13 @@ class INF_PrisonerComponent : ScriptComponent
 	protected bool m_bCaptured;
 
 	[RplProp()]
-	protected bool m_bQuestioned;
+	protected int m_iQuestions;
+	// Officers are flagged by the zone that spawns them; they take three questioning attempts and one search.
+	[RplProp()]
+	protected bool m_bOfficer;
+	[RplProp()]
+	protected bool m_bOfficerSearched;
+	protected string m_sOfficerKey;
 	protected bool m_bWeaponsDropped;
 	protected ref array<ref INF_PrisonerDropCallback> m_aPendingDrops = {};
 	protected vector m_vPile;
@@ -182,7 +205,69 @@ class INF_PrisonerComponent : ScriptComponent
 
 	bool IsQuestioned()
 	{
-		return m_bQuestioned;
+		return m_iQuestions >= QuestionLimit();
+	}
+
+	int QuestionLimit()
+	{
+		if (m_bOfficer)
+			return INF_Officers.QUESTION_LIMIT;
+		return 1;
+	}
+
+	bool IsOfficer()
+	{
+		return m_bOfficer;
+	}
+
+	bool IsOfficerSearched()
+	{
+		return m_bOfficerSearched;
+	}
+
+	void INF_MarkOfficer(string key)
+	{
+		if (!Replication.IsServer())
+			return;
+		m_bOfficer = true;
+		m_sOfficerKey = key;
+		Replication.BumpMe();
+		m_DamageManager = SCR_CharacterDamageManagerComponent.Cast(GetOwner().FindComponent(SCR_CharacterDamageManagerComponent));
+		if (m_DamageManager)
+			m_DamageManager.GetOnDamage().Insert(OnOfficerDamage);
+		else
+			Print("[INF_Officers] Officer has no character damage manager; his death will not be recorded.", LogLevel.ERROR);
+	}
+
+	protected void OnOfficerDamage(notnull BaseDamageContext context)
+	{
+		if (m_bOfficer && m_DamageManager && m_DamageManager.IsDestroyed())
+			OfficerOut();
+	}
+
+	protected void OfficerOut()
+	{
+		if (!m_bOfficer || m_sOfficerKey.IsEmpty())
+			return;
+		INF_Officers.Down(m_sOfficerKey);
+		m_sOfficerKey = string.Empty;
+	}
+
+	void SearchOfficer(IEntity user)
+	{
+		if (!Replication.IsServer() || !m_bOfficer || m_bOfficerSearched)
+			return;
+		m_bOfficerSearched = true;
+		Replication.BumpMe();
+		INS_IntelManager intel = INS_IntelManager.GetInstance();
+		int playerID = GetGame().GetPlayerManager().GetPlayerIdFromControlledEntity(user);
+		bool helpful = intel && intel.INF_HasQuestioningIntel() && Math.RandomFloat01() < INF_Officers.SEARCH_CHANCE;
+		if (helpful)
+			intel.AddIntelAndBroadcast(1, playerID);
+		if (helpful)
+			Respond(user, "The officer carried orders that point to a weapons cache. Check your map.");
+		else
+			Respond(user, "The officer's papers hold nothing useful.");
 	}
 
 	protected bool IsUsableBy(IEntity user)
@@ -223,7 +308,7 @@ class INF_PrisonerComponent : ScriptComponent
 
 	bool CanQuestion(IEntity user, bool includeBleeding = false)
 	{
-		if (!m_bCaptured || m_bQuestioned || !IsUsableBy(user))
+		if (!m_bCaptured || IsQuestioned() || !IsUsableBy(user))
 			return false;
 		CharacterControllerComponent controller = CharacterControllerComponent.Cast(GetOwner().FindComponent(CharacterControllerComponent));
 		if (!controller || controller.GetLifeState() != ECharacterLifeState.ALIVE || controller.IsUnconscious())
@@ -261,6 +346,7 @@ class INF_PrisonerComponent : ScriptComponent
 			return;
 		}
 		m_bCaptured = true;
+		OfficerOut();
 		INF_BlockPresence.InvalidateWorld();
 		BindCleanupRules(group);
 		m_DamageManager.GetOnDamage().Insert(OnCapturedDamage);
@@ -301,12 +387,15 @@ class INF_PrisonerComponent : ScriptComponent
 		}
 
 		// Questioning and physical searching each have their own team-wide attempt.
-		m_bQuestioned = true;
+		m_iQuestions++;
 		Replication.BumpMe();
-		bool helpful = intel.INF_HasQuestioningIntel() && Math.RandomFloat01() < intel.INF_GetQuestioningChance();
+		float chance = intel.INF_GetQuestioningChance();
+		if (m_bOfficer)
+			chance = INF_Officers.QUESTION_CHANCE;
+		bool helpful = intel.INF_HasQuestioningIntel() && Math.RandomFloat01() < chance;
 		if (helpful)
 			intel.AddIntelAndBroadcast(1, playerID);
-		player.INF_SendPrisonerResponse(INF_PrisonerDialogue.Reply(helpful));
+		player.INF_SendPrisonerResponse(INF_PrisonerDialogue.Reply(helpful, m_bOfficer));
 	}
 
 	// Any player-attributed injury after capture counts, not only the killing blow; a burst of hits is one offence.
@@ -696,7 +785,10 @@ class INF_PrisonerComponent : ScriptComponent
 	override void OnDelete(IEntity owner)
 	{
 		if (m_DamageManager)
+		{
 			m_DamageManager.GetOnDamage().Remove(OnCapturedDamage);
+			m_DamageManager.GetOnDamage().Remove(OnOfficerDamage);
+		}
 		if (GetGame())
 			GetGame().GetCallqueue().Remove(MaintainRestraints);
 	}
@@ -781,6 +873,8 @@ modded class INS_BodySearchAction
 		if (!INF_IntelSearchReady() || !super.CanBePerformedScript(user))
 			return false;
 		INF_PrisonerComponent prisoner = INF_PrisonerComponent.Find(GetOwner());
+		if (prisoner && prisoner.IsOfficer() && prisoner.IsOfficerSearched())
+			return false;
 		if (prisoner && prisoner.IsCaptured())
 			return prisoner.CanSearch(user);
 		return super.CanBeShownScript(user);
@@ -803,6 +897,13 @@ modded class INS_BodySearchAction
 		if (!CanBePerformedScript(pUserEntity))
 		{
 			Print("[INF_Prisoners] Intel search is no longer available or the prisoner is out of reach.", LogLevel.WARNING);
+			return;
+		}
+		// An officer's papers have their own odds, and replace the ordinary search result.
+		INF_PrisonerComponent officer = INF_PrisonerComponent.Find(pOwnerEntity);
+		if (officer && officer.IsOfficer())
+		{
+			officer.SearchOfficer(pUserEntity);
 			return;
 		}
 		super.PerformAction(pOwnerEntity, pUserEntity);

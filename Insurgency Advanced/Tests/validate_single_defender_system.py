@@ -59,7 +59,7 @@ class SingleDefenderSystem(unittest.TestCase):
     def test_five_state_grid_renderer_still_uses_grid_records(self):
         self.assertIn("zones.GetOnChanged().Insert(INF_QueueZoneArea)", MAP)
         self.assertIn("foreach (INS_AmbientPatrolZoneState state : zones.GetZones())", MAP)
-        self.assertIn("area.INF_SetZoneState(state.m_vCenter, INF_BuildingGrid.HALF, appearance, true, state.m_iINFTargetAI)", MAP)
+        self.assertIn("area.INF_SetZoneState(state.m_vCenter, INF_BuildingGrid.HALF, appearance, true, state.m_iINFTargetAI,", MAP)
         for state in ("DORMANT", "ACTIVE", "CAPTURING", "CLEARED", "COUNTERATTACK"):
             self.assertIn("case INF_EGarrisonMapState." + state, MAP)
 

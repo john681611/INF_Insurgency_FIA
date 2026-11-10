@@ -102,7 +102,7 @@ class ZoneVehicles(unittest.TestCase):
         for chance in (0, 15, 100):
             self.assertEqual(sum(roll < chance for roll in range(100)), chance)
         activated = body("void INF_OnZoneActivated(")
-        self.assertIn("Math.RandomInt(0, 100) < m_iINFZoneVehicleChance", activated)
+        self.assertIn("Math.RandomInt(0, 100) < INF_Officers.Boost(m_iINFZoneVehicleChance, zone)", activated)
         self.assertIn("m_bINFZoneVehicleWinCarried ||", activated)
         self.assertLess(activated.index("m_INFZoneVehicleRolls.Contains(key)"),
                         activated.index("m_INFZoneVehicleRolls.Set(key, true)"))

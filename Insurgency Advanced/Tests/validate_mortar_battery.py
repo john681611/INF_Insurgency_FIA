@@ -34,7 +34,7 @@ class MortarBattery(unittest.TestCase):
         self.assertIn("Fail(", start)
         self.assertIn("CarryWin(", start)
         self.assertNotIn("roll lost", start)
-        self.assertIn("m_bWinCarried || Math.RandomInt(0, 100) < config.m_iChance", start)
+        self.assertIn("m_bWinCarried || Math.RandomInt(0, 100) < INF_Officers.Boost(config.m_iChance, zone)", start)
         self.assertIn("Placement rejected", body("protected bool FindPosition("))
 
     def test_win_is_carried_to_the_next_zone_when_unplaceable(self):

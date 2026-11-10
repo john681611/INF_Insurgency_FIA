@@ -524,6 +524,10 @@ modded class INS_AmbientPatrolZoneState
 	ref array<INF_Defence> m_aINFDefences = {};
 	ref array<INF_Defence> m_aINFActiveDefences = {};
 	INF_Defence m_INFSpawnDefence;
+	// Officer zones: flagged at mission start (saved), the post is where the officer's squad stands.
+	bool m_bINFOfficer;
+	bool m_bINFOfficerAlive = true;
+	ref INF_Defence m_INFOfficerPost;
 
 	bool INF_IsCapturing()
 	{
@@ -612,6 +616,14 @@ modded class INS_AmbientPatrolManager
 	protected ResourceName m_sINFMortarComposition;
 	protected ref INF_MortarBatteries m_INFMortars;
 	protected ref INF_MortarConfig m_INFMortarConfig;
+
+	[Attribute("{5117311FB822FD1F}Prefabs/Characters/Factions/OPFOR/USSR_Army/Character_USSR_Officer.et", UIWidgets.ResourceNamePicker, "Officer character. About one zone or camp in 50 (at least one) holds an officer with an extra squad of four, a gold map border, and tripled mortar and vehicle chances. Empty disables officers.", "et", category: "Officers")]
+	protected ResourceName m_sINFOfficerPrefab;
+
+	ResourceName INF_GetOfficerPrefab()
+	{
+		return m_sINFOfficerPrefab;
+	}
 
 	[Attribute("15", UIWidgets.Slider, "Percentage of viable defence positions (road slots for barricades and checkpoints, small flat slots for sandbags, nests and bunkers) that receive a defence at a fresh mission start, then saved and restored. Zero disables defences.", "0 100 5", category: "Defences")]
 	protected int m_iINFDefencePercent = 15;
@@ -1086,6 +1098,7 @@ modded class INS_AmbientPatrolManager
 			m_sINFStartupFailure = "Restoring secured territory is pending. An administrator needs to check camp ownership and territory recovery errors in the server log.";
 			return;
 		}
+		m_INFZoneStates.AssignOfficers(!m_sINFOfficerPrefab.IsEmpty());
 		m_sINFStartupFailure = string.Empty;
 		INS_GarrisonManager areas = INS_GarrisonManager.Cast(GetOwner().FindComponent(INS_GarrisonManager));
 		if (areas)
@@ -1207,6 +1220,9 @@ modded class INS_AmbientPatrolManager
 			int guardAI = 0;
 			foreach (int guardSize : guardPlan)
 				guardAI += guardSize;
+			// The officer's squad is additional to the zone's budget, not drawn from it.
+			if (!state.m_aINFActiveDefences.IsEmpty() && state.m_aINFActiveDefences[0] == state.m_INFOfficerPost)
+				guardAI -= guardPlan[0];
 			int fromZone = Math.Min(Math.Max(limitAI - INF_Defences.MIN_ROAMING, 0), guardAI);
 			INF_BuildingGrid.Plan(limitAI - fromZone,
 				INF_BuildingGrid.Buckets(m_aGroupPrefabs, m_aINFGroupBuckets), state.m_aINFPlan);
@@ -1447,6 +1463,8 @@ modded class INS_AmbientPatrolManager
 			agent = new INS_PatrolAgent(entity, state.m_vCenter, state.m_fRadius);
 			agent.m_bINFInbound = !INF_BuildingGrid.Contains(state.m_vCenter, pos);
 		}
+		if (guardedDefence && guardedDefence.m_bOfficerPost && state.m_bINFOfficerAlive)
+			INF_Officers.SpawnInto(entity, pos, m_sINFOfficerPrefab, INF_BuildingGrid.Key(state.m_vCenter));
 		state.m_aAgents.Insert(agent);
 		m_INFZoneStates.InvalidatePresence();
 		m_CallQueue.CallLater(INF_InitDefenderGroup, 500, false, agent);

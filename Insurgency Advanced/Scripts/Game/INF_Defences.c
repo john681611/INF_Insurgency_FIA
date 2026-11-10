@@ -10,6 +10,8 @@ class INF_Defence
 	float m_fYaw;
 	string m_sOwnerKey;
 	bool m_bFlat;
+	// The officer's squad post: held by a zone, never placed, saved or streamed like a composition defence.
+	bool m_bOfficerPost;
 	int m_iActiveSize;
 	int m_iRememberedAI = -1;
 	float m_fRememberedAt = -1;
@@ -917,6 +919,7 @@ class INF_Defences
 	static void AppendGuards(INS_AmbientPatrolZoneState state, int guards, float now)
 	{
 		state.m_aINFActiveDefences.Clear();
+		INF_Officers.AppendPost(state, now);
 		foreach (INF_Defence defence : state.m_aINFDefences)
 		{
 			int full = guards;
@@ -935,6 +938,8 @@ class INF_Defences
 
 	static bool HasRememberedGuards(INS_AmbientPatrolZoneState state, float now)
 	{
+		if (INF_Officers.HasRememberedSquad(state, now))
+			return true;
 		foreach (INF_Defence defence : state.m_aINFDefences)
 		{
 			if (defence.m_iRememberedAI > 0 && now - defence.m_fRememberedAt < INF_BuildingGrid.DEFENDER_MEMORY_MS)

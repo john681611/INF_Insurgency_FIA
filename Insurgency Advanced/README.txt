@@ -603,6 +603,25 @@ activation hook with no tick of their own, use the shared spawn and despawn gate
 never written to mission saves, preserve secured prisoners under the zone cleanup rules
 and are removed when the mission ends. Every refusal to spawn logs its reason.
 
+Officers
+About one zone or camp in fifty holds an enemy officer (at least one). Set on the game
+mode prefab's patrol manager under Officers (Officer Prefab; empty disables the feature).
+Selection runs once when the zone registry is complete: every unsecured hostile zone and
+camp is shuffled and the first max(1, count / 50) are chosen. The choice and whether each
+officer is still alive are saved in the territory snapshot (format 2; format 1 saves still
+load), so a restart keeps the same officers; a persisted mission that has none gets them
+when it next starts. A clean mission end deletes the snapshot like all other territory.
+An officer zone has a gold, thicker map border until it is cleared, a squad of four that
+is additional to the zone's AI budget, and tripled mortar and vehicle chances (capped at
+100) while the officer lives. The squad is an ordinary defence-guard group around an
+internal post (the camp, or the building nearest the zone centre), so it spawns, is
+remembered, despawns and blocks capture exactly like defence guards, holds the post under
+a defend waypoint and returns to it if displaced. The officer is spawned into that squad.
+Intel: searching his body is one 50% attempt; he can be secured and questioned up to three
+times at 75% each. Each success gives one cache hint like prisoner intel. Killing or
+capturing him ends the officer for good: his squad and zone are otherwise ordinary.
+No timers are added: selection, spawn and death handling all run from existing events.
+
 Defences
 Persistent defences placed into the world's own composition slots (SCR_SiteSlotEntity,
 the slots the editor and base building use): barricades and checkpoints in the road slots,

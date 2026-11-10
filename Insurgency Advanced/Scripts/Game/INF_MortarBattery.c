@@ -135,7 +135,7 @@ class INF_MortarBatteries
 		if (m_Rolls.Contains(key))
 			return;
 		m_Rolls.Set(key, true);
-		bool win = m_bWinCarried || Math.RandomInt(0, 100) < config.m_iChance;
+		bool win = m_bWinCarried || Math.RandomInt(0, 100) < INF_Officers.Boost(config.m_iChance, zone);
 		if (!win)
 			return;
 		INF_MortarBattery covering = Covering(zone.m_vCenter);

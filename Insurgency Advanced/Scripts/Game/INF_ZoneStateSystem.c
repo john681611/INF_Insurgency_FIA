@@ -225,6 +225,41 @@ class INF_ZoneStateSystem
 		m_Persistence.CollectSavedOnlyCells(m_Zones, keys);
 	}
 
+	// Once the registry is complete: restore the saved officer zones, or pick them if this mission has none yet.
+	void AssignOfficers(bool enabled)
+	{
+		if (!enabled || !Replication.IsServer() || !IsPersistenceReady())
+			return;
+		if (!m_Persistence.HasOfficers())
+		{
+			array<INS_AmbientPatrolZoneState> chosen = {};
+			INF_Officers.Select(m_Zones, chosen);
+			foreach (INS_AmbientPatrolZoneState pick : chosen)
+				m_Persistence.AddOfficer(INF_BuildingGrid.Key(pick.m_vCenter));
+			Print(string.Format("[INF_Officers] Assigned %1 officer zone(s).", chosen.Count()));
+		}
+		foreach (INS_AmbientPatrolZoneState state : m_Zones)
+		{
+			string key = INF_BuildingGrid.Key(state.m_vCenter);
+			if (!m_Persistence.IsOfficer(key))
+				continue;
+			state.m_bINFOfficer = true;
+			state.m_bINFOfficerAlive = m_Persistence.IsOfficerAlive(key);
+			state.m_INFOfficerPost = INF_Officers.CreatePost(state);
+			NotifyChanged(state);
+		}
+		FlushPermanent();
+	}
+
+	void OfficerDown(string key)
+	{
+		INS_AmbientPatrolZoneState state = m_Cells.Get(key);
+		if (state)
+			state.m_bINFOfficerAlive = false;
+		if (m_Persistence.OfficerDown(key))
+			FlushPermanent();
+	}
+
 	void Start(IEntity owner)
 	{
 		if (!Replication.IsServer())

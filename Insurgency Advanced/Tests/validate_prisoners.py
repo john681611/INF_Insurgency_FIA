@@ -233,7 +233,7 @@ class Prisoners(unittest.TestCase):
 
     def test_question_requires_captured_conscious_and_unspent(self):
         check = method(SOURCE, "bool CanQuestion(", "bool CanSearch(")
-        for text in ("!m_bCaptured", "m_bQuestioned", "!IsUsableBy(user)",
+        for text in ("!m_bCaptured", "IsQuestioned()", "!IsUsableBy(user)",
                      "ECharacterLifeState.ALIVE", "controller.IsUnconscious()", "!damage.IsBleeding()"):
             self.assertIn(text, check)
         for captured, awake, questioned, searched in product((False, True), repeat=4):
@@ -249,8 +249,8 @@ class Prisoners(unittest.TestCase):
         question = method(SOURCE, "void Question(", "void Respond(")
         for check in ("!Replication.IsServer()", "!CanQuestion(user)",
                       "!intel.INF_IsIntelReady()", "if (!player)"):
-            self.assertLess(question.index(check), question.index("m_bQuestioned = true"))
-        self.assertLess(question.index("m_bQuestioned = true"), question.index("Math.RandomFloat01()"))
+            self.assertLess(question.index(check), question.index("m_iQuestions++"))
+        self.assertLess(question.index("m_iQuestions++"), question.index("Math.RandomFloat01()"))
         self.assertNotIn("MarkSearched", question)
         self.assertIn("AddIntelAndBroadcast(1, playerID)", question)
         self.assertIn("INF_HasQuestioningIntel()", question)
@@ -304,7 +304,7 @@ class Prisoners(unittest.TestCase):
             self.assertEqual(rolls, {"search": 1, "question": 1})
         search = method(SOURCE, "bool CanSearch(", "void Capture(")
         self.assertIn("m_bCaptured && IsUsableBy(user)", search)
-        self.assertNotIn("m_bQuestioned", search)
+        self.assertNotIn("IsQuestioned", search)
         self.assertNotIn("GetLifeState", search)
 
     def test_chance_defaults_to_twice_effective_body_chance_and_is_configurable(self):
@@ -317,7 +317,7 @@ class Prisoners(unittest.TestCase):
         for body, expected in ((0, 0), (0.05, 0.1), (0.3, 0.6), (0.75, 1), (1, 1)):
             self.assertAlmostEqual(min(1, max(0, body * 2)), expected)
         question = method(SOURCE, "void Question(", "void Respond(")
-        self.assertIn("Math.RandomFloat01() < intel.INF_GetQuestioningChance()", question)
+        self.assertIn("Math.RandomFloat01() < chance", question)
         for chance in (0, 0.1, 1):
             self.assertEqual(0 < chance, chance != 0)
             self.assertEqual(0.999999 < chance, chance == 1)
@@ -334,7 +334,7 @@ class Prisoners(unittest.TestCase):
 
     def test_replication_join_in_progress_and_ticker_cleanup(self):
         self.assertIn('[RplProp(onRplName: "OnCapturedChanged")]', SOURCE)
-        self.assertRegex(SOURCE, r"\[RplProp\(\)\]\s+protected bool m_bQuestioned")
+        self.assertRegex(SOURCE, r"\[RplProp\(\)\]\s+protected int m_iQuestions")
         init = method(SOURCE, "override void EOnInit(", "override void OnDelete(")
         self.assertIn("if (m_bCaptured)", init)
         self.assertIn("ApplyRestraints()", init)
@@ -351,7 +351,7 @@ class Prisoners(unittest.TestCase):
         self.assertIn("GetPlayerId() != SCR_PlayerController.GetLocalPlayerId()", response)
         self.assertIn('ShowCustomHint(message, "Prisoner", 10)', response)
         self.assertNotIn("RplRcver.Broadcast", response)
-        dialogue = SOURCE.split("[ComponentEditorProps", 1)[0]
+        dialogue = SOURCE.split("[ComponentEditorProps", 1)[0].split("array<string> helpfulLines", 1)[1]
         helpful, denials = dialogue.split("array<string> refusals", 1)
         helpful_lines = re.findall(r'^\s+"[^"]+"', helpful, re.M)
         refusal_lines = re.findall(r'^\s+"[^"]+"', denials, re.M)
