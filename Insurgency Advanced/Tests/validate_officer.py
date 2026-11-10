@@ -93,9 +93,12 @@ class Officers(unittest.TestCase):
         self.assertNotIn("CallLater", OFFICERS)
         self.assertNotIn("EOnFrame", OFFICERS)
 
-    def test_field_manual_describes_officers(self):
-        for text in ("Enemy officers", "gold border", "50% chance", "three times", "75% chance"):
+    def test_field_manual_describes_officers_without_numbers(self):
+        for text in ("Enemy officers", "gold border", "Gold border - An enemy officer commands the area.",
+                     "interrogated more deeply", "keep him alive"):
             self.assertIn(text, MANUAL)
+        for text in ("50%", "75%", "three times", "fifty", "four-man", "mortar", "vehicle"):
+            self.assertNotIn(text, MANUAL.split("Enemy officers", 1)[1].split("Read the map", 1)[0])
 
 
 if __name__ == "__main__":
