@@ -48,8 +48,12 @@ modded class INS_MissionParams
 	float m_fINFQuestioningChance = -1;
 	[Attribute("-1", UIWidgets.EditBox, "Intel sources: 0 = body search and questioning, 1 = questioning only.", category: "Prisoners")]
 	int m_iINFIntelSource = -1;
-	[Attribute("-1", UIWidgets.EditBox, "Objectives required for victory: 0 = caches, 1 = caches and camps, 2 = caches, camps and zones.", category: "Objectives")]
-	int m_iINFMissionEndMode = -1;
+	[Attribute("-1", UIWidgets.EditBox, "Victory requires every camp captured: 0 = off, 1 = on.", category: "Objectives")]
+	int m_iINFRequireCamps = -1;
+	[Attribute("-1", UIWidgets.EditBox, "Victory requires every building zone captured: 0 = off, 1 = on.", category: "Objectives")]
+	int m_iINFRequireZones = -1;
+	[Attribute("-1", UIWidgets.EditBox, "Victory requires every enemy officer killed or captured: 0 = off, 1 = on.", category: "Objectives")]
+	int m_iINFRequireOfficers = -1;
 	[Attribute("-1", UIWidgets.EditBox, "Cache destruction objective: 0 = off, 1 = on.", category: "Objectives")]
 	int m_iINFCacheObjective = -1;
 }
@@ -455,11 +459,7 @@ class INF_BuildingGrid
 			Print("[INF_BuildingGrid] Cannot load infantry prefab: " + prefab, LogLevel.ERROR);
 			return null;
 		}
-		EntitySpawnParams params = new EntitySpawnParams();
-		params.TransformMode = ETransformMode.WORLD;
-		Math3D.MatrixIdentity4(params.Transform);
-		params.Transform[3] = pos;
-		IEntity entity = GetGame().SpawnEntityPrefab(resource, GetGame().GetWorld(), params);
+		IEntity entity = INF_Spawn.Prefab(resource, pos);
 		if (!entity)
 		{
 			Print("[INF_BuildingGrid] Failed to spawn infantry group.", LogLevel.ERROR);

@@ -66,10 +66,17 @@ modded class INS_IntelManager
 	{
 		INF_HeaderSettings.Float(params.m_fINFQuestioningChance, 0, 1, "m_fINFQuestioningChance", m_fINFQuestioningChance);
 		INF_HeaderSettings.Int(params.m_iINFIntelSource, INF_EIntelSource.SEARCH_AND_QUESTIONING, INF_EIntelSource.QUESTIONING_ONLY, "m_iINFIntelSource", m_iINFIntelSource);
-		INF_HeaderSettings.Int(params.m_iINFMissionEndMode, INF_EMissionEndMode.CACHES, INF_EMissionEndMode.CACHES_CAMPS_ZONES, "m_iINFMissionEndMode", m_iINFMissionEndMode);
-		int cacheObjective;
-		if (INF_HeaderSettings.Int(params.m_iINFCacheObjective, 0, 1, "m_iINFCacheObjective", cacheObjective))
-			m_bINFCacheObjective = cacheObjective == 1;
+		INF_ApplyObjectiveHeader(params.m_iINFRequireCamps, "m_iINFRequireCamps", m_bINFRequireCamps);
+		INF_ApplyObjectiveHeader(params.m_iINFRequireZones, "m_iINFRequireZones", m_bINFRequireZones);
+		INF_ApplyObjectiveHeader(params.m_iINFRequireOfficers, "m_iINFRequireOfficers", m_bINFRequireOfficers);
+		INF_ApplyObjectiveHeader(params.m_iINFCacheObjective, "m_iINFCacheObjective", m_bINFCacheObjective);
+	}
+
+	protected void INF_ApplyObjectiveHeader(int value, string name, out bool target)
+	{
+		int applied;
+		if (INF_HeaderSettings.Int(value, 0, 1, name, applied))
+			target = applied == 1;
 	}
 
 	bool INF_HasQuestioningIntel()
@@ -96,10 +103,16 @@ modded class INS_IntelManager
 	protected ref array<vector> m_aINFPendingCacheDestructions = {};
 	protected ref array<vector> m_aINFZoneCachePositions = {};
 
-	[Attribute("0", UIWidgets.ComboBox, "Objectives required for victory.", enums: ParamEnumArray.FromEnum(INF_EMissionEndMode), category: "Objectives"), RplProp()]
-	protected int m_iINFMissionEndMode = INF_EMissionEndMode.CACHES;
+	[Attribute("0", UIWidgets.CheckBox, "Victory also requires every hostile camp to be captured.", category: "Objectives"), RplProp()]
+	protected bool m_bINFRequireCamps;
+	[Attribute("0", UIWidgets.CheckBox, "Victory also requires every hostile building zone to be captured.", category: "Objectives"), RplProp()]
+	protected bool m_bINFRequireZones;
+	[Attribute("0", UIWidgets.CheckBox, "Victory also requires every enemy officer to be killed or captured.", category: "Objectives"), RplProp()]
+	protected bool m_bINFRequireOfficers;
+	protected bool m_bINFOfficersCleared;
 	protected SCR_Task m_INFCampTask;
 	protected SCR_Task m_INFZoneTask;
+	protected SCR_Task m_INFOfficerTask;
 	protected int m_iINFCampsCaptured;
 	protected int m_iINFCampsTotal;
 	protected int m_iINFZonesCaptured;
@@ -199,9 +212,23 @@ modded class INS_IntelManager
 		GetGame().GetCallqueue().CallLater(INF_RefreshBaseMarkers, 3000, false);
 	}
 
-	int INF_GetMissionEndMode()
+	bool INF_IsObjectiveRequired(INF_EMissionObjective objective)
 	{
-		return m_iINFMissionEndMode;
+		switch (objective)
+		{
+			case INF_EMissionObjective.CAMPS:
+				return m_bINFRequireCamps;
+			case INF_EMissionObjective.ZONES:
+				return m_bINFRequireZones;
+			case INF_EMissionObjective.OFFICERS:
+				return m_bINFRequireOfficers;
+		}
+		return false;
+	}
+
+	bool INF_HasExtraObjectives()
+	{
+		return m_bINFRequireCamps || m_bINFRequireZones || m_bINFRequireOfficers;
 	}
 
 	bool INF_IsIntelReady()
@@ -209,16 +236,25 @@ modded class INS_IntelManager
 		return m_bINFIntelLoaded && !m_bINFMissionEnded;
 	}
 
-	void INF_SetMissionEndMode(int value)
+	void INF_SetObjectiveRequired(INF_EMissionObjective objective, bool required)
 	{
 		if (!Replication.IsServer())
 			return;
-		if (value < INF_EMissionEndMode.CACHES || value > INF_EMissionEndMode.CACHES_CAMPS_ZONES)
+		switch (objective)
 		{
-			Print("[INF_Objectives] Invalid mission-end mode; keeping the current setting.", LogLevel.ERROR);
-			return;
+			case INF_EMissionObjective.CAMPS:
+				m_bINFRequireCamps = required;
+				break;
+			case INF_EMissionObjective.ZONES:
+				m_bINFRequireZones = required;
+				break;
+			case INF_EMissionObjective.OFFICERS:
+				m_bINFRequireOfficers = required;
+				break;
+			default:
+				Print("[INF_Objectives] Invalid mission objective; keeping the current settings.", LogLevel.ERROR);
+				return;
 		}
-		m_iINFMissionEndMode = value;
 		Replication.BumpMe();
 		GetGame().GetCallqueue().Remove(TriggerMissionComplete);
 		m_bINFMissionEndQueued = false;
@@ -259,6 +295,7 @@ modded class INS_IntelManager
 		m_iINFCampsCaptured = INF_CaptureObjectiveCells.Captured(camps);
 		m_iINFZonesTotal = zones.Count();
 		m_iINFZonesCaptured = INF_CaptureObjectiveCells.Captured(zones);
+		m_bINFOfficersCleared = !patrols || !patrols.INF_GetZoneStates() || patrols.INF_GetZoneStates().OfficersCleared();
 		m_bINFCaptureCountsReady = true;
 
 		if (m_bINFCacheObjective)
@@ -269,13 +306,26 @@ modded class INS_IntelManager
 			m_INFZoneTask = INF_UpdateCaptureTask(m_INFZoneTask, "INF_CaptureHostileZones",
 				string.Format("Captured %1/%2 Zones", m_iINFZonesCaptured, m_iINFZonesTotal),
 				"Capture every non-camp 100m building/cache square. Each square counts once. Capture credit is retained for this mission even if a counterattack retakes the zone.");
+			INF_UpdateOfficerTask(patrols);
 		}
-		if (INF_CanCompleteMission() && !m_bINFMissionEndQueued)
 		{
 			m_bINFMissionEndQueued = true;
 			GetGame().GetCallqueue().CallLater(TriggerMissionComplete, 5000, false);
 		}
 		INF_RetryMissingTasks();
+	}
+
+	// Only shown while officers exist in this mission; the count is what is left, since the total is not saved.
+	protected void INF_UpdateOfficerTask(INS_AmbientPatrolManager patrols)
+	{
+		INF_ZoneStateSystem states;
+		if (patrols)
+			states = patrols.INF_GetZoneStates();
+		if (!states || !states.OfficersEnabled())
+			return;
+		m_INFOfficerTask = INF_UpdateCaptureTask(m_INFOfficerTask, "INF_NeutraliseOfficers",
+			string.Format("Officers remaining: %1", states.OfficerCount()),
+			"Enemy officers hold zones marked with a gold border. Kill or capture each one; searching or questioning a secured officer gives better intel odds. His zone is ordinary again once he is down.");
 	}
 
 	protected SCR_Task INF_UpdateCaptureTask(SCR_Task task, string id, string title, string description)
@@ -326,12 +376,15 @@ modded class INS_IntelManager
 		INS_AmbientPatrolManager patrols = INF_ZoneEditorContext.Patrols(GetOwner());
 		if (patrols && !patrols.INF_AreCampsReady())
 			return false;
-		if (m_iINFMissionEndMode == INF_EMissionEndMode.CACHES)
+		if (!INF_HasExtraObjectives())
 			return true;
-		if (!m_bINFCaptureCountsReady || m_iINFCampsCaptured < m_iINFCampsTotal)
+		if (!m_bINFCaptureCountsReady)
 			return false;
-		return m_iINFMissionEndMode != INF_EMissionEndMode.CACHES_CAMPS_ZONES
-			|| m_iINFZonesCaptured >= m_iINFZonesTotal;
+		if (m_bINFRequireCamps && m_iINFCampsCaptured < m_iINFCampsTotal)
+			return false;
+		if (m_bINFRequireZones && m_iINFZonesCaptured < m_iINFZonesTotal)
+			return false;
+		return !m_bINFRequireOfficers || m_bINFOfficersCleared;
 	}
 
 	override protected void TriggerMissionComplete()
@@ -351,9 +404,10 @@ modded class INS_IntelManager
 			return;
 		m_bINFMissionEnded = true;
 		GetGame().GetCallqueue().Remove(TriggerMissionComplete);
-		Print(string.Format("[INF_Objectives] Victory authorised: caches=%1/%2, selected=%3, camps=%4/%5, zones=%6/%7, mode=%8.",
+		string required = string.Format("camps=%1 zones=%2 officers=%3", m_bINFRequireCamps, m_bINFRequireZones, m_bINFRequireOfficers);
+		Print(string.Format("[INF_Objectives] Victory authorised: caches=%1/%2, selected=%3, camps=%4/%5, zones=%6/%7, required %8.",
 			m_iCachesDestroyed, m_aCacheEntities.Count(), INF_ForestCampRewards.CacheCount(),
-			m_iINFCampsCaptured, m_iINFCampsTotal, m_iINFZonesCaptured, m_iINFZonesTotal, m_iINFMissionEndMode));
+			m_iINFCampsCaptured, m_iINFCampsTotal, m_iINFZonesCaptured, m_iINFZonesTotal, required));
 		super.TriggerMissionComplete();
 	}
 
@@ -951,8 +1005,8 @@ modded class INS_IntelManager
 		}
 		if (Replication.IsServer())
 		{
-			Print(string.Format("[INF_Objectives] Mission ending: cacheVictoryAuthorised=%1, caches=%2/%3, selected=%4, mode=%5.",
-				m_bINFMissionEnded, m_iCachesDestroyed, m_aCacheEntities.Count(), m_iINFSelectedCacheCount, m_iINFMissionEndMode));
+			Print(string.Format("[INF_Objectives] Mission ending: cacheVictoryAuthorised=%1, caches=%2/%3, selected=%4, extra objectives=%5.",
+				m_bINFMissionEnded, m_iCachesDestroyed, m_aCacheEntities.Count(), m_iINFSelectedCacheCount, INF_HasExtraObjectives()));
 			m_bINFMissionEnded = true;
 		}
 		GetGame().GetCallqueue().Remove(LoadIntelState);
@@ -1122,10 +1176,7 @@ modded class INS_IntelManager
 		Resource res = Resource.Load("{6AA19CB200000544}Prefabs/Effects/INF_CacheFireSound.et");
 		if (!res || !res.IsValid())
 			return;
-		EntitySpawnParams params = new EntitySpawnParams();
-		params.TransformMode = ETransformMode.WORLD;
-		params.Transform[3] = pos;
-		IEntity blast = GetGame().SpawnEntityPrefab(res, GetGame().GetWorld(), params);
+		IEntity blast = INF_Spawn.Prefab(res, pos);
 		if (!blast)
 			return;
 		SoundComponent sound = SoundComponent.Cast(blast.FindComponent(SoundComponent));
@@ -1170,10 +1221,7 @@ modded class INS_IntelManager
 				Print("[INF_Objectives] Cache fire sound prefab failed to load.", LogLevel.ERROR);
 				return;
 			}
-			EntitySpawnParams params = new EntitySpawnParams();
-			params.TransformMode = ETransformMode.WORLD;
-			params.Transform[3] = pos;
-			m_INFFireSoundEntity = GetGame().SpawnEntityPrefab(res, GetGame().GetWorld(), params);
+			m_INFFireSoundEntity = INF_Spawn.Prefab(res, pos);
 			if (!m_INFFireSoundEntity)
 				return;
 		}
@@ -1232,10 +1280,7 @@ modded class INS_IntelManager
 			Print(string.Format("[INF_Objectives] Cache explosion prefab failed to load: %1", charge), LogLevel.ERROR);
 			return;
 		}
-		EntitySpawnParams params = new EntitySpawnParams();
-		params.TransformMode = ETransformMode.WORLD;
-		params.Transform[3] = pos;
-		IEntity entity = GetGame().SpawnEntityPrefab(res, GetGame().GetWorld(), params);
+		IEntity entity = INF_Spawn.Prefab(res, pos);
 		if (!entity)
 			return;
 		// Effect-only prefabs may fire on spawn without a trigger component.
@@ -1258,7 +1303,7 @@ modded class INS_IntelManager
 	}
 	override protected void ShowCacheDestroyedHint(int destroyed, int total)
 	{
-		if (INF_ZoneEditorContext.Grid(GetOwner()) && m_iINFMissionEndMode != INF_EMissionEndMode.CACHES && destroyed >= total)
+		if (INF_ZoneEditorContext.Grid(GetOwner()) && INF_HasExtraObjectives() && destroyed >= total)
 		{
 			SCR_HintManagerComponent.ShowCustomHint("All weapon caches destroyed. Complete the remaining capture objectives.",
 				"Caches Destroyed", 8);
@@ -1287,6 +1332,8 @@ modded class INS_IntelManager
 			INF_AssignObjective(taskSystem, m_INFCampTask, playerId);
 		if (m_INFZoneTask)
 			INF_AssignObjective(taskSystem, m_INFZoneTask, playerId);
+		if (m_INFOfficerTask)
+			INF_AssignObjective(taskSystem, m_INFOfficerTask, playerId);
 	}
 
 	protected void INF_AssignObjective(SCR_TaskSystem taskSystem, SCR_Task task, int playerId)

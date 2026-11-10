@@ -28,9 +28,8 @@ class CampCompositions(unittest.TestCase):
     def test_one_complete_composition_is_spawned_at_the_site_not_individual_tents(self):
         spawn = CAMP.split("static bool SpawnLayout", 1)[1].split("static bool PrepareComposition", 1)[0]
         self.assertIn("Resource.Load(site.m_Composition)", spawn)
-        self.assertEqual(spawn.count("SpawnEntityPrefab("), 1)
-        self.assertIn("params.Transform[3] = site.m_Position", spawn)
-        self.assertIn("Vector(site.m_Yaw, 0, 0)", spawn)
+        self.assertEqual(spawn.count("INF_Spawn.Prefab("), 1)
+        self.assertIn("INF_Spawn.Prefab(resource, site.m_Position, site.m_Yaw)", spawn)
         self.assertNotIn("foreach", spawn)
         self.assertNotIn("INF_CampTent.et", CAMP)
         self.assertFalse((ROOT / "Prefabs" / "ForestCamps" / "INF_CampTent.et").exists())
@@ -93,7 +92,9 @@ class CampCompositions(unittest.TestCase):
             "INF_SiteStrengthEditorAttribute": "{6AA19CB200000305}",
             "INF_CounterAttackChanceEditorAttribute": "{6AA19CB200000307}",
             "INF_DebugCampMarkersEditorAttribute": "{6AA19CB200000303}",
-            "INF_MissionEndModeEditorAttribute": "{6AA19CB200000301}",
+            "INF_RequireCampsEditorAttribute": "{6AA19CB200000320}",
+            "INF_RequireZonesEditorAttribute": "{6AA19CB200000322}",
+            "INF_RequireOfficersEditorAttribute": "{6AA19CB200000324}",
             "INS_DebugCacheMarkersEditorAttribute": "{494E53000000001C}",
         }
         travel = {(name, guid) for name, guid in (
@@ -108,7 +109,9 @@ class CampCompositions(unittest.TestCase):
     def test_custom_runtime_settings_also_have_workbench_attributes(self):
         for source, field in ((GRID, "m_iINFSiteStrengthMultiplier"),
                               (GRID, "m_iINFChance"),
-                              (INTEL, "m_iINFMissionEndMode"),
+                              (INTEL, "m_bINFRequireCamps"),
+                              (INTEL, "m_bINFRequireZones"),
+                              (INTEL, "m_bINFRequireOfficers"),
                               (GRID, "m_fINFTravelEnterSpeed"),
                               (GRID, "m_fINFTravelExitSpeed"),
                               (GRID, "m_fINFTravelEnterSeconds"),

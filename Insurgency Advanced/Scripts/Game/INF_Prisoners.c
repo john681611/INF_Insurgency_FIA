@@ -444,10 +444,7 @@ class INF_PrisonerComponent : ScriptComponent
 			Print("[INF_Prisoners] Cannot deliver prisoner execution penalty: lightning resource failed to load.", LogLevel.ERROR);
 			return;
 		}
-		EntitySpawnParams parameters = new EntitySpawnParams();
-		parameters.TransformMode = ETransformMode.WORLD;
-		parameters.Transform[3] = offender.GetOrigin();
-		if (!GetGame().SpawnEntityPrefab(lightning, GetGame().GetWorld(), parameters))
+		if (!INF_Spawn.Prefab(lightning, offender.GetOrigin()))
 		{
 			Print("[INF_Prisoners] Cannot deliver prisoner execution penalty: lightning failed to spawn.", LogLevel.ERROR);
 			return;
@@ -654,11 +651,7 @@ class INF_PrisonerComponent : ScriptComponent
 		position[0] = position[0] + Math.Cos(angle) * radius;
 		position[2] = position[2] + Math.Sin(angle) * radius;
 		position[1] = GetGame().GetWorld().GetSurfaceY(position[0], position[2]) + PILE_SPAWN_HEIGHT;
-		EntitySpawnParams params = new EntitySpawnParams();
-		params.TransformMode = ETransformMode.WORLD;
-		Math3D.AnglesToMatrix(Vector(Math.RandomFloat(0, 360), 0, 0), params.Transform);
-		params.Transform[3] = position;
-		IEntity copy = GetGame().SpawnEntityPrefab(resource, GetGame().GetWorld(), params);
+		IEntity copy = INF_Spawn.Prefab(resource, position, Math.RandomFloat(0, 360));
 		if (!copy)
 		{
 			WarnHandling("Dropped prisoner weapon copy failed to spawn: " + prefab);

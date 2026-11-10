@@ -12,14 +12,19 @@ GARRISON = (ROOT / "Scripts/Game/INF_GarrisonMapAreas.c").read_text()
 POLICY = (ROOT / "Scripts/Game/INF_CaptureObjectives.c").read_text()
 
 
-def can_end(mode, cache_total, cache_done, camps, zones, intel_ready=True, counts_ready=True):
+def can_end(required, cache_total, cache_done, camps, zones, officers_cleared=True, intel_ready=True, counts_ready=True):
+    """required is (camps, zones, officers) switches; caches are always required."""
     if not intel_ready or cache_total == 0 or cache_done < cache_total:
         return False
-    if mode == 0:
+    if not any(required):
         return True
-    if not counts_ready or camps[0] < camps[1]:
+    if not counts_ready:
         return False
-    return mode != 2 or zones[0] >= zones[1]
+    if required[0] and camps[0] < camps[1]:
+        return False
+    if required[1] and zones[0] < zones[1]:
+        return False
+    return not required[2] or officers_cleared
 
 
 def merge(entries):
@@ -30,22 +35,28 @@ def merge(entries):
 
 
 class CaptureObjectives(unittest.TestCase):
-    def test_all_three_modes(self):
-        for mode, cache_done, camp_done, zone_done in product(range(3), (0, 2, 3), (0, 1), (0, 2)):
-            with self.subTest(mode=mode, caches=cache_done, camps=camp_done, zones=zone_done):
-                expected = cache_done >= 3 and (mode == 0 or camp_done == 1) and (mode < 2 or zone_done == 2)
-                self.assertEqual(can_end(mode, 3, cache_done, (camp_done, 1), (zone_done, 2)), expected)
-        self.assertIn("m_iINFMissionEndMode = INF_EMissionEndMode.CACHES", INTEL)
+    def test_independent_objective_switches(self):
+        for required, cache_done, camp_done, zone_done, cleared in product(
+                product((False, True), repeat=3), (0, 2, 3), (0, 1), (0, 2), (False, True)):
+            with self.subTest(required=required, caches=cache_done, camps=camp_done, zones=zone_done, officers=cleared):
+                expected = (cache_done >= 3 and (not required[0] or camp_done == 1)
+                            and (not required[1] or zone_done == 2) and (not required[2] or cleared))
+                self.assertEqual(can_end(required, 3, cache_done, (camp_done, 1), (zone_done, 2), cleared), expected)
+        self.assertIn("protected bool m_bINFRequireCamps;", INTEL)
         self.assertIn("m_iINFCampsCaptured < m_iINFCampsTotal", INTEL)
-        self.assertIn("m_iINFZonesCaptured >= m_iINFZonesTotal", INTEL)
+        self.assertIn("m_iINFZonesCaptured < m_iINFZonesTotal", INTEL)
+        self.assertIn("!m_bINFRequireOfficers || m_bINFOfficersCleared", INTEL)
+        for name in ("m_bINFRequireCamps", "m_bINFRequireZones", "m_bINFRequireOfficers"):
+            self.assertRegex(INTEL, r'\[Attribute\("0", UIWidgets.CheckBox[^\n]+RplProp\(\)\]\s+protected bool ' + name)
 
     def test_readiness_zero_sites_and_no_cache_objectives(self):
-        for mode in range(3):
-            self.assertFalse(can_end(mode, 0, 0, (0, 0), (0, 0)))
-            self.assertFalse(can_end(mode, 3, 3, (0, 0), (0, 0), intel_ready=False))
-            self.assertTrue(can_end(mode, 3, 3, (0, 0), (0, 0)))
-        self.assertFalse(can_end(1, 3, 3, (0, 0), (0, 0), counts_ready=False))
-        self.assertFalse(can_end(2, 3, 3, (0, 0), (0, 0), counts_ready=False))
+        for required in product((False, True), repeat=3):
+            self.assertFalse(can_end(required, 0, 0, (0, 0), (0, 0)))
+            self.assertFalse(can_end(required, 3, 3, (0, 0), (0, 0), intel_ready=False))
+            self.assertTrue(can_end(required, 3, 3, (0, 0), (0, 0)))
+        self.assertTrue(can_end((False, False, False), 3, 3, (0, 0), (0, 0), counts_ready=False))
+        for required in ((True, False, False), (False, True, False), (False, False, True)):
+            self.assertFalse(can_end(required, 3, 3, (0, 0), (0, 0), counts_ready=False))
         update = INTEL.split("protected void INF_UpdateCampaignObjectives()", 1)[1].split(
             "protected SCR_Task INF_UpdateCaptureTask", 1)[0]
         self.assertLess(update.index("bool discoveryReady ="), update.index("m_iINFCampsTotal ="))
@@ -101,18 +112,19 @@ class CaptureObjectives(unittest.TestCase):
         self.assertIn("task.GetTaskName() != title", helper)
         join = INTEL.split("override void OnPlayerRegistered(int playerId)", 1)[1].split(
             "protected void INF_AssignObjective", 1)[0]
-        for task in ("m_INFCacheTask", "m_INFCampTask", "m_INFZoneTask"):
+        for task in ("m_INFCacheTask", "m_INFCampTask", "m_INFZoneTask", "m_INFOfficerTask"):
             self.assertIn("if (" + task + ")", join)
 
-    def test_mode_changes_recheck_delayed_victory(self):
-        self.assertTrue(can_end(0, 3, 3, (0, 4), (0, 200)))
-        self.assertFalse(can_end(1, 3, 3, (0, 4), (0, 200)))
-        self.assertTrue(can_end(1, 3, 3, (4, 4), (0, 200)))
-        self.assertFalse(can_end(2, 3, 3, (4, 4), (0, 200)))
-        setter = INTEL.split("void INF_SetMissionEndMode(int value)", 1)[1].split(
+    def test_switch_changes_recheck_delayed_victory(self):
+        self.assertTrue(can_end((False, False, False), 3, 3, (0, 4), (0, 200)))
+        self.assertFalse(can_end((True, False, False), 3, 3, (0, 4), (0, 200)))
+        self.assertTrue(can_end((True, False, False), 3, 3, (4, 4), (0, 200)))
+        self.assertFalse(can_end((True, True, False), 3, 3, (4, 4), (0, 200)))
+        self.assertFalse(can_end((False, False, True), 3, 3, (4, 4), (200, 200), officers_cleared=False))
+        setter = INTEL.split("void INF_SetObjectiveRequired(", 1)[1].split(
             "protected void INF_UpdateCampaignObjectives", 1)[0]
         self.assertIn("!Replication.IsServer()", setter)
-        self.assertIn("Invalid mission-end mode", setter)
+        self.assertIn("Invalid mission objective", setter)
         self.assertIn("Replication.BumpMe()", setter)
         self.assertIn("Remove(TriggerMissionComplete)", setter)
         self.assertIn("m_bINFMissionEndQueued = false", setter)
@@ -124,19 +136,22 @@ class CaptureObjectives(unittest.TestCase):
         self.assertIn("m_bINFMissionEnded = true", trigger)
         self.assertIn("CallLater(TriggerMissionComplete, 5000, false)", INTEL)
 
-    def test_gm_dropdown_preserves_inherited_options(self):
+    def test_gm_checkboxes_preserve_inherited_options(self):
         config = (ROOT / "Configs/Editor/AttributeLists/Edit.conf").read_text()
         meta = (ROOT / "Configs/Editor/AttributeLists/Edit.conf.meta").read_text()
         inherited = "{F3D6C6D25642352C}Configs/Editor/AttributeLists/Edit.conf"
         self.assertIn('SCR_EditorAttributeList : "' + inherited + '"', config)
         self.assertIn(inherited, meta)
-        self.assertIn("INF_MissionEndModeEditorAttribute", config)
-        self.assertIn("AttributePrefab_Dropdown.layout", config)
-        self.assertIn("SCR_BaseEditorAttributeVar.CreateInt", POLICY)
-        self.assertIn("INF_SetMissionEndMode(var.GetInt())", POLICY)
-        for text in ("Caches only", "Caches and camps", "Caches, camps and zones"):
-            self.assertIn('new SCR_BaseEditorAttributeEntryText("' + text + '")', POLICY)
-        self.assertEqual(POLICY.count("outEntries.Insert("), 3)
+        self.assertNotIn("INF_MissionEndModeEditorAttribute", config)
+        for name, guid, objective in (("INF_RequireCampsEditorAttribute", "{6AA19CB200000320}", 0),
+                                      ("INF_RequireZonesEditorAttribute", "{6AA19CB200000322}", 1),
+                                      ("INF_RequireOfficersEditorAttribute", "{6AA19CB200000324}", 2)):
+            entry = config.split(name + ' "' + guid + '" {', 1)[1].split("m_Layout", 1)[0]
+            self.assertIn("m_iObjective " + str(objective), entry)
+            self.assertIn("class " + name + " : INF_MissionObjectiveEditorAttribute", POLICY)
+        self.assertNotIn("AttributePrefab_Dropdown", config.split("INF_RequireCampsEditorAttribute", 1)[1].split("INF_Travel", 1)[0])
+        self.assertIn("SCR_BaseEditorAttributeVar.CreateBool(intel.INF_IsObjectiveRequired(m_iObjective))", POLICY)
+        self.assertIn("intel.INF_SetObjectiveRequired(m_iObjective, var.GetBool())", POLICY)
 
     def test_event_refresh_and_queued_end_cleanup(self):
         self.assertIn("CallLater(INF_UpdateCampaignObjectives, 0, false)", INTEL)

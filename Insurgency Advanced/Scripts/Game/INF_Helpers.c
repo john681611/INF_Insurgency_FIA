@@ -9,6 +9,18 @@ class INF_Persistence
 	}
 }
 
+class INF_Spawn
+{
+	static IEntity Prefab(Resource resource, vector position, float yaw = 0)
+	{
+		EntitySpawnParams params = new EntitySpawnParams();
+		params.TransformMode = ETransformMode.WORLD;
+		Math3D.AnglesToMatrix(Vector(yaw, 0, 0), params.Transform);
+		params.Transform[3] = position;
+		return GetGame().SpawnEntityPrefab(resource, GetGame().GetWorld(), params);
+	}
+}
+
 class INF_ArrayHelper<Class T>
 {
 	static void Shuffle(notnull array<T> items)

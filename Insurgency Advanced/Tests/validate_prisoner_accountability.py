@@ -68,7 +68,7 @@ class PrisonerAccountability(unittest.TestCase):
     def test_lethal_damage_targets_only_the_current_offender(self):
         self.assertIn("players.GetPlayerControlledEntity(attackerID)", SOURCE)
         self.assertIn("offender.FindComponent(SCR_CharacterDamageManagerComponent)", SOURCE)
-        self.assertIn("parameters.Transform[3] = offender.GetOrigin()", SOURCE)
+        self.assertIn("INF_Spawn.Prefab(lightning, offender.GetOrigin())", SOURCE)
         self.assertIn("damage.Kill(Instigator.CreateInstigator(null))", SOURCE)
         effect = (EFFECTS / "PrisonerRebukeEffect.et").read_text()
         for forbidden in ("ExplosionDamageContainer", "DamageValue", "ExplosionImpulseEffect"):
@@ -98,7 +98,7 @@ class PrisonerAccountability(unittest.TestCase):
         self.assertIn("players.GetPlayers(recipients)", callback)
         self.assertIn("foreach (int playerID : recipients)", callback)
         self.assertIn("player.INF_SendPrisonerResponse(message)", callback)
-        self.assertLess(callback.index("SpawnEntityPrefab("), callback.index("damage.Kill("))
+        self.assertLess(callback.index("INF_Spawn.Prefab("), callback.index("damage.Kill("))
         self.assertLess(callback.index("damage.Kill("), callback.index("players.GetPlayers("))
         self.assertIn("lightning resource failed to load", callback)
         self.assertIn("lightning failed to spawn", callback)

@@ -1,6 +1,11 @@
 [BaseContainerProps(), SCR_BaseEditorAttributeCustomTitle()]
-class INF_DebugCampMarkersEditorAttribute : SCR_BaseEditorAttribute
+class INF_DebugMarkersEditorAttribute : SCR_BaseEditorAttribute
 {
+	protected bool UsesCampLayer()
+	{
+		return false;
+	}
+
 	override SCR_BaseEditorAttributeVar ReadVariable(Managed item, SCR_AttributesManagerEditorComponent manager)
 	{
 		if (!IsGameMode(item))
@@ -13,7 +18,7 @@ class INF_DebugCampMarkersEditorAttribute : SCR_BaseEditorAttribute
 		INS_IntelManager intel = INF_ZoneEditorContext.Intel(m_GameMode);
 		if (!intel)
 			return null;
-		return SCR_BaseEditorAttributeVar.CreateBool(intel.INF_GetDebugMarkersForPlayer(editor.GetPlayerID(), true));
+		return SCR_BaseEditorAttributeVar.CreateBool(intel.INF_GetDebugMarkersForPlayer(editor.GetPlayerID(), UsesCampLayer()));
 	}
 
 	override void WriteVariable(Managed item, SCR_BaseEditorAttributeVar var,
@@ -25,39 +30,22 @@ class INF_DebugCampMarkersEditorAttribute : SCR_BaseEditorAttribute
 			return;
 		INS_IntelManager intel = INF_ZoneEditorContext.Intel(m_GameMode);
 		if (intel)
-			intel.INF_SetDebugMarkersForPlayer(playerID, true, var.GetBool());
+			intel.INF_SetDebugMarkersForPlayer(playerID, UsesCampLayer(), var.GetBool());
 	}
 }
 
 [BaseContainerProps(), SCR_BaseEditorAttributeCustomTitle()]
-class INF_DebugCacheMarkersEditorAttribute : SCR_BaseEditorAttribute
+class INF_DebugCampMarkersEditorAttribute : INF_DebugMarkersEditorAttribute
 {
-	override SCR_BaseEditorAttributeVar ReadVariable(Managed item, SCR_AttributesManagerEditorComponent manager)
+	override protected bool UsesCampLayer()
 	{
-		if (!IsGameMode(item))
-			return null;
-		if (!INF_ZoneEditorContext.Grid(m_GameMode))
-			return null;
-		SCR_EditorManagerEntity editor = manager.GetManager();
-		if (!editor || !editor.HasMode(EEditorMode.EDIT))
-			return null;
-		INS_IntelManager intel = INF_ZoneEditorContext.Intel(m_GameMode);
-		if (!intel)
-			return null;
-		return SCR_BaseEditorAttributeVar.CreateBool(intel.INF_GetDebugMarkersForPlayer(editor.GetPlayerID(), false));
+		return true;
 	}
+}
 
-	override void WriteVariable(Managed item, SCR_BaseEditorAttributeVar var,
-		SCR_AttributesManagerEditorComponent manager, int playerID)
-	{
-		if (!var || !IsGameMode(item))
-			return;
-		if (!INF_ZoneEditorContext.Grid(m_GameMode))
-			return;
-		INS_IntelManager intel = INF_ZoneEditorContext.Intel(m_GameMode);
-		if (intel)
-			intel.INF_SetDebugMarkersForPlayer(playerID, false, var.GetBool());
-	}
+[BaseContainerProps(), SCR_BaseEditorAttributeCustomTitle()]
+class INF_DebugCacheMarkersEditorAttribute : INF_DebugMarkersEditorAttribute
+{
 }
 
 modded class INS_DebugCacheMarkersEditorAttribute

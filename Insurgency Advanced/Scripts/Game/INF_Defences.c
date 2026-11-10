@@ -578,11 +578,7 @@ class INF_Defences
 
 	protected static IEntity SpawnAt(Resource resource, vector position, float yaw)
 	{
-		EntitySpawnParams params = new EntitySpawnParams();
-		params.TransformMode = ETransformMode.WORLD;
-		Math3D.AnglesToMatrix(Vector(yaw, 0, 0), params.Transform);
-		params.Transform[3] = position;
-		return GetGame().SpawnEntityPrefab(resource, GetGame().GetWorld(), params);
+		return INF_Spawn.Prefab(resource, position, yaw);
 	}
 
 	protected IEntity SpawnComposition(INF_Defence defence)
@@ -893,11 +889,7 @@ class INF_Defences
 			Fail("Defend waypoint prefab cannot load; defence guards will idle.");
 			return null;
 		}
-		EntitySpawnParams params = new EntitySpawnParams();
-		params.TransformMode = ETransformMode.WORLD;
-		Math3D.MatrixIdentity4(params.Transform);
-		params.Transform[3] = position;
-		AIWaypoint waypoint = AIWaypoint.Cast(GetGame().SpawnEntityPrefab(resource, GetGame().GetWorld(), params));
+		AIWaypoint waypoint = AIWaypoint.Cast(INF_Spawn.Prefab(resource, position));
 		if (!waypoint)
 		{
 			Fail("Defend waypoint failed to spawn; defence guards will idle.");

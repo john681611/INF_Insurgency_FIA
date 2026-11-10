@@ -36,7 +36,10 @@ class GMDebugPreferences(unittest.TestCase):
         self.assertIn("controller.INF_SendDebugMarkerSnapshot(layers, cachePositions, campPositions)", snapshot)
 
     def test_attributes_read_and_write_requesting_players_preferences(self):
-        for camps in ("true", "false"):
+        self.assertIn("INF_GetDebugMarkersForPlayer(editor.GetPlayerID(), UsesCampLayer())", ATTRIBUTES)
+        self.assertIn("INF_SetDebugMarkersForPlayer(playerID, UsesCampLayer(), var.GetBool())", ATTRIBUTES)
+        self.assertIn("class INF_DebugCampMarkersEditorAttribute : INF_DebugMarkersEditorAttribute", ATTRIBUTES)
+        for camps in ("false",):
             self.assertIn(f"INF_GetDebugMarkersForPlayer(editor.GetPlayerID(), {camps})", ATTRIBUTES)
             self.assertIn(f"INF_SetDebugMarkersForPlayer(playerID, {camps}, var.GetBool())", ATTRIBUTES)
         self.assertIn("editor.HasMode(EEditorMode.EDIT)", ATTRIBUTES)

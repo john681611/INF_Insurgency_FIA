@@ -72,7 +72,7 @@ class INF_QuestioningChanceEditorAttribute : SCR_BaseValueListEditorAttribute
 	{
 		if (!IsGameMode(item) || !INF_ZoneEditorContext.Grid(m_GameMode))
 			return null;
-		INS_IntelManager intel = INS_IntelManager.Cast(m_GameMode.FindComponent(INS_IntelManager));
+		INS_IntelManager intel = INF_ZoneEditorContext.Intel(m_GameMode);
 		if (!intel)
 			return null;
 		return SCR_BaseEditorAttributeVar.CreateFloat(intel.INF_GetQuestioningChance() * 100);
@@ -83,7 +83,7 @@ class INF_QuestioningChanceEditorAttribute : SCR_BaseValueListEditorAttribute
 	{
 		if (!var || !IsGameMode(item) || !INF_ZoneEditorContext.Grid(m_GameMode))
 			return;
-		INS_IntelManager intel = INS_IntelManager.Cast(m_GameMode.FindComponent(INS_IntelManager));
+		INS_IntelManager intel = INF_ZoneEditorContext.Intel(m_GameMode);
 		if (intel)
 			intel.INF_SetQuestioningChance(var.GetFloat() / 100);
 	}
@@ -102,7 +102,7 @@ class INF_IntelSourceEditorAttribute : SCR_BaseEditorAttribute
 	{
 		if (!IsGameMode(item) || !INF_ZoneEditorContext.Grid(m_GameMode))
 			return null;
-		INS_IntelManager intel = INS_IntelManager.Cast(m_GameMode.FindComponent(INS_IntelManager));
+		INS_IntelManager intel = INF_ZoneEditorContext.Intel(m_GameMode);
 		if (!intel)
 			return null;
 		return SCR_BaseEditorAttributeVar.CreateInt(intel.INF_GetIntelSource());
@@ -113,7 +113,7 @@ class INF_IntelSourceEditorAttribute : SCR_BaseEditorAttribute
 	{
 		if (!var || !IsGameMode(item) || !INF_ZoneEditorContext.Grid(m_GameMode))
 			return;
-		INS_IntelManager intel = INS_IntelManager.Cast(m_GameMode.FindComponent(INS_IntelManager));
+		INS_IntelManager intel = INF_ZoneEditorContext.Intel(m_GameMode);
 		if (intel)
 			intel.INF_SetIntelSource(var.GetInt());
 	}

@@ -862,11 +862,7 @@ class INF_ForestCamps
 			Print("[INF_ForestCamps] Cannot load configured camp composition: " + site.m_Composition, LogLevel.ERROR);
 			return false;
 		}
-		EntitySpawnParams params = new EntitySpawnParams();
-		params.TransformMode = ETransformMode.WORLD;
-		Math3D.AnglesToMatrix(Vector(site.m_Yaw, 0, 0), params.Transform);
-		params.Transform[3] = site.m_Position;
-		IEntity prop = GetGame().SpawnEntityPrefab(resource, GetGame().GetWorld(), params);
+		IEntity prop = INF_Spawn.Prefab(resource, site.m_Position, site.m_Yaw);
 		if (!prop)
 		{
 			Print("[INF_ForestCamps] Camp composition spawn failed.", LogLevel.ERROR);
@@ -1079,11 +1075,7 @@ class INF_ForestCamps
 		vector position = arsenalTransform[3] + arsenalTransform[0] * SERVICE_OFFSET;
 		position[1] = GetGame().GetWorld().GetSurfaceY(position[0], position[2]);
 		vector inward = site.m_Position - position;
-		EntitySpawnParams params = new EntitySpawnParams();
-		params.TransformMode = ETransformMode.WORLD;
-		Math3D.AnglesToMatrix(Vector(inward.ToYaw(), 0, 0), params.Transform);
-		params.Transform[3] = position;
-		IEntity service = GetGame().SpawnEntityPrefab(resource, GetGame().GetWorld(), params);
+		IEntity service = INF_Spawn.Prefab(resource, position, inward.ToYaw());
 		if (!service)
 		{
 			Print("[INF_ForestCamps] Camp vehicle service spawn failed: " + site.m_Key, LogLevel.ERROR);

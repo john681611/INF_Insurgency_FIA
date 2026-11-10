@@ -759,11 +759,7 @@ modded class INS_AmbientVehicleManager
 			Print("[INF_ZoneVehicles] Cannot load configured vehicle: " + prefab, LogLevel.ERROR);
 			return;
 		}
-		EntitySpawnParams params = new EntitySpawnParams();
-		params.TransformMode = ETransformMode.WORLD;
-		Math3D.AnglesToMatrix(Vector(yaw, 0, 0), params.Transform);
-		params.Transform[3] = pos;
-		IEntity entity = GetGame().SpawnEntityPrefab(resource, GetGame().GetWorld(), params);
+		IEntity entity = INF_Spawn.Prefab(resource, pos, yaw);
 		if (!entity)
 		{
 			Print("[INF_ZoneVehicles] Vehicle spawn failed.", LogLevel.ERROR);

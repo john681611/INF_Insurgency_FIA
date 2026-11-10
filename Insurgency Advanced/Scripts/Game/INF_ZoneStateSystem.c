@@ -25,6 +25,7 @@ class INF_ZoneStateSystem
 	protected float m_EnemySampleAt = -1;
 	protected bool m_LoopQueued;
 	protected bool m_Stopped;
+	protected bool m_bOfficersEnabled;
 	protected int m_SaveRetryMS = 5000;
 	protected IEntity m_Owner;
 	protected ref INF_TerritoryPersistence m_Persistence = new INF_TerritoryPersistence();
@@ -230,12 +231,14 @@ class INF_ZoneStateSystem
 	{
 		if (!enabled || !Replication.IsServer() || !IsPersistenceReady())
 			return;
-		if (!m_Persistence.HasOfficers())
+		m_bOfficersEnabled = true;
+		if (!m_Persistence.OfficersAssigned())
 		{
 			array<INS_AmbientPatrolZoneState> chosen = {};
 			INF_Officers.Select(m_Zones, chosen);
 			foreach (INS_AmbientPatrolZoneState pick : chosen)
 				m_Persistence.AddOfficer(INF_BuildingGrid.Key(pick.m_vCenter));
+			m_Persistence.MarkOfficersAssigned();
 			Print(string.Format("[INF_Officers] Assigned %1 officer zone(s).", chosen.Count()));
 		}
 		foreach (INS_AmbientPatrolZoneState state : m_Zones)
@@ -258,10 +261,27 @@ class INF_ZoneStateSystem
 		{
 			state.m_bINFOfficer = false;
 			state.m_INFOfficerPost = null;
-			NotifyChanged(state);
 		}
 		m_Persistence.RemoveOfficer(key);
 		FlushPermanent();
+		if (state)
+			NotifyChanged(state, true);
+	}
+
+	// With officers disabled there are none to clear; otherwise every officer chosen must be down.
+	bool OfficersCleared()
+	{
+		return !m_bOfficersEnabled || (m_Persistence.OfficersAssigned() && m_Persistence.OfficerCount() == 0);
+	}
+
+	bool OfficersEnabled()
+	{
+		return m_bOfficersEnabled;
+	}
+
+	int OfficerCount()
+	{
+		return m_Persistence.OfficerCount();
 	}
 
 	void Start(IEntity owner)

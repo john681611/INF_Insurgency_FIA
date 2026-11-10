@@ -383,7 +383,9 @@ the range log an error and keep the game mode value. Complete default header:
       "m_iINFZoneVehicleLimit": -1,
       "m_fINFQuestioningChance": -1,
       "m_iINFIntelSource": -1,
-      "m_iINFMissionEndMode": -1,
+      "m_iINFRequireCamps": -1,
+      "m_iINFRequireZones": -1,
+      "m_iINFRequireOfficers": -1,
       "m_iINFCacheObjective": -1
     }
   }
@@ -407,7 +409,9 @@ Game mode defaults and ranges when left at -1:
   m_iINFZoneVehicleLimit        6      0-32
   m_fINFQuestioningChance       twice the body-search chance, capped at 1; 0-1
   m_iINFIntelSource             0      0 = search and questioning, 1 = questioning only
-  m_iINFMissionEndMode          0      0 = caches, 1 = + camps, 2 = + camps and zones
+  m_iINFRequireCamps            0      0 = off, 1 = victory also needs every camp captured
+  m_iINFRequireZones            0      0 = off, 1 = victory also needs every building zone captured (camps count separately)
+  m_iINFRequireOfficers         0      0 = off, 1 = victory also needs every officer killed or captured
   m_iINFCacheObjective          0      0 = off, 1 = on
   m_sINFPlayerFaction           US
 Compositions (camp, mortar) default to the game mode's USSR prefabs.
@@ -608,8 +612,9 @@ About one zone or camp in fifty holds an enemy officer (at least one). Set on th
 mode prefab's patrol manager under Officers (Officer Prefab; empty disables the feature).
 Selection runs once when the zone registry is complete: every unsecured hostile zone and
 camp is shuffled and the first max(1, count / 50) are chosen. The chosen zones are saved
-in the territory snapshot (format 2; format 1 saves still load), so a restart keeps the
-same officers; a persisted mission that has none gets them when it next starts. A clean
+in the territory snapshot (format 3; formats 1 and 2 still load) with an "officers
+assigned" flag, so a restart keeps the same officers and never re-rolls once they are all
+down; a persisted mission that predates officers gets them when it next starts. A clean
 mission end deletes the snapshot like all other territory.
 An officer zone has a gold map border, a squad of four that
 is additional to the zone's AI budget, and tripled mortar and vehicle chances (capped at
@@ -620,7 +625,9 @@ a defend waypoint and returns to it if displaced. The officer is spawned into th
 Intel: searching his body is one 50% attempt; he can be secured and questioned up to three
 times at 75% each. Each success gives one cache hint like prisoner intel. Killing or
 capturing him makes the zone ordinary again: it is removed from the saved set, loses the
-gold border, squad post and boosts, and the officer never returns.
+gold border, squad post and boosts, and the officer never returns. With the cache objective
+on, an "Officers remaining" task lists how many are left. The Victory Requires: All Officers
+switch (header m_iINFRequireOfficers) makes clearing them a victory condition.
 No timers are added: selection, spawn and death handling all run from existing events.
 
 Defences

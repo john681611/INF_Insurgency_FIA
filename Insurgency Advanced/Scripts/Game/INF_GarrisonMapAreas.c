@@ -310,10 +310,7 @@ modded class INS_GarrisonManager
 		float now = GetGame().GetWorld().GetWorldTime();
 		if (now < m_fINFNextAreaSpawnAttempt)
 			return null;
-		EntitySpawnParams spawnParams = new EntitySpawnParams();
-		spawnParams.TransformMode = ETransformMode.WORLD;
-		spawnParams.Transform[3] = center;
-		IEntity entity = GetGame().SpawnEntityPrefab(m_INFZoneAreaResource, GetGame().GetWorld(), spawnParams);
+		IEntity entity = INF_Spawn.Prefab(m_INFZoneAreaResource, center);
 		INF_GarrisonMapArea area = INF_GarrisonMapArea.Cast(entity);
 		if (!area)
 		{

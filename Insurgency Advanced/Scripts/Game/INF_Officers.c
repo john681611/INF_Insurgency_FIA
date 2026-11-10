@@ -98,11 +98,7 @@ class INF_Officers
 			Print("[INF_Officers] Cannot spawn the officer: squad or officer prefab unavailable: " + prefab, LogLevel.ERROR);
 			return;
 		}
-		EntitySpawnParams params = new EntitySpawnParams();
-		params.TransformMode = ETransformMode.WORLD;
-		Math3D.MatrixIdentity4(params.Transform);
-		params.Transform[3] = position;
-		IEntity entity = GetGame().SpawnEntityPrefab(resource, GetGame().GetWorld(), params);
+		IEntity entity = INF_Spawn.Prefab(resource, position);
 		ChimeraCharacter character = ChimeraCharacter.Cast(entity);
 		AIControlComponent control;
 		AIAgent agent;

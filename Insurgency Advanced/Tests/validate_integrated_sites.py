@@ -59,7 +59,7 @@ class IntegratedSites(unittest.TestCase):
         self.assertIn("!patrols.INF_AreCampsReady()", GRID.split("override protected void CounterAttackTick", 1)[1])
         complete = INTEL.split("protected bool INF_CanCompleteMission()", 1)[1].split(
             "override protected void TriggerMissionComplete", 1)[0]
-        self.assertLess(complete.index("!patrols.INF_AreCampsReady()"), complete.index("INF_EMissionEndMode.CACHES"))
+        self.assertLess(complete.index("!patrols.INF_AreCampsReady()"), complete.index("!INF_HasExtraObjectives()"))
 
     def test_owned_site_objects_are_not_obstructions_or_concealment(self):
         exclude = CAMP.split("static void ExcludeSite", 1)[1].split("static bool DryFlat", 1)[0]

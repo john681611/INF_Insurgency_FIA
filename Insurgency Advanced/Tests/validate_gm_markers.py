@@ -147,8 +147,8 @@ class GMMarkerContracts(unittest.TestCase):
         self.assertIn('Name "Debug: Show Camp Locations"', config)
         self.assertIn("INF_DebugCampMarkersEditorAttribute", config)
         self.assertIn("AttributePrefab_Checkbox.layout", config)
-        self.assertIn("intel.INF_GetDebugMarkersForPlayer(editor.GetPlayerID(), true)", attribute)
-        self.assertIn("intel.INF_SetDebugMarkersForPlayer(playerID, true, var.GetBool())", attribute)
+        self.assertIn("INF_GetDebugMarkersForPlayer(editor.GetPlayerID(), UsesCampLayer())", attribute)
+        self.assertIn("intel.INF_SetDebugMarkersForPlayer(playerID, UsesCampLayer(), var.GetBool())", attribute)
         self.assertIn("protected bool m_bINFDebugCampMarkers;", source)
         setter = source.split("void INF_SetDebugMarkersForPlayer(", 1)[1].split(
             "protected void INF_SendDebugMarkerSnapshot", 1)[0]

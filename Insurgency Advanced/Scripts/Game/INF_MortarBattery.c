@@ -400,12 +400,8 @@ class INF_MortarBatteries
 		Resource resource = Resource.Load(prefab);
 		if (!resource || !resource.IsValid())
 			return null;
-		EntitySpawnParams params = new EntitySpawnParams();
-		params.TransformMode = ETransformMode.WORLD;
-		Math3D.AnglesToMatrix(Vector(yaw, 0, 0), params.Transform);
 		pos[1] = GetGame().GetWorld().GetSurfaceY(pos[0], pos[2]);
-		params.Transform[3] = pos;
-		return GetGame().SpawnEntityPrefab(resource, GetGame().GetWorld(), params);
+		return INF_Spawn.Prefab(resource, pos, yaw);
 	}
 
 	// Waits for each composition's mortar and every group's members, then hands each mortar to its own crew.

@@ -36,14 +36,16 @@ class Officers(unittest.TestCase):
 
     def test_selection_is_saved_and_restored_once_the_registry_is_complete(self):
         assign = method_body(ZONES, "void AssignOfficers(")
-        self.assertIn("!m_Persistence.HasOfficers()", assign)
+        self.assertIn("!m_Persistence.OfficersAssigned()", assign)
+        self.assertIn("m_Persistence.MarkOfficersAssigned()", assign)
         self.assertIn("m_Persistence.AddOfficer(", assign)
         self.assertIn("m_Persistence.IsOfficer(key)", assign)
         self.assertIn("m_Persistence.RemoveOfficer(key)", method_body(ZONES, "void OfficerDown("))
         self.assertIn("state.m_bINFOfficer = false", method_body(ZONES, "void OfficerDown("))
         self.assertLess(GRID.index("RestorePermanentCamps()"), GRID.index("AssignOfficers("))
-        self.assertIn("file.Write(2)", PERSISTENCE)
-        self.assertIn("version == 1 || version == 2", PERSISTENCE)
+        self.assertIn("file.Write(3)", PERSISTENCE)
+        self.assertIn("version >= 1 && version <= 3", PERSISTENCE)
+        self.assertIn("verified.m_OfficersAssigned != m_State.m_OfficersAssigned", PERSISTENCE)
         self.assertIn("verified.m_Officers.Count() != m_State.m_Officers.Count()", PERSISTENCE)
 
     def test_squad_reuses_the_defence_guard_path_and_is_additional_to_the_budget(self):
@@ -72,6 +74,18 @@ class Officers(unittest.TestCase):
         self.assertIn("OfficerOut()", capture)
         self.assertIn("m_DamageManager.IsDestroyed()", method_body(PRISONERS, "protected void OnOfficerDamage("))
         self.assertIn("officer.SearchOfficer(pUserEntity)", PRISONERS)
+
+    def test_officer_objective_switch_is_wired_to_the_saved_set(self):
+        cleared = method_body(ZONES, "bool OfficersCleared(")
+        self.assertIn("!m_bOfficersEnabled", cleared)
+        self.assertIn("m_Persistence.OfficersAssigned() && m_Persistence.OfficerCount() == 0", cleared)
+        self.assertIn("NotifyChanged(state, true)", method_body(ZONES, "void OfficerDown("))
+        intel = (SCRIPTS / "INF_CacheObjective.c").read_text()
+        self.assertIn("patrols.INF_GetZoneStates().OfficersCleared()", intel)
+        task = method_body(intel, "protected void INF_UpdateOfficerTask(")
+        self.assertIn("!states.OfficersEnabled()", task)
+        self.assertIn('"INF_NeutraliseOfficers"', task)
+        self.assertIn("INF_UpdateOfficerTask(patrols)", intel)
 
     def test_no_new_timers(self):
         self.assertNotIn("CallLater", OFFICERS)

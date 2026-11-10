@@ -1,8 +1,9 @@
-enum INF_EMissionEndMode
+// Extra objectives that can each be required for victory; caches are always required.
+enum INF_EMissionObjective
 {
-	CACHES,
-	CACHES_CAMPS,
-	CACHES_CAMPS_ZONES
+	CAMPS,
+	ZONES,
+	OFFICERS
 }
 
 class INF_CaptureObjectiveCells
@@ -28,8 +29,11 @@ class INF_CaptureObjectiveCells
 }
 
 [BaseContainerProps(), SCR_BaseEditorAttributeCustomTitle()]
-class INF_MissionEndModeEditorAttribute : SCR_BaseEditorAttribute
+class INF_MissionObjectiveEditorAttribute : SCR_BaseEditorAttribute
 {
+	[Attribute("0")]
+	protected int m_iObjective;
+
 	override SCR_BaseEditorAttributeVar ReadVariable(Managed item, SCR_AttributesManagerEditorComponent manager)
 	{
 		if (!IsGameMode(item))
@@ -39,7 +43,7 @@ class INF_MissionEndModeEditorAttribute : SCR_BaseEditorAttribute
 		INS_IntelManager intel = INF_ZoneEditorContext.Intel(m_GameMode);
 		if (!intel)
 			return null;
-		return SCR_BaseEditorAttributeVar.CreateInt(intel.INF_GetMissionEndMode());
+		return SCR_BaseEditorAttributeVar.CreateBool(intel.INF_IsObjectiveRequired(m_iObjective));
 	}
 
 	override void WriteVariable(Managed item, SCR_BaseEditorAttributeVar var,
@@ -51,14 +55,21 @@ class INF_MissionEndModeEditorAttribute : SCR_BaseEditorAttribute
 			return;
 		INS_IntelManager intel = INF_ZoneEditorContext.Intel(m_GameMode);
 		if (intel)
-			intel.INF_SetMissionEndMode(var.GetInt());
+			intel.INF_SetObjectiveRequired(m_iObjective, var.GetBool());
 	}
+}
 
-	override int GetEntries(notnull array<ref SCR_BaseEditorAttributeEntry> outEntries)
-	{
-		outEntries.Insert(new SCR_BaseEditorAttributeEntryText("Caches only"));
-		outEntries.Insert(new SCR_BaseEditorAttributeEntryText("Caches and camps"));
-		outEntries.Insert(new SCR_BaseEditorAttributeEntryText("Caches, camps and zones"));
-		return outEntries.Count();
-	}
+[BaseContainerProps(), SCR_BaseEditorAttributeCustomTitle()]
+class INF_RequireCampsEditorAttribute : INF_MissionObjectiveEditorAttribute
+{
+}
+
+[BaseContainerProps(), SCR_BaseEditorAttributeCustomTitle()]
+class INF_RequireZonesEditorAttribute : INF_MissionObjectiveEditorAttribute
+{
+}
+
+[BaseContainerProps(), SCR_BaseEditorAttributeCustomTitle()]
+class INF_RequireOfficersEditorAttribute : INF_MissionObjectiveEditorAttribute
+{
 }

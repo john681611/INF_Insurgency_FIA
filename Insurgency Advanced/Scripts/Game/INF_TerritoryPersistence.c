@@ -4,6 +4,8 @@ class INF_TerritorySnapshot
 	ref map<string, string> m_Cells = new map<string, string>();
 	// Officer zone keys; a killed or captured officer is removed.
 	ref array<string> m_Officers = {};
+	// Set once the first selection has been made, so an empty set means "all down", not "not chosen yet".
+	bool m_OfficersAssigned;
 }
 
 // Alternate complete snapshots so a failed write cannot destroy the last good save.
@@ -64,7 +66,7 @@ class INF_TerritoryPersistence
 		INF_TerritorySnapshot result = new INF_TerritorySnapshot();
 		bool valid = file.Read(magic) && file.Read(version) && file.Read(world)
 			&& file.Read(result.m_Generation) && file.Read(count);
-		valid = valid && magic == "INF_TERRITORY" && (version == 1 || version == 2)
+		valid = valid && magic == "INF_TERRITORY" && version >= 1 && version <= 3
 			&& world == GetGame().GetWorldFile() && result.m_Generation > 0
 			&& count >= 0 && count <= 100000;
 		for (int i = 0; valid && i < count; i++)
@@ -76,7 +78,9 @@ class INF_TerritoryPersistence
 			if (valid)
 				result.m_Cells.Set(key, camp);
 		}
-		int officerCount;
+		int assigned, officerCount;
+		if (valid && version >= 3)
+			valid = file.Read(assigned) && (assigned == 0 || assigned == 1);
 		if (valid && version >= 2)
 			valid = file.Read(officerCount) && officerCount >= 0 && officerCount <= 100000;
 		for (int o = 0; valid && o < officerCount; o++)
@@ -86,6 +90,8 @@ class INF_TerritoryPersistence
 			if (valid)
 				result.m_Officers.Insert(officerKey);
 		}
+		// Format 2 had no flag: officers on file meant they had been assigned.
+		result.m_OfficersAssigned = assigned == 1 || (version == 2 && officerCount > 0);
 		valid = valid && file.Read(complete) && complete == "COMPLETE";
 		file.Close();
 		if (!valid)
@@ -138,9 +144,22 @@ class INF_TerritoryPersistence
 		return m_Ready && m_State.m_Cells.Contains(key);
 	}
 
-	bool HasOfficers()
+	bool OfficersAssigned()
 	{
-		return m_State.m_Officers.Count() > 0;
+		return m_State.m_OfficersAssigned;
+	}
+
+	int OfficerCount()
+	{
+		return m_State.m_Officers.Count();
+	}
+
+	void MarkOfficersAssigned()
+	{
+		if (!m_Ready || m_State.m_OfficersAssigned)
+			return;
+		m_State.m_OfficersAssigned = true;
+		m_Dirty = true;
 	}
 
 	bool IsOfficer(string key)
@@ -228,7 +247,7 @@ class INF_TerritoryPersistence
 			return;
 		}
 		int generation = m_State.m_Generation + 1;
-		bool success = file.Write("INF_TERRITORY") && file.Write(2)
+		bool success = file.Write("INF_TERRITORY") && file.Write(3)
 			&& file.Write(GetGame().GetWorldFile()) && file.Write(generation)
 			&& file.Write(m_State.m_Cells.Count());
 		foreach (string key, string camp : m_State.m_Cells)
@@ -236,8 +255,11 @@ class INF_TerritoryPersistence
 			if (!file.Write(key) || !file.Write(camp))
 				success = false;
 		}
+		int assignedFlag = 0;
+		if (m_State.m_OfficersAssigned)
+			assignedFlag = 1;
 		if (success)
-			success = file.Write(m_State.m_Officers.Count());
+			success = file.Write(assignedFlag) && file.Write(m_State.m_Officers.Count());
 		foreach (string officerKey : m_State.m_Officers)
 		{
 			if (!file.Write(officerKey))
@@ -250,7 +272,8 @@ class INF_TerritoryPersistence
 		if (success)
 			verified = ReadSlot(slot);
 		if (!verified || verified.m_Generation != generation || verified.m_Cells.Count() != m_State.m_Cells.Count()
-			|| verified.m_Officers.Count() != m_State.m_Officers.Count())
+			|| verified.m_Officers.Count() != m_State.m_Officers.Count()
+			|| verified.m_OfficersAssigned != m_State.m_OfficersAssigned)
 		{
 			WriteFailure("Territory snapshot write/verification failed; retaining previous snapshot and retrying.");
 			return;

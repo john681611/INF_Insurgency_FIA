@@ -46,12 +46,12 @@ class CacheState:
             self.flags[key] = True
             self.awards += 1
 
-    def can_end(self, mode=0, camps=(0, 0), zones=(0, 0)):
+    def can_end(self, camps_required=False, zones_required=False, camps=(0, 0), zones=(0, 0)):
         return (self.ready and bool(self.selected)
                 and len(self.registered) == len(self.selected)
                 and all(self.flags.values())
-                and (mode == 0 or camps[0] >= camps[1])
-                and (mode != 2 or zones[0] >= zones[1]))
+                and (not camps_required or camps[0] >= camps[1])
+                and (not zones_required or zones[0] >= zones[1]))
 
 
 class ReplicationAndCacheVictory(unittest.TestCase):
@@ -229,16 +229,17 @@ class ReplicationAndCacheVictory(unittest.TestCase):
         state.destroy("B")
         self.assertFalse(state.can_end())
         state.destroy("C")
-        self.assertTrue(state.can_end(0))
-        self.assertFalse(state.can_end(1, camps=(1, 2)))
-        self.assertFalse(state.can_end(2, camps=(2, 2), zones=(2, 3)))
-        self.assertTrue(state.can_end(2, camps=(2, 2), zones=(3, 3)))
+        self.assertTrue(state.can_end())
+        self.assertFalse(state.can_end(True, camps=(1, 2)))
+        self.assertFalse(state.can_end(True, True, camps=(2, 2), zones=(2, 3)))
+        self.assertTrue(state.can_end(True, True, camps=(2, 2), zones=(3, 3)))
+        self.assertTrue(state.can_end(False, True, camps=(0, 2), zones=(3, 3)))
         # A genuinely two-cache recovered roster is not silently expanded or reset.
         smaller = CacheState("AB")
         smaller.restore(0, [True, True])
         self.assertTrue(smaller.can_end())
         hint = method(INTEL, "override protected void ShowCacheDestroyedHint(")
-        self.assertIn("m_iINFMissionEndMode != INF_EMissionEndMode.CACHES", hint)
+        self.assertIn("INF_HasExtraObjectives()", hint)
 
     def test_private_rpc_results_stay_private_and_persistent_state_is_not_rpc_only(self):
         self.assertEqual(CONTROLLER.count("RplRcver.Owner"), 2)
