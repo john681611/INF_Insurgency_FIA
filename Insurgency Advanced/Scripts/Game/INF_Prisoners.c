@@ -769,6 +769,11 @@ class INF_PrisonerComponent : ScriptComponent
 	{
 		if (m_bCaptured)
 			ApplyRestraints();
+		if (!Replication.IsServer())
+			return;
+		string officerKey = INF_Officers.Claim(owner);
+		if (!officerKey.IsEmpty())
+			INF_MarkOfficer(officerKey);
 	}
 
 	override void OnDelete(IEntity owner)

@@ -1456,7 +1456,7 @@ modded class INS_AmbientPatrolManager
 			agent.m_bINFInbound = !INF_BuildingGrid.Contains(state.m_vCenter, pos);
 		}
 		if (guardedDefence && guardedDefence.m_bOfficerPost && state.m_bINFOfficer)
-			INF_Officers.SpawnInto(entity, pos, m_sINFOfficerPrefab, INF_BuildingGrid.Key(state.m_vCenter));
+			INF_Officers.AddToSquad(entity, pos, m_sINFOfficerPrefab, INF_BuildingGrid.Key(state.m_vCenter));
 		state.m_aAgents.Insert(agent);
 		m_INFZoneStates.InvalidatePresence();
 		m_CallQueue.CallLater(INF_InitDefenderGroup, 500, false, agent);

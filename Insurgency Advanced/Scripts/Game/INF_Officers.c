@@ -1,3 +1,12 @@
+// An officer slot added to a squad that has not initialised its officer yet.
+class INF_PendingOfficer
+{
+	string m_sKey;
+	vector m_vPosition;
+	string m_sPath;
+	float m_fAt;
+}
+
 // Enemy officers: a few zones and camps (selected once, saved with the territory snapshot) hold an officer whose
 // squad is an ordinary defence-guard group, so spawning, budget, memory, despawn and capture blocking reuse the
 // defence guard path. Nothing here runs on its own timer.
@@ -9,6 +18,16 @@ class INF_Officers
 	static const int QUESTION_LIMIT = 3;
 	static const float QUESTION_CHANCE = 0.75;
 	static const float SEARCH_CHANCE = 0.5;
+	// A reserved officer slot that nobody claims (the squad failed to spawn him) is dropped after this long.
+	static const float PENDING_MS = 60000;
+	protected static ref array<ref INF_PendingOfficer> s_aPending;
+
+	protected static array<ref INF_PendingOfficer> Pending()
+	{
+		if (!s_aPending)
+			s_aPending = {};
+		return s_aPending;
+	}
 
 	static bool Active(INS_AmbientPatrolZoneState state)
 	{
@@ -88,40 +107,76 @@ class INF_Officers
 			&& now - state.m_INFOfficerPost.m_fRememberedAt < INF_BuildingGrid.DEFENDER_MEMORY_MS;
 	}
 
-	// The officer joins the squad that was just spawned at the post.
-	static void SpawnInto(IEntity groupEntity, vector position, ResourceName prefab, string key)
+	// The officer is added as one more unit slot of the squad group before its members spawn, so the group spawns and
+	// initialises him exactly like every other member (his own AI, leader handling and waypoints). He is claimed by
+	// his prisoner component when he initialises.
+	static void AddToSquad(IEntity groupEntity, vector position, ResourceName prefab, string key)
 	{
 		SCR_AIGroup group = SCR_AIGroup.Cast(groupEntity);
-		Resource resource = Resource.Load(prefab);
-		if (!group || !resource || !resource.IsValid())
+		if (!group || !group.m_aUnitPrefabSlots || prefab.IsEmpty())
 		{
-			Print("[INF_Officers] Cannot spawn the officer: squad or officer prefab unavailable: " + prefab, LogLevel.ERROR);
+			Print("[INF_Officers] Cannot add the officer: squad group or officer prefab unavailable: " + prefab, LogLevel.ERROR);
 			return;
 		}
-		IEntity entity = INF_Spawn.Prefab(resource, position);
-		ChimeraCharacter character = ChimeraCharacter.Cast(entity);
-		AIControlComponent control;
-		AIAgent agent;
-		if (character)
-			control = character.GetAIControlComponent();
-		if (control)
-			agent = control.GetControlAIAgent();
-		if (!agent)
+		group.m_aUnitPrefabSlots.Insert(prefab);
+		group.SetMaxUnitsToSpawn(group.m_aUnitPrefabSlots.Count());
+		float now = GetGame().GetWorld().GetWorldTime();
+		array<ref INF_PendingOfficer> pendingList = Pending();
+		for (int i = pendingList.Count() - 1; i >= 0; i--)
 		{
-			Print("[INF_Officers] Officer prefab has no AI agent: " + prefab, LogLevel.ERROR);
-			if (entity)
-				SCR_EntityHelper.DeleteEntityAndChildren(entity);
-			return;
+			if (now - pendingList[i].m_fAt > PENDING_MS)
+				pendingList.Remove(i);
 		}
-		INF_Persistence.Untrack(entity);
-		group.AddAgent(agent);
-		INF_PrisonerComponent prisoner = INF_PrisonerComponent.Find(entity);
-		if (!prisoner)
+		INF_PendingOfficer pending = new INF_PendingOfficer();
+		pending.m_sKey = key;
+		pending.m_vPosition = position;
+		pending.m_sPath = BarePath(prefab);
+		pending.m_fAt = now;
+		pendingList.Insert(pending);
+	}
+
+	// The resource path without its {GUID} prefix, so a configured name and the spawned prefab's name compare equal.
+	protected static string BarePath(string name)
+	{
+		int end = name.IndexOf("}");
+		if (end < 0)
+			return name;
+		return name.Substring(end + 1, name.Length() - end - 1);
+	}
+
+	protected static string PrefabPath(IEntity entity)
+	{
+		EntityPrefabData data = entity.GetPrefabData();
+		if (!data)
+			return string.Empty;
+		return BarePath(data.GetPrefabName());
+	}
+
+	// Called as a soldier initialises: the nearest reserved officer slot of the same prefab is his.
+	static string Claim(IEntity entity)
+	{
+		array<ref INF_PendingOfficer> pendingList = Pending();
+		if (pendingList.IsEmpty())
+			return string.Empty;
+		string path = PrefabPath(entity);
+		int nearest = -1;
+		float nearestDistance;
+		for (int i = 0; i < pendingList.Count(); i++)
 		{
-			Print("[INF_Officers] Officer prefab has no INF_PrisonerComponent; it cannot be captured or questioned: " + prefab, LogLevel.ERROR);
-			return;
+			if (pendingList[i].m_sPath != path)
+				continue;
+			float distance = vector.DistanceSqXZ(pendingList[i].m_vPosition, entity.GetOrigin());
+			if (nearest < 0 || distance < nearestDistance)
+			{
+				nearest = i;
+				nearestDistance = distance;
+			}
 		}
-		prisoner.INF_MarkOfficer(key);
+		if (nearest < 0)
+			return string.Empty;
+		string key = pendingList[nearest].m_sKey;
+		pendingList.Remove(nearest);
+		return key;
 	}
 
 	// Killed or captured: the officer is gone for good and his zone no longer gets the boosts.

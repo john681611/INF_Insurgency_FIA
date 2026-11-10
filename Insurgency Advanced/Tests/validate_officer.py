@@ -54,7 +54,9 @@ class Officers(unittest.TestCase):
         self.assertIn("guardAI -= guardPlan[0]", GRID)
         spawn = method_body(GRID, "override protected void SpawnGroupAt(")
         self.assertIn("guardedDefence.m_bOfficerPost && state.m_bINFOfficer)", spawn)
-        self.assertIn("INF_Officers.SpawnInto(", spawn)
+        self.assertIn("INF_Officers.AddToSquad(", spawn)
+        self.assertIn("group.m_aUnitPrefabSlots.Insert(prefab)", method_body(OFFICERS, "static void AddToSquad("))
+        self.assertIn("INF_Officers.Claim(owner)", PRISONERS)
         self.assertIn("m_bOfficerPost", DEFENCES)
         self.assertIn("INF_Officers.HasRememberedSquad(", DEFENCES)
 
