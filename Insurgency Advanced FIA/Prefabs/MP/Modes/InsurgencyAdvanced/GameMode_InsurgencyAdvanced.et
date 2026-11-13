@@ -3,10 +3,27 @@ SCR_GameModeEditor : "{DA3986AF1B5032B8}Prefabs/MP/Modes/Editor/GameMode_Editor_
  components {
   INS_AmbientPatrolManager "{69226EB846FFAEFF}" {
    m_bINFBuildingGrid 1
-   m_sINFCampComposition "{B7C71CFC27B3EE24}Prefabs/Compositions/Slotted/SlotFlatSmall/PlayerHub_S_FIA_01.et"
    m_fINFCampFootprintRadius 9
-   m_sINFOfficerPrefab "{7353710EFA08FF92}Prefabs/Characters/Factions/INDFOR/FIA/Character_FIA_Officer.et"
-   m_aINFDefenceCompositions {
+  }
+  INF_PrefabManagerComponent "{6AA19CB200000400}" {
+   m_sOfficer "{7353710EFA08FF92}Prefabs/Characters/Factions/INDFOR/FIA/Character_FIA_Officer.et"
+   m_sCamp "{B7C71CFC27B3EE24}Prefabs/Compositions/Slotted/SlotFlatSmall/PlayerHub_S_FIA_01.et"
+   m_aLightVehicles {
+    "{22B327C6752EC4D4}Prefabs/Vehicles/Wheeled/UAZ469/UAZ469_PKM_FIA.et" "{E72D78E7F45532EC}Prefabs/Vehicles/Wheeled/UAZ469/UAZ469_UK59_FIA.et"
+   }
+   m_aHeavyVehicles {
+    "{442939C9617DF228}Prefabs/Vehicles/Wheeled/BRDM2/BRDM2_FIA.et" "{B47110AA1A806556}Prefabs/Vehicles/Wheeled/BTR70/BTR70_FIA.et"
+   }
+   m_aLightCrew {
+    "{8515E8BD26A5D5F8}Prefabs/Characters/Factions/INDFOR/FIA/Character_FIA_Randomized.et"
+   }
+   m_aHeavyCrew {
+    "{641AD7731E23454B}Prefabs/Characters/Factions/INDFOR/FIA/Character_FIA_Crew.et" "{7B171A8ADD2664FE}Prefabs/Characters/Factions/INDFOR/FIA/Character_FIA_CC.et"
+   }
+   m_aPassengers {
+    "{8515E8BD26A5D5F8}Prefabs/Characters/Factions/INDFOR/FIA/Character_FIA_Randomized.et"
+   }
+   m_aDefences {
     "{17B68DA54A970140}PrefabsEditable/Auto/Compositions/Slotted/SlotRoadSmall/E_Barricade_S_USSR_01.et" "{1236588FCEA4848F}PrefabsEditable/Auto/Compositions/Slotted/SlotRoadMedium/E_Barricade_M_USSR_01.et" "{3FB42D0A5589A530}PrefabsEditable/Auto/Compositions/Slotted/SlotRoadLarge/E_Barricade_L_USSR_01.et" "{5AF4E84CA11058F4}PrefabsEditable/Auto/Compositions/Slotted/SlotRoadSmall/E_Checkpoint_S_USSR_01.et" "{1DF9835399B603EB}PrefabsEditable/Auto/Compositions/Slotted/SlotRoadMedium/E_Checkpoint_M_USSR_01.et" "{612AB9E420809989}PrefabsEditable/Auto/Compositions/Slotted/SlotRoadLarge/E_Checkpoint_L_USSR_01.et" "{1EED86CBA983241E}PrefabsEditable/Auto/Compositions/Slotted/SlotFlatSmall/E_Bunker_S_FIA_01.et" "{336DB98AC1B21594}PrefabsEditable/Auto/Compositions/Slotted/SlotFlatSmall/E_MachineGunNest_S_FIA_02.et" "{BB201FF4DC275DBB}PrefabsEditable/Auto/Compositions/Slotted/SlotFlatSmall/E_MachineGunNest_Scoped_S_FIA_01.et" "{CE74090473B270DE}PrefabsEditable/Auto/Compositions/Slotted/SlotFlatSmall/E_SandbagPosition_S_FIA_01.et"
    }
   }

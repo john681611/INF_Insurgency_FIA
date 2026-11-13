@@ -126,7 +126,7 @@ class ZoneVehicles(unittest.TestCase):
 
     def test_passengers_use_their_own_list_not_the_crew_pools(self):
         passengers = body("void INF_SpawnPassengers(")
-        self.assertIn("INF_RandomPrefab(m_aINFPassengerPrefabs)", passengers)
+        self.assertIn("GetPassengers()", passengers)
         self.assertNotIn("INF_PickCrewPrefab", passengers)
         self.assertIn("SpawnDefaultCharacterInCompartment(group)", passengers)
 

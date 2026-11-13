@@ -1,5 +1,5 @@
 // A world's composition slots baked into a config, for servers whose world does not create the slot entities. The
-// mission's game mode prefab names it (INS_AmbientPatrolManager m_sINFDefenceSlotCache) and defences fall back to it
+// mission's game mode prefab names it (INF_PrefabManagerComponent m_sDefenceSlotCache) and defences fall back to it
 // when the scan finds no SCR_SiteSlotEntity. Generated from the world's slot layer by the mission addon's
 // Tools/generate_defence_slot_cache.py.
 [BaseContainerProps(), BaseContainerCustomTitleField("m_sType")]

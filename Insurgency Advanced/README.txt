@@ -362,14 +362,12 @@ the range log an error and keep the game mode value. Complete default header:
     "m_Insurgency": {
       "m_iINFCampCount": 7,
       "m_iINFTerrainIndexRevision": -1,
-      "m_sINFCampComposition": "",
       "m_sINFPlayerFaction": "",
       "m_fINFCampFootprintRadius": -1,
       "m_iINFSiteStrengthMultiplier": -1,
       "m_iINFCounterAttackChance": -1,
       "m_iINFMortarChance": -1,
       "m_iINFMortarLimit": -1,
-      "m_sINFMortarComposition": "",
       "m_iINFDefencePercent": -1,
       "m_fINFDefenceSpacing": -1,
       "m_fINFDefenceOwnerDistance": -1,
@@ -530,14 +528,20 @@ and FIA arsenals, late joining, and deployment at a secured camp in-game.
 
 Zone vehicle defenders
 Occasional AI-crewed road-position defenders reuse the ambient manager's
-m_aVehiclePrefabs and native default driver/turret crew spawning. Ambient route
+vehicle list (m_aVehiclePrefabs, filled from the prefab manager's light and heavy
+vehicles) and, unless the prefab manager sets crew lists, native default driver/turret
+crew spawning. Ambient route
 vehicles retain their original routing, cap, enable switch and distance/grace
-rules; their cleanup now shares the prisoner-safe vehicle cleanup path.
-Both zone and ambient vehicles add a random 0-N passengers after native crew
+rules; their cleanup now shares the prefab-safe vehicle cleanup path.
+Both zone and ambient vehicles add a random 0-N passengers after the crew
 spawning finishes. N includes only free, accessible cargo seats with a configured
-default occupant. Selected seats use their own default character prefab and join
+default occupant. Selected seats take a character from the prefab manager's
+m_aPassengers (their own default character when that list is empty) and join
 the crew's existing AI group; empty/defaultless seats never get faction fallbacks.
-The count is chosen once per vehicle from the native crew-completion callback.
+Crew seats take their character from m_aLightCrew or, for heavy vehicles,
+m_aHeavyCrew via BaseCompartmentSlot.SpawnCharacterInCompartment; ambient vehicles
+then get their crew group and drive waypoint from the same code.
+The count is chosen once per vehicle from the crew-completion callback.
 Native crew and successful passengers are recorded immediately, so early
 dismounts, deaths and captures cannot turn a valid vehicle into a polling timeout.
 Passenger spawning is server-only and uses native character/compartment replication.
@@ -767,10 +771,19 @@ Non-functional base lists
   Advanced and Insurgency Advanced FIA game mode prefabs. The base Insurgency FIA and FIA Ext Veh
   prefabs keep them because non-Advanced missions still use the garrison. Every other base list
   (ambient m_aGroupPrefabs, counterattack m_aSquadPrefabs, field threat m_aGroupPrefabs,
-  ambient m_aVehiclePrefabs) is still used.
+  ambient m_aVehiclePrefabs) is still used, but is now set through the prefab manager below. Those four base
+  lists (Non Functional) are emptied in the Advanced game mode prefab: the prefab manager fills them at init.
 
-Vehicle crew lists (INS_AmbientVehicleManager, Vehicle Crew category)
-  m_aINFHeavyVehiclePrefabs is merged into m_aVehiclePrefabs so ambient and zone vehicles share one list.
-  Crew seats come from m_aINFCrewPrefabs (light vehicles) or m_aINFHeavyCrewPrefabs (heavy vehicles).
-  Passengers on every vehicle come from m_aINFPassengerPrefabs. An empty list keeps native default
-  occupants for that role.
+Prefab manager (INF_PrefabManagerComponent, on the game mode prefab)
+  The one place that defines the mission's units and prefabs:
+    Vehicles       m_aLightVehicles, m_aHeavyVehicles (merged into one list for ambient and zone vehicles)
+    Crews          m_aLightCrew, m_aHeavyCrew (crew seats), m_aPassengers (every vehicle)
+    Infantry       m_aDefenderGroups, m_aCounterAttackSquads, m_aFieldThreatGroups
+    Specials       m_sOfficer
+    Compositions   m_sCamp, m_sMortar, m_aDefences, m_sDefenceSlotCache
+  At init it writes each value into the manager that uses it (including the base mod's lists), so the base
+  mod needs no changes. A list left empty keeps the base mod's own list. The old INS_AmbientPatrolManager
+  attributes (camp, mortar, officer, defence compositions, slot cache) are gone, and the mission header no longer
+  overrides the camp or mortar composition: prefabs are set on the prefab manager only. Empty crew or passenger
+  lists keep the vehicle's native occupants.
+  Heavy vehicles use m_aHeavyCrew; every other vehicle uses m_aLightCrew.

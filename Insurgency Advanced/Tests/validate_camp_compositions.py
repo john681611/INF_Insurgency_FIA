@@ -15,10 +15,7 @@ ENCAMPMENT = "{8809D070C43CD78C}Prefabs/Compositions/Slotted/SlotFlatSmall/Playe
 
 class CampCompositions(unittest.TestCase):
     def test_manager_and_mission_select_the_actual_ussr_encampment(self):
-        self.assertIn(ENCAMPMENT, GRID)
-        self.assertIn('m_sINFCampComposition "' + ENCAMPMENT + '"', MODE)
-        self.assertIn('UIWidgets.ResourceNamePicker', GRID)
-        self.assertIn('category: "Forest Camps"', GRID)
+        self.assertIn('m_sCamp "' + ENCAMPMENT + '"', MODE)
         self.assertIn('m_fINFCampFootprintRadius 9', MODE)
         self.assertIn("m_Manager.INF_GetCampComposition()", CAMP)
         self.assertIn("m_Manager.INF_GetCampFootprintRadius()", CAMP)

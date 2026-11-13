@@ -18,8 +18,7 @@ def body(signature):
 
 class MortarBattery(unittest.TestCase):
     def test_composition_is_configured_on_the_game_mode_next_to_camps(self):
-        self.assertIn('m_sINFMortarComposition "' + COMPOSITION + '"', MODE)
-        self.assertIn(COMPOSITION, GRID)
+        self.assertIn('m_sMortar "' + COMPOSITION + '"', MODE)
         self.assertIn("protected ResourceName m_sINFMortarComposition;", GRID)
         self.assertNotIn("SpawnPrefab(config.m_Prefab", MORTAR)
 

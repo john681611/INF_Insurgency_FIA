@@ -763,6 +763,11 @@ modded class INS_PatrolAgent
 
 modded class INS_FieldThreatManager
 {
+	void INF_ApplyPrefabs(INF_PrefabManagerComponent prefabs)
+	{
+		m_aGroupPrefabs = INF_PrefabManagerComponent.PreferList(prefabs.GetFieldThreatGroups(), m_aGroupPrefabs);
+	}
+
 	bool INF_BindPrisonerCleanup(AIGroup group, INF_PrisonerComponent prisoner)
 	{
 		foreach (INS_FieldThreatEntry entry : m_aEntries)

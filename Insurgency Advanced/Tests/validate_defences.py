@@ -63,7 +63,7 @@ class DefencePlacement(unittest.TestCase):
         }
         for addon, faction_markers in modes.items():
             text = (ROOT.parent / addon / MODE).read_text()
-            block = re.search(r"m_aINFDefenceCompositions \{(.*?)\n\s*\}", text, re.S)
+            block = re.search(r"m_aDefences \{(.*?)\n\s*\}", text, re.S)
             self.assertIsNotNone(block, addon)
             entries = re.findall(r'"(\{[0-9A-F]{16}\}[^"]+)"', block.group(1))
             kinds = set()

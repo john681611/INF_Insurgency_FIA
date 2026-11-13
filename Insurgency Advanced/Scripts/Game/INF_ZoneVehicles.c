@@ -52,14 +52,7 @@ modded class INS_AmbientVehicleManager
 	protected int m_iINFZoneVehicleChance = 30;
 	[Attribute("6", UIWidgets.Slider, "Zone vehicle cap, independent of ambient route vehicles. Lowering affects future admissions.", "0 32 1", category: "Zone Vehicles"), RplProp()]
 	protected int m_iINFZoneVehicleLimit = 6;
-	[Attribute("", UIWidgets.ResourceNamePicker, "Heavy vehicles (APCs, IFVs, armour). Merged into m_aVehiclePrefabs at runtime, so ambient and zone vehicles choose from both.", "et", category: "Vehicle Crew")]
-	protected ref array<ResourceName> m_aINFHeavyVehiclePrefabs;
-	[Attribute("", UIWidgets.ResourceNamePicker, "Character prefabs for the crew seats of light vehicles, zone and ambient; empty keeps the vehicle's native crew.", "et", category: "Vehicle Crew")]
-	protected ref array<ResourceName> m_aINFCrewPrefabs;
-	[Attribute("", UIWidgets.ResourceNamePicker, "Character prefabs for the crew seats of heavy vehicles (armoured crewmen), zone and ambient; empty keeps the vehicle's native crew.", "et", category: "Vehicle Crew")]
-	protected ref array<ResourceName> m_aINFHeavyCrewPrefabs;
-	[Attribute("", UIWidgets.ResourceNamePicker, "Infantry character prefabs for passengers on every vehicle, light or heavy; empty keeps the vehicle's default occupants.", "et", category: "Vehicle Crew")]
-	protected ref array<ResourceName> m_aINFPassengerPrefabs;
+	protected INF_PrefabManagerComponent m_INFPrefabs;
 	protected ref array<ref INF_ZoneVehicle> m_INFZoneVehicles = {};
 	protected INF_StaggerGate m_INFSpawnGate = INF_StaggerGate.Spawns();
 	protected INF_StaggerGate m_INFDespawnGate = INF_StaggerGate.Despawns();
@@ -68,7 +61,6 @@ modded class INS_AmbientVehicleManager
 	protected int m_iINFZonePending;
 	protected ref array<vector> m_aINFZonePendingPositions = {};
 	protected bool m_INFZoneVehiclesStopped;
-	protected bool m_bINFHeavyMerged;
 	protected ref array<vector> m_INFRejectedVehiclePositions = {};
 	protected ref map<string, float> m_INFVehicleSearchRetry = new map<string, float>();
 
@@ -173,7 +165,6 @@ modded class INS_AmbientVehicleManager
 	{
 		if (!Replication.IsServer() || m_INFZoneVehiclesStopped)
 			return;
-		INF_MergeHeavyVehicles();
 		if (INF_ZoneEditorContext.Grid(GetOwner()))
 		{
 			string key = spawnPos.ToString();
@@ -272,15 +263,18 @@ modded class INS_AmbientVehicleManager
 		super.SpawnCrew(agent);
 	}
 
-	// Folds the heavy list into m_aVehiclePrefabs once, so ambient and zone vehicles share one merged list.
-	protected void INF_MergeHeavyVehicles()
+	// Takes the vehicle list from the prefab manager and folds the heavy vehicles into it, so ambient and zone
+	// vehicles share one list. Light vehicles keep the base list when the prefab manager sets none.
+	void INF_ApplyPrefabs(INF_PrefabManagerComponent prefabs)
 	{
-		if (m_bINFHeavyMerged)
+		m_INFPrefabs = prefabs;
+		m_aVehiclePrefabs = INF_PrefabManagerComponent.PreferList(prefabs.GetLightVehicles(), m_aVehiclePrefabs);
+		if (!m_aVehiclePrefabs)
+			m_aVehiclePrefabs = {};
+		array<ResourceName> heavyVehicles = prefabs.GetHeavyVehicles();
+		if (!heavyVehicles)
 			return;
-		m_bINFHeavyMerged = true;
-		if (!m_aINFHeavyVehiclePrefabs)
-			return;
-		foreach (ResourceName heavy : m_aINFHeavyVehiclePrefabs)
+		foreach (ResourceName heavy : heavyVehicles)
 		{
 			if (!m_aVehiclePrefabs.Contains(heavy))
 				m_aVehiclePrefabs.Insert(heavy);
@@ -305,13 +299,13 @@ modded class INS_AmbientVehicleManager
 		return prefab.Substring(end + 1, prefab.Length() - end - 1);
 	}
 
-	protected bool INF_IsHeavyVehicle(INS_AmbientVehicleAgent agent)
+	protected bool INF_IsHeavyVehicle(INS_AmbientVehicleAgent agent, array<ResourceName> heavyVehicles)
 	{
 		EntityPrefabData data = agent.m_VehicleEntity.GetPrefabData();
-		if (!data || !m_aINFHeavyVehiclePrefabs)
+		if (!data || !heavyVehicles)
 			return false;
 		string path = INF_PrefabPath(data.GetPrefabName());
-		foreach (ResourceName heavy : m_aINFHeavyVehiclePrefabs)
+		foreach (ResourceName heavy : heavyVehicles)
 		{
 			if (INF_PrefabPath(heavy) == path)
 				return true;
@@ -319,26 +313,22 @@ modded class INS_AmbientVehicleManager
 		return false;
 	}
 
-	protected ResourceName INF_RandomPrefab(array<ResourceName> pool)
+	// Heavy crew for heavy vehicles, light crew for the rest. Empty means native default crew.
+	protected array<ResourceName> INF_CrewPool(INS_AmbientVehicleAgent agent)
 	{
-		if (!pool || pool.IsEmpty())
-			return "";
-		return pool[Math.RandomInt(0, pool.Count())];
-	}
-
-	// Light crew for light vehicles, heavy crew for heavy ones. Empty means native default crew.
-	ResourceName INF_PickCrewPrefab(INS_AmbientVehicleAgent agent)
-	{
-		if (INF_IsHeavyVehicle(agent))
-			return INF_RandomPrefab(m_aINFHeavyCrewPrefabs);
-		return INF_RandomPrefab(m_aINFCrewPrefabs);
+		if (!m_INFPrefabs)
+			return null;
+		if (INF_IsHeavyVehicle(agent, m_INFPrefabs.GetHeavyVehicles()))
+			return m_INFPrefabs.GetHeavyCrew();
+		return m_INFPrefabs.GetLightCrew();
 	}
 
 	// Fills the crew seats from the crew lists instead of the vehicle's default occupants, for zone and ambient
 	// vehicles. Returns false to leave the vehicle on native crew.
 	protected bool INF_SpawnPoolCrew(INS_AmbientVehicleAgent agent)
 	{
-		if (INF_PickCrewPrefab(agent).IsEmpty())
+		array<ResourceName> pool = INF_CrewPool(agent);
+		if (!pool || pool.IsEmpty())
 			return false;
 		array<BaseCompartmentSlot> slots = {};
 		agent.m_INFCompartmentManager.GetCompartmentsOfTypes(slots, SCR_BaseCompartmentManagerComponent.CREW_COMPARTMENT_TYPES);
@@ -348,7 +338,7 @@ modded class INS_AmbientVehicleManager
 		{
 			if (!slot || slot.IsOccupied() || !slot.IsCompartmentAccessible() || slot.GetDefaultOccupantPrefab().IsEmpty())
 				continue;
-			IEntity member = slot.SpawnCharacterInCompartment(INF_PickCrewPrefab(agent), group);
+			IEntity member = slot.SpawnCharacterInCompartment(INF_PrefabManagerComponent.RandomPrefab(pool), group);
 			if (!member)
 			{
 				Print("[INF_VehicleCrew] Failed to spawn a pool crew member.", LogLevel.ERROR);
@@ -501,12 +491,15 @@ modded class INS_AmbientVehicleManager
 					persistence.StopTracking(nativeCrew, true);
 			}
 		}
+		array<ResourceName> passengerPool;
+		if (m_INFPrefabs)
+			passengerPool = m_INFPrefabs.GetPassengers();
 		for (int i = 0; i < count; i++)
 		{
 			int index = Math.RandomInt(0, eligible.Count());
 			BaseCompartmentSlot selected = eligible[index];
 			eligible.Remove(index);
-			ResourceName passengerPrefab = INF_RandomPrefab(m_aINFPassengerPrefabs);
+			ResourceName passengerPrefab = INF_PrefabManagerComponent.RandomPrefab(passengerPool);
 			IEntity passenger;
 			if (passengerPrefab.IsEmpty())
 				passenger = selected.SpawnDefaultCharacterInCompartment(group);
@@ -788,7 +781,6 @@ modded class INS_AmbientVehicleManager
 	void INF_OnZoneActivated(INS_AmbientPatrolZoneState zone)
 	{
 		INS_AmbientPatrolManager patrols = INF_ZoneEditorContext.Grid(GetOwner());
-		INF_MergeHeavyVehicles();
 		if (!Replication.IsServer() || m_INFZoneVehiclesStopped || !patrols || !patrols.INF_GetZoneStates()
 			|| m_iINFZoneVehicleChance == 0 || m_aVehiclePrefabs.IsEmpty()
 			|| m_INFZoneVehicles.Count() + m_iINFZonePending >= m_iINFZoneVehicleLimit)

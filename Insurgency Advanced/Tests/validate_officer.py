@@ -21,7 +21,7 @@ PREFAB = "{5117311FB822FD1F}Prefabs/Characters/Factions/OPFOR/USSR_Army/Characte
 
 class Officers(unittest.TestCase):
     def test_officer_prefab_is_configured_on_the_game_mode(self):
-        self.assertIn('m_sINFOfficerPrefab "' + PREFAB + '"', MODE)
+        self.assertIn('m_sOfficer "' + PREFAB + '"', MODE)
         self.assertIn("protected ResourceName m_sINFOfficerPrefab;", GRID)
         self.assertIn("AssignOfficers(!m_sINFOfficerPrefab.IsEmpty())", GRID)
 

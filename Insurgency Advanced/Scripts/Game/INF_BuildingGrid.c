@@ -6,8 +6,6 @@ modded class INS_MissionParams
 	// Every field below overrides the matching game mode attribute. -1 (or empty) keeps the game mode value.
 	[Attribute("-1", UIWidgets.EditBox, "Terrain-index revision (1 or more).", category: "Terrain Index")]
 	int m_iINFTerrainIndexRevision = -1;
-	[Attribute("", UIWidgets.ResourceNamePicker, "Camp composition prefab.", "et", category: "Forest Camps")]
-	ResourceName m_sINFCampComposition;
 	[Attribute("", UIWidgets.EditBox, "Player faction key.", category: "Forest Camps")]
 	string m_sINFPlayerFaction;
 	[Attribute("-1", UIWidgets.EditBox, "Camp footprint half-width in metres (3 to 24).", category: "Forest Camps")]
@@ -20,8 +18,6 @@ modded class INS_MissionParams
 	int m_iINFMortarChance = -1;
 	[Attribute("-1", UIWidgets.EditBox, "Maximum mortar batteries (0 to 4).", category: "Mortar Batteries")]
 	int m_iINFMortarLimit = -1;
-	[Attribute("", UIWidgets.ResourceNamePicker, "Mortar battery composition prefab.", "et", category: "Mortar Batteries")]
-	ResourceName m_sINFMortarComposition;
 	[Attribute("-1", UIWidgets.EditBox, "Percentage of viable road and small flat slots that receive a defence (0 to 100). 0 disables defences.", category: "Defences")]
 	int m_iINFDefencePercent = -1;
 	[Attribute("-1", UIWidgets.EditBox, "Minimum spacing between road defences in metres (200 to 3000).", category: "Defences")]
@@ -553,7 +549,6 @@ modded class INS_AmbientPatrolManager
 	{
 		return m_iINFTerrainIndexRevision;
 	}
-	[Attribute("{8809D070C43CD78C}Prefabs/Compositions/Slotted/SlotFlatSmall/PlayerHub_S_USSR_01.et", UIWidgets.ResourceNamePicker, "Persistent camp composition spawned at mission startup. Default: USSR Encampment. Use a static composition without AI groups; zone defenders are managed separately.", "et", category: "Forest Camps")]
 	protected ResourceName m_sINFCampComposition;
 	[Attribute("US", UIWidgets.EditBox, "Mission player faction key. Permanently secured camps and their spawn points transfer to this faction, not the captor's faction.", category: "Forest Camps")]
 	protected string m_sINFPlayerFaction = "US";
@@ -608,16 +603,25 @@ modded class INS_AmbientPatrolManager
 		return m_aGroupPrefabs;
 	}
 
+	// The prefab manager is the only source of these definitions.
+	void INF_ApplyPrefabs(INF_PrefabManagerComponent prefabs)
+	{
+		m_aGroupPrefabs = INF_PrefabManagerComponent.PreferList(prefabs.GetDefenderGroups(), m_aGroupPrefabs);
+		m_sINFCampComposition = prefabs.GetCamp();
+		m_sINFMortarComposition = prefabs.GetMortar();
+		m_sINFOfficerPrefab = prefabs.GetOfficer();
+		m_sINFDefenceSlotCache = prefabs.GetDefenceSlotCache();
+		m_aINFDefenceCompositions = INF_PrefabManagerComponent.PreferList(prefabs.GetDefences(), m_aINFDefenceCompositions);
+	}
+
 	[Attribute("10", UIWidgets.Slider, "Chance per activating zone that it owns a mortar battery. Zero disables batteries. Neighbouring zones roll independently, so the chance per cluster is higher.", "0 100 1", category: "Mortar Batteries"), RplProp()]
 	protected int m_iINFMortarChance = INF_MortarConfig.DEFAULT_CHANCE;
 	[Attribute("2", UIWidgets.Slider, "Maximum mortar batteries alive at once. Zero disables batteries.", "0 4 1", category: "Mortar Batteries"), RplProp()]
 	protected int m_iINFMortarLimit = 2;
-	[Attribute("{28D63631873AA636}Prefabs/Compositions/Slotted/SlotFlatSmall/MortarPlacement_S_USSR_01.et", UIWidgets.ResourceNamePicker, "Static composition holding the battery's mortars. Each mortar needs an AI vehicle usage component. Do not include AI groups; gunners and guards are spawned separately.", "et", category: "Mortar Batteries")]
 	protected ResourceName m_sINFMortarComposition;
 	protected ref INF_MortarBatteries m_INFMortars;
 	protected ref INF_MortarConfig m_INFMortarConfig;
 
-	[Attribute("{5117311FB822FD1F}Prefabs/Characters/Factions/OPFOR/USSR_Army/Character_USSR_Officer.et", UIWidgets.ResourceNamePicker, "Officer character. About one zone or camp in 50 (at least one) holds an officer with an extra squad of four, a gold map border, and tripled mortar and vehicle chances. Empty disables officers.", "et", category: "Officers")]
 	protected ResourceName m_sINFOfficerPrefab;
 
 	[Attribute("15", UIWidgets.Slider, "Percentage of viable defence positions (road slots for barricades and checkpoints, small flat slots for sandbags, nests and bunkers) that receive a defence at a fresh mission start, then saved and restored. Zero disables defences.", "0 100 5", category: "Defences")]
@@ -630,9 +634,7 @@ modded class INS_AmbientPatrolManager
 	protected int m_iINFDefencesPerZone = 2;
 	[Attribute("4", UIWidgets.Slider, "Soldiers in each road defence guard group (small flat defences use 2 to 4). They count as defenders of the owning zone.", "2 8 1", category: "Defences")]
 	protected int m_iINFDefenceGuards = 4;
-	[Attribute("", UIWidgets.ResourceNamePicker, "Compositions to choose from, under Prefabs/Compositions/Slotted: SlotRoad* for road defences, SlotFlatSmall for small flat ones (use the editable PrefabsEditable E_ variants so a Game Master can edit them). Empty disables defences.", "et", category: "Defences")]
 	protected ref array<ResourceName> m_aINFDefenceCompositions;
-	[Attribute("", UIWidgets.ResourceNamePicker, "Baked list of the world's slots (a config of INF_DefenceSlotCache), used when the world creates no slot entities at runtime, as on a dedicated server. Set it in the mission's game mode prefab.", "conf", category: "Defences")]
 	protected ResourceName m_sINFDefenceSlotCache;
 	protected ref INF_Defences m_INFDefences;
 
@@ -701,16 +703,12 @@ modded class INS_AmbientPatrolManager
 	protected void INF_ApplyHeaderSettings(INS_MissionParams params)
 	{
 		INF_HeaderSettings.Int(params.m_iINFTerrainIndexRevision, 1, 1000000, "m_iINFTerrainIndexRevision", m_iINFTerrainIndexRevision);
-		if (!params.m_sINFCampComposition.IsEmpty())
-			m_sINFCampComposition = params.m_sINFCampComposition;
 		if (!params.m_sINFPlayerFaction.IsEmpty())
 			m_sINFPlayerFaction = params.m_sINFPlayerFaction;
 		INF_HeaderSettings.Float(params.m_fINFCampFootprintRadius, 3, 24, "m_fINFCampFootprintRadius", m_fINFCampFootprintRadius);
 		INF_HeaderSettings.Int(params.m_iINFSiteStrengthMultiplier, 1, 4, "m_iINFSiteStrengthMultiplier", m_iINFSiteStrengthMultiplier);
 		INF_HeaderSettings.Int(params.m_iINFMortarChance, 0, 100, "m_iINFMortarChance", m_iINFMortarChance);
 		INF_HeaderSettings.Int(params.m_iINFMortarLimit, 0, 4, "m_iINFMortarLimit", m_iINFMortarLimit);
-		if (!params.m_sINFMortarComposition.IsEmpty())
-			m_sINFMortarComposition = params.m_sINFMortarComposition;
 		INF_HeaderSettings.Int(params.m_iINFDefencePercent, 0, 100, "m_iINFDefencePercent", m_iINFDefencePercent);
 		INF_HeaderSettings.Float(params.m_fINFDefenceSpacing, 200, 3000, "m_fINFDefenceSpacing", m_fINFDefenceSpacing);
 		INF_HeaderSettings.Float(params.m_fINFDefenceOwnerDistance, 200, 3000, "m_fINFDefenceOwnerDistance", m_fINFDefenceOwnerDistance);
@@ -2016,6 +2014,12 @@ modded class INS_CounterAttackZone
 modded class INS_CounterAttackManager
 {
 	protected ref array<int> m_aINFSquadBuckets = {};
+
+	void INF_ApplyPrefabs(INF_PrefabManagerComponent prefabs)
+	{
+		m_aSquadPrefabs = INF_PrefabManagerComponent.PreferList(prefabs.GetCounterAttackSquads(), m_aSquadPrefabs);
+	}
+
 	protected float m_fINFNextAttackStepAt;
 	protected float m_fINFNextMonitorAt;
 	protected float m_fINFLastMonitorAt = -1;
