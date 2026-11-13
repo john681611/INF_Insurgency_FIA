@@ -59,7 +59,8 @@ class GMMarkerContracts(unittest.TestCase):
 
     def test_cache_debug_waits_for_discovery_and_refreshes(self):
         source = (ROOT / "Scripts/Game/INF_CacheObjective.c").read_text()
-        self.assertIn("CallLater(INF_RefreshDebugMarkers, 2000, false)", source)
+        self.assertNotIn("CallLater(INF_RefreshDebugMarkers", source)
+        self.assertIn("INF_RefreshDebugMarkers();", source)
         self.assertIn("controller.INF_DebugSnapshotChanged(layers, m_iINFDebugRevision)", source)
         snapshot = source.split("protected void INF_SendDebugMarkerSnapshot(", 1)[1].split(
             "void INF_ApplyDebugMarkerSnapshot(", 1)[0]

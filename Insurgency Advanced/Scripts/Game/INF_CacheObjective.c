@@ -145,13 +145,11 @@ modded class INS_IntelManager
 	}
 	protected bool m_bINFObjectiveUpdateQueued;
 	protected int m_iINFDebugRevision;
-	protected bool m_bINFDebugRefreshQueued;
 	protected ref array<SCR_PlayerController> m_aINFDebugSubscribers = {};
 	protected ref array<vector> m_aINFLocalDebugCaches = {};
 	protected ref array<vector> m_aINFLocalDebugCamps = {};
 	protected int m_iINFLocalDebugLayers;
-	protected bool m_bINFDebugApplyPending;
-	protected float m_fINFNextDebugApplyAt;
+	protected const int BASE_MARKER_POLL_MS = 30000;
 	protected int m_iINFDebugPositionRevision = -1;
 	protected ref array<vector> m_aINFDebugCachePositions = {};
 	protected ref array<vector> m_aINFDebugCampPositions = {};
@@ -433,34 +431,8 @@ modded class INS_IntelManager
 		return INF_DebugMarkerAccess.IsGM(SCR_PlayerController.GetLocalPlayerId());
 	}
 
-	protected void INF_OnDebugVisibilityChanged()
-	{
-		GetGame().GetCallqueue().Remove(INF_OnDebugVisibilityChanged);
-		if (System.IsConsoleApp())
-			return;
-		bool allowed = INF_CanSeeDebugMarkers();
-		if (!m_bINFDebugCachesEnabled || !allowed)
-			ClearDebugMarkers();
-		if (!m_bINFDebugCampMarkers || !allowed)
-			INF_ClearCampDebugMarkers();
-		if (!allowed)
-		{
-			m_bINFDebugCachesEnabled = false;
-			m_bINFDebugCampMarkers = false;
-			m_bINFDebugApplyPending = m_iINFLocalDebugLayers != 0;
-		}
-		if (m_bINFDebugApplyPending && allowed && GetGame().GetWorld().GetWorldTime() >= m_fINFNextDebugApplyAt)
-			INF_ApplyDebugMarkerSnapshot(m_iINFLocalDebugLayers, m_aINFLocalDebugCaches, m_aINFLocalDebugCamps);
-		GetGame().GetCallqueue().Remove(INF_OnDebugVisibilityChanged);
-		if (m_bINFDebugCachesEnabled || m_bINFDebugCampMarkers || !m_aDebugMarkers.IsEmpty()
-			|| !m_aINFCampDebugMarkers.IsEmpty() || m_bINFDebugApplyPending)
-			GetGame().GetCallqueue().CallLater(INF_OnDebugVisibilityChanged, 2000, false);
-	}
-
 	protected void INF_RefreshDebugMarkers()
 	{
-		GetGame().GetCallqueue().Remove(INF_RefreshDebugMarkers);
-		m_bINFDebugRefreshQueued = false;
 		if (!Replication.IsServer())
 			return;
 		for (int i = m_aINFDebugSubscribers.Count() - 1; i >= 0; i--)
@@ -474,11 +446,6 @@ modded class INS_IntelManager
 			INF_SendDebugMarkerSnapshot(controller, controller.INF_GetDebugMarkerLayers());
 			if (controller.INF_GetDebugMarkerLayers() == 0)
 				m_aINFDebugSubscribers.Remove(i);
-		}
-		if (!m_aINFDebugSubscribers.IsEmpty())
-		{
-			m_bINFDebugRefreshQueued = true;
-			GetGame().GetCallqueue().CallLater(INF_RefreshDebugMarkers, 2000, false);
 		}
 	}
 
@@ -523,11 +490,6 @@ modded class INS_IntelManager
 			m_aINFDebugSubscribers.Insert(controller);
 		if (layers == 0)
 			m_aINFDebugSubscribers.RemoveItem(controller);
-		if (!m_bINFDebugRefreshQueued && !m_aINFDebugSubscribers.IsEmpty())
-		{
-			m_bINFDebugRefreshQueued = true;
-			GetGame().GetCallqueue().CallLater(INF_RefreshDebugMarkers, 2000, false);
-		}
 	}
 
 	protected void INF_SendDebugMarkerSnapshot(SCR_PlayerController controller, int layers)
@@ -571,15 +533,11 @@ modded class INS_IntelManager
 			m_aINFLocalDebugCaches.Copy(cachePositions);
 		if (campPositions != m_aINFLocalDebugCamps)
 			m_aINFLocalDebugCamps.Copy(campPositions);
-		m_bINFDebugApplyPending = true;
-		m_fINFNextDebugApplyAt = GetGame().GetWorld().GetWorldTime() + 5000;
 		ClearDebugMarkers();
 		INF_ClearCampDebugMarkers();
 		bool allowed = INF_CanSeeDebugMarkers();
 		m_bINFDebugCachesEnabled = allowed && (layers & INF_EDebugMarkerLayers.CACHES) != 0;
 		m_bINFDebugCampMarkers = allowed && (layers & INF_EDebugMarkerLayers.CAMPS) != 0;
-		if (layers == 0 && m_aDebugMarkers.IsEmpty() && m_aINFCampDebugMarkers.IsEmpty())
-			m_bINFDebugApplyPending = false;
 		if ((allowed || layers == 0) && SCR_MapMarkerManagerComponent.GetInstance()
 			&& m_aDebugMarkers.IsEmpty() && m_aINFCampDebugMarkers.IsEmpty())
 		{
@@ -587,12 +545,7 @@ modded class INS_IntelManager
 				PlaceDebugMarker((int)cachePos[0], (int)cachePos[2], cacheIndex);
 			foreach (int campIndex, vector campPos : m_aINFLocalDebugCamps)
 				INF_PlaceCampDebugMarker((int)campPos[0], (int)campPos[2], campIndex);
-			m_bINFDebugApplyPending = (m_bINFDebugCachesEnabled && m_aDebugMarkers.Count() != m_aINFLocalDebugCaches.Count())
-				|| (m_bINFDebugCampMarkers && m_aINFCampDebugMarkers.Count() != m_aINFLocalDebugCamps.Count());
 		}
-		GetGame().GetCallqueue().Remove(INF_OnDebugVisibilityChanged);
-		if (layers != 0 || m_bINFDebugApplyPending || !m_aDebugMarkers.IsEmpty() || !m_aINFCampDebugMarkers.IsEmpty())
-			GetGame().GetCallqueue().CallLater(INF_OnDebugVisibilityChanged, 2000, false);
 	}
 
 	protected void INF_ClearCampDebugMarkers()
@@ -665,7 +618,7 @@ modded class INS_IntelManager
 		GetGame().GetCallqueue().Remove(INF_RefreshBaseMarkers);
 		if (m_bINFMissionEnded)
 			return;
-		GetGame().GetCallqueue().CallLater(INF_RefreshBaseMarkers, 3000, false);
+		GetGame().GetCallqueue().CallLater(INF_RefreshBaseMarkers, BASE_MARKER_POLL_MS, false);
 		if (SCR_PlayerController.GetLocalPlayerId() <= 0 || !SCR_MapMarkerManagerComponent.GetInstance())
 			return;
 		Faction faction = SCR_FactionManager.SGetLocalPlayerFaction();
@@ -1010,7 +963,6 @@ modded class INS_IntelManager
 			m_bINFMissionEnded = true;
 		}
 		GetGame().GetCallqueue().Remove(LoadIntelState);
-		GetGame().GetCallqueue().Remove(INF_OnDebugVisibilityChanged);
 		GetGame().GetCallqueue().Remove(INF_RefreshDebugMarkers);
 		GetGame().GetCallqueue().Remove(INF_RefreshBaseMarkers);
 		INF_ClearLocalDebugMarkers(m_aINFBaseMarkers);

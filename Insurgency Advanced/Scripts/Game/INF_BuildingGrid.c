@@ -95,6 +95,9 @@ class INF_StaggerGate
 	static const int GAP_MS = 2000;
 	// Defence compositions are far cheaper than AI groups, so their own gates space them much closer.
 	static const int DEFENCE_GAP_MS = 500;
+	// Must stay 100: the base game's TickCallQueue advances the private queue by a fixed Tick(0.1) per call,
+	// so any other interval speeds up or slows down every private delay.
+	static const int QUEUE_TICK_MS = 100;
 	protected static ref INF_StaggerGate s_Spawns = new INF_StaggerGate();
 	protected static ref INF_StaggerGate s_Despawns = new INF_StaggerGate();
 	protected static ref INF_StaggerGate s_DefenceSpawns = new INF_StaggerGate(DEFENCE_GAP_MS);
@@ -875,7 +878,7 @@ modded class INS_AmbientPatrolManager
 		DiscoverZones();
 		INF_PublishStartupProgress();
 		GetGame().GetCallqueue().CallLater(INF_PublishStartupProgress, 5000, true);
-		GetGame().GetCallqueue().CallLater(TickCallQueue, 100, true);
+		GetGame().GetCallqueue().CallLater(TickCallQueue, INF_StaggerGate.QUEUE_TICK_MS, true);
 		if (m_bEnabled)
 			INF_ScheduleProximity();
 	}
@@ -1012,6 +1015,9 @@ modded class INS_AmbientPatrolManager
 			m_bINFPoolHinted = true;
 			SCR_HintManagerComponent.ShowCustomHint("Camp search complete. The next start will be quicker.", "Camp search", 8);
 		}
+		// Camps and pool are both ready, so nothing further to hint.
+		if (m_bINFPoolReady)
+			GetGame().GetCallqueue().Remove(INF_NotifyStartupProgress);
 	}
 
 	// Runs every frame for a fixed time budget, so the scan is as fast as possible without freezing the server.
@@ -2077,7 +2083,7 @@ modded class INS_CounterAttackManager
 		if (!Replication.IsServer())
 			return;
 		ApplyMissionHeader();
-		GetGame().GetCallqueue().CallLater(TickCallQueue, 100, true);
+		GetGame().GetCallqueue().CallLater(TickCallQueue, INF_StaggerGate.QUEUE_TICK_MS, true);
 	}
 
 	override void OnGameModeEnd(SCR_GameModeEndData data)

@@ -47,7 +47,8 @@ class FIACompatibility(unittest.TestCase):
 
     def test_other_fia_integration_surfaces_are_not_overridden_by_mission(self):
         prefab = (ROOT / "Prefabs" / "MP" / "Modes" / "InsurgencyAdvanced" / "GameMode_InsurgencyAdvanced.et").read_text()
-        self.assertNotIn("m_aVehiclePrefabs", prefab)
+        self.assertIn("m_aVehiclePrefabs", prefab)
+        self.assertIn("m_aINFHeavyVehiclePrefabs", prefab)
         self.assertNotIn("m_aGroupPrefabs", prefab)
         self.assertNotIn("m_aSquadPrefabs", prefab)
         self.assertNotIn("m_sCachePrefab", prefab)

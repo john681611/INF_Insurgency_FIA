@@ -413,10 +413,7 @@ class RuntimeEfficiency(unittest.TestCase):
         self.assertIn("m_aINFDebugSubscribers", refresh)
         self.assertIn("m_aINFDebugSubscribers.Remove(i)", refresh)
         self.assertIn("m_iINFDebugSnapshotLayers == layers && m_iINFDebugSnapshotRevision == revision", CONTROLLER)
-        local = method_body(INTEL, "protected void INF_OnDebugVisibilityChanged(")
-        self.assertLess(local.index("System.IsConsoleApp()"), local.index("INF_CanSeeDebugMarkers()"))
-        self.assertIn("m_bINFDebugApplyPending = m_iINFLocalDebugLayers != 0", local)
-        self.assertIn("m_fINFNextDebugApplyAt", local)
+        self.assertNotIn("m_bINFDebugApplyPending", INTEL)
 
     def test_lifecycle_removes_listeners_and_retry_queues(self):
         stop = method_body(CORE, "void Stop(")

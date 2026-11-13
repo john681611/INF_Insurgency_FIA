@@ -48,13 +48,7 @@ class GMDebugPreferences(unittest.TestCase):
         self.assertNotIn('RplProp(onRplName: "INF_OnDebugVisibilityChanged")', INTEL)
 
     def test_disable_and_lost_access_clear_both_maps_without_forgetting_handles(self):
-        self.assertIn("CallLater(INF_OnDebugVisibilityChanged, 2000, false)", INTEL)
-        self.assertIn("if (System.IsConsoleApp())", INTEL)
-        self.assertIn("Remove(INF_OnDebugVisibilityChanged)", INTEL)
-        callback = INTEL.split("protected void INF_OnDebugVisibilityChanged()", 1)[1].split(
-            "protected void INF_RefreshDebugMarkers()", 1)[0]
-        self.assertIn("!m_bINFDebugCachesEnabled || !allowed", callback)
-        self.assertIn("!m_bINFDebugCampMarkers || !allowed", callback)
+        self.assertNotIn("INF_OnDebugVisibilityChanged", INTEL)
         helper = INTEL.split("protected void INF_ClearLocalDebugMarkers(", 1)[1].split(
             "protected void INF_PlaceCampDebugMarker", 1)[0]
         missing = helper.split("if (!markerMgr)", 1)[1].split("m_bINFDebugClearWarning = false", 1)[0]

@@ -1085,15 +1085,22 @@ class INF_ForestCamps
 		site.m_Service = service;
 	}
 
+	// Retries only while a friendly camp still lacks its service station, then stops.
 	protected void MaintainServices()
 	{
 		if (m_Stopped)
 			return;
+		bool missing;
 		foreach (INF_ForestCampSite site : m_Sites)
 		{
-			if (site.m_Friendly && !site.m_Service)
-				SpawnService(site);
+			if (!site.m_Friendly)
+				continue;
+			SpawnService(site);
+			if (!site.m_Service)
+				missing = true;
 		}
+		if (!missing)
+			GetGame().GetCallqueue().Remove(MaintainServices);
 	}
 
 	static void Cleanup(INF_ForestCampSite site)

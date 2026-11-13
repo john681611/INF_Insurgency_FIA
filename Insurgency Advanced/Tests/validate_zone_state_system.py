@@ -189,7 +189,8 @@ class ZoneArchitecture(unittest.TestCase):
         for name in ("INS_AmbientPatrolManager", "INS_CounterAttackManager"):
             body = AI.split("modded class " + name + "\n", 1)[1].split("\nmodded class ", 1)[0]
             start = body.split("override void OnGameModeStart()", 1)[1].split("\n\t}", 1)[0]
-            self.assertIn("CallLater(TickCallQueue, 100, true)", start)
+            self.assertIn("CallLater(TickCallQueue, INF_StaggerGate.QUEUE_TICK_MS, true)", start)
+            self.assertIn("static const int QUEUE_TICK_MS = 100;", AI)
             self.assertNotIn("m_aGroupPrefabs.IsEmpty", start)
             self.assertNotIn("m_aZones.IsEmpty", start)
 
