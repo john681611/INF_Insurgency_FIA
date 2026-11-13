@@ -768,3 +768,9 @@ Non-functional base lists
   prefabs keep them because non-Advanced missions still use the garrison. Every other base list
   (ambient m_aGroupPrefabs, counterattack m_aSquadPrefabs, field threat m_aGroupPrefabs,
   ambient m_aVehiclePrefabs) is still used.
+
+Vehicle crew lists (INS_AmbientVehicleManager, Vehicle Crew category)
+  m_aINFHeavyVehiclePrefabs is merged into m_aVehiclePrefabs so ambient and zone vehicles share one list.
+  Crew seats come from m_aINFCrewPrefabs (light vehicles) or m_aINFHeavyCrewPrefabs (heavy vehicles).
+  Passengers on every vehicle come from m_aINFPassengerPrefabs. An empty list keeps native default
+  occupants for that role.

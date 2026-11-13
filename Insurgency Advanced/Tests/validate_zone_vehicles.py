@@ -124,6 +124,12 @@ class ZoneVehicles(unittest.TestCase):
         self.assertNotIn("INF_ZoneVehicleTick", SOURCE)
         self.assertNotIn("INF_ScheduleZoneVehicles", SOURCE + GRID + BLOCK)
 
+    def test_passengers_use_their_own_list_not_the_crew_pools(self):
+        passengers = body("void INF_SpawnPassengers(")
+        self.assertIn("INF_RandomPrefab(m_aINFPassengerPrefabs)", passengers)
+        self.assertNotIn("INF_PickCrewPrefab", passengers)
+        self.assertIn("SpawnDefaultCharacterInCompartment(group)", passengers)
+
     def test_reuses_current_vehicle_list_and_native_crew_not_a_duplicate_pool(self):
         spawn = body("protected void INF_TryZoneVehicle(")
         self.assertIn("m_aVehiclePrefabs[Math.RandomInt", spawn)

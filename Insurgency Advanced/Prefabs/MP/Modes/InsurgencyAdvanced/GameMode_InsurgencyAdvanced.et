@@ -24,6 +24,9 @@ SCR_GameModeEditor : "{DA3986AF1B5032B8}Prefabs/MP/Modes/Editor/GameMode_Editor_
    m_aINFHeavyCrewPrefabs {
     "{9FFEF10757E742EB}Prefabs/Characters/Factions/OPFOR/USSR_Army/Character_USSR_Crew.et" "{BA010C4C82F3DE92}Prefabs/Characters/Factions/OPFOR/USSR_Army/Character_USSR_CC.et"
    }
+   m_aINFPassengerPrefabs {
+    "{7DE1CBA32A0225EB}Prefabs/Characters/Factions/OPFOR/USSR_Army/Character_USSR_Randomized.et"
+   }
   }
   INS_GarrisonManager "{68B2B72E61E88AD0}" {
    m_aInfantryGroupPrefabs {

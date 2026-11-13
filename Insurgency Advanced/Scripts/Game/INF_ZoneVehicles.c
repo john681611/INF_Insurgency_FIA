@@ -54,10 +54,12 @@ modded class INS_AmbientVehicleManager
 	protected int m_iINFZoneVehicleLimit = 6;
 	[Attribute("", UIWidgets.ResourceNamePicker, "Heavy vehicles (APCs, IFVs, armour). Merged into m_aVehiclePrefabs at runtime, so ambient and zone vehicles choose from both.", "et", category: "Vehicle Crew")]
 	protected ref array<ResourceName> m_aINFHeavyVehiclePrefabs;
-	[Attribute("", UIWidgets.ResourceNamePicker, "Character prefabs for the crew of light vehicles (ordinary infantry). Crew seats and passengers, zone and ambient vehicles; empty keeps the vehicle's native crew.", "et", category: "Vehicle Crew")]
+	[Attribute("", UIWidgets.ResourceNamePicker, "Character prefabs for the crew seats of light vehicles, zone and ambient; empty keeps the vehicle's native crew.", "et", category: "Vehicle Crew")]
 	protected ref array<ResourceName> m_aINFCrewPrefabs;
-	[Attribute("", UIWidgets.ResourceNamePicker, "Character prefabs for the crew of heavy vehicles (armoured crewmen). Crew seats and passengers, zone and ambient vehicles; empty keeps the vehicle's native crew.", "et", category: "Vehicle Crew")]
+	[Attribute("", UIWidgets.ResourceNamePicker, "Character prefabs for the crew seats of heavy vehicles (armoured crewmen), zone and ambient; empty keeps the vehicle's native crew.", "et", category: "Vehicle Crew")]
 	protected ref array<ResourceName> m_aINFHeavyCrewPrefabs;
+	[Attribute("", UIWidgets.ResourceNamePicker, "Infantry character prefabs for passengers on every vehicle, light or heavy; empty keeps the vehicle's default occupants.", "et", category: "Vehicle Crew")]
+	protected ref array<ResourceName> m_aINFPassengerPrefabs;
 	protected ref array<ref INF_ZoneVehicle> m_INFZoneVehicles = {};
 	protected INF_StaggerGate m_INFSpawnGate = INF_StaggerGate.Spawns();
 	protected INF_StaggerGate m_INFDespawnGate = INF_StaggerGate.Despawns();
@@ -317,16 +319,19 @@ modded class INS_AmbientVehicleManager
 		return false;
 	}
 
-	// Light crew for light vehicles, heavy crew for heavy ones, for crew seats and passengers alike.
-	// Empty means native default crew.
-	ResourceName INF_PickCrewPrefab(INS_AmbientVehicleAgent agent)
+	protected ResourceName INF_RandomPrefab(array<ResourceName> pool)
 	{
-		array<ResourceName> pool = m_aINFCrewPrefabs;
-		if (INF_IsHeavyVehicle(agent))
-			pool = m_aINFHeavyCrewPrefabs;
 		if (!pool || pool.IsEmpty())
 			return "";
 		return pool[Math.RandomInt(0, pool.Count())];
+	}
+
+	// Light crew for light vehicles, heavy crew for heavy ones. Empty means native default crew.
+	ResourceName INF_PickCrewPrefab(INS_AmbientVehicleAgent agent)
+	{
+		if (INF_IsHeavyVehicle(agent))
+			return INF_RandomPrefab(m_aINFHeavyCrewPrefabs);
+		return INF_RandomPrefab(m_aINFCrewPrefabs);
 	}
 
 	// Fills the crew seats from the crew lists instead of the vehicle's default occupants, for zone and ambient
@@ -501,12 +506,12 @@ modded class INS_AmbientVehicleManager
 			int index = Math.RandomInt(0, eligible.Count());
 			BaseCompartmentSlot selected = eligible[index];
 			eligible.Remove(index);
-			ResourceName poolCrew = INF_PickCrewPrefab(agent);
+			ResourceName passengerPrefab = INF_RandomPrefab(m_aINFPassengerPrefabs);
 			IEntity passenger;
-			if (poolCrew.IsEmpty())
+			if (passengerPrefab.IsEmpty())
 				passenger = selected.SpawnDefaultCharacterInCompartment(group);
 			else
-				passenger = selected.SpawnCharacterInCompartment(poolCrew, group);
+				passenger = selected.SpawnCharacterInCompartment(passengerPrefab, group);
 			if (!passenger)
 			{
 				Print("[INF_VehiclePassengers] Failed to spawn a selected seat's default passenger.", LogLevel.ERROR);
