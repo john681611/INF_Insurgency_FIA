@@ -52,6 +52,14 @@ class INF_MortarBattery
 	AIWaypoint m_Defend;
 }
 
+// Compositions of a cleared battery; they go by the defences' rules (no player within INF_Defences.DESPAWN_DISTANCE for DESPAWN_DELAY_MS).
+class INF_MortarRemains
+{
+	vector m_vPos;
+	float m_fIdleSince = -1;
+	ref array<IEntity> m_Compositions = {};
+}
+
 class INF_MortarBatteries
 {
 	// Maximum waypoint priority (attribute range 0-2000) so nearby combat does not pre-empt the fire mission.
@@ -93,13 +101,14 @@ class INF_MortarBatteries
 	static const float INIT_TIMEOUT_MS = 45000;
 
 	protected ref array<ref INF_MortarBattery> m_Batteries = {};
+	protected ref array<ref INF_MortarRemains> m_Remains = {};
 	protected ref map<string, bool> m_Rolls = new map<string, bool>();
 	protected bool m_bWinCarried;
 	protected bool m_bStopped;
 
 	bool HasBatteries()
 	{
-		return !m_Batteries.IsEmpty();
+		return !m_Batteries.IsEmpty() || !m_Remains.IsEmpty();
 	}
 
 	static void Log(string message)
@@ -293,10 +302,11 @@ class INF_MortarBatteries
 	// Called from the patrol manager's proximity check, so batteries need no tick of their own.
 	void Maintain(INS_AmbientPatrolManager patrols, INF_BlockPresence presence, INF_MortarConfig config)
 	{
-		if (!Replication.IsServer() || m_bStopped || m_Batteries.IsEmpty())
+		if (!Replication.IsServer() || m_bStopped || (m_Batteries.IsEmpty() && m_Remains.IsEmpty()))
 			return;
 		array<vector> players = presence.m_AllPlayers;
 		float now = GetGame().GetWorld().GetWorldTime();
+		MaintainRemains(players, now);
 		for (int i = m_Batteries.Count() - 1; i >= 0; i--)
 		{
 			INF_MortarBattery battery = m_Batteries[i];
@@ -322,7 +332,7 @@ class INF_MortarBatteries
 			}
 			if (AllCrewsDead(battery) && GuardsDead(battery))
 			{
-				Remove(battery, "crew and guards eliminated");
+				Remove(battery, "crew and guards eliminated", false, true);
 				continue;
 			}
 			Fire(patrols, battery, now);
@@ -865,12 +875,24 @@ class INF_MortarBatteries
 		}
 	}
 
-	protected void Remove(INF_MortarBattery battery, string reason, bool immediate = false)
+	// keepCompositions leaves the mortars standing for MaintainRemains instead of deleting them with the crews.
+	protected void Remove(INF_MortarBattery battery, string reason, bool immediate = false, bool keepCompositions = false)
 	{
 		Log("Battery for zone " + battery.m_sKey + " removed: " + reason + ".");
 		array<IEntity> doomed = {};
-		foreach (IEntity composition : battery.m_Compositions)
-			doomed.Insert(composition);
+		if (keepCompositions)
+		{
+			INF_MortarRemains remains = new INF_MortarRemains();
+			remains.m_vPos = battery.m_vPos;
+			foreach (IEntity kept : battery.m_Compositions)
+				remains.m_Compositions.Insert(kept);
+			m_Remains.Insert(remains);
+		}
+		else
+		{
+			foreach (IEntity composition : battery.m_Compositions)
+				doomed.Insert(composition);
+		}
 		foreach (INF_MortarCrew crew : battery.m_Crews)
 		{
 			foreach (AIWaypoint waypoint : crew.m_Salvo)
@@ -889,6 +911,26 @@ class INF_MortarBatteries
 			DeleteParts(doomed);
 		else
 			GetGame().GetCallqueue().CallLater(DeleteParts, INF_StaggerGate.Despawns().Reserve(), false, doomed);
+	}
+
+	protected void MaintainRemains(array<vector> players, float now)
+	{
+		float range = INF_Defences.DESPAWN_DISTANCE;
+		for (int i = m_Remains.Count() - 1; i >= 0; i--)
+		{
+			INF_MortarRemains remains = m_Remains[i];
+			if (!players.IsEmpty() && INF_BlockRules.Nearest(remains.m_vPos, players) <= range)
+			{
+				remains.m_fIdleSince = -1;
+				continue;
+			}
+			if (remains.m_fIdleSince < 0)
+				remains.m_fIdleSince = now;
+			if (now - remains.m_fIdleSince < INF_BlockRules.DESPAWN_DELAY_MS)
+				continue;
+			m_Remains.Remove(i);
+			GetGame().GetCallqueue().CallLater(DeleteParts, INF_StaggerGate.DefenceDespawns().Reserve(), false, remains.m_Compositions);
+		}
 	}
 
 	protected void CollectMembers(SCR_AIGroup group, array<IEntity> into)
@@ -947,5 +989,8 @@ class INF_MortarBatteries
 		m_bStopped = true;
 		for (int i = m_Batteries.Count() - 1; i >= 0; i--)
 			Remove(m_Batteries[i], "game mode ended", true);
+		foreach (INF_MortarRemains remains : m_Remains)
+			DeleteParts(remains.m_Compositions);
+		m_Remains.Clear();
 	}
 }

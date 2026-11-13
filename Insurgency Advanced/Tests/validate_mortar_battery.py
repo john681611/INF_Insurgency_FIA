@@ -184,6 +184,16 @@ class MortarBattery(unittest.TestCase):
         self.assertIn("m_INFMortars.Maintain(", GRID)
         self.assertIn("INF_GetMortars().OnZoneActivated(", GRID)
 
+    def test_cleared_battery_keeps_its_mortars_until_the_defence_despawn_rules_release_them(self):
+        self.assertIn('"crew and guards eliminated", false, true)', body("void Update(") if "void Update(" in MORTAR else MORTAR)
+        remove = body("protected void Remove(")
+        self.assertIn("if (keepCompositions)", remove)
+        remains = body("protected void MaintainRemains(")
+        self.assertIn("INF_Defences.DESPAWN_DISTANCE", remains)
+        self.assertIn("INF_BlockRules.DESPAWN_DELAY_MS", remains)
+        self.assertIn("INF_StaggerGate.DefenceDespawns()", remains)
+        self.assertIn("MaintainRemains(players, now)", MORTAR)
+
     def test_nothing_is_persisted(self):
         spawn = body("protected bool SpawnBattery(")
         self.assertIn("PrepareComposition(composition)", spawn)
