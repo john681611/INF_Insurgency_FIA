@@ -26,7 +26,7 @@ class AdvancedArchitecture(unittest.TestCase):
             'SCR_GameModeEditor : "{DA3986AF1B5032B8}Prefabs/MP/Modes/Editor/GameMode_Editor_Full.et"'))
         for setting in ("m_bINFBuildingGrid 1", "m_bINFShowZoneAreas 1", "m_bINFCacheObjective 1"):
             self.assertIn(setting, prefab)
-        for setting in ("m_aGroupPrefabs", "m_aSquadPrefabs", "m_aVehiclePrefabs", "coords", "m_Welcome"):
+        for setting in ("m_aGroupPrefabs", "m_aSquadPrefabs", "coords", "m_Welcome"):
             self.assertNotIn(setting, prefab)
         self.assertFalse((ROOT / "Prefabs" / "MP" / "Modes" / "Editor" / "GameMode_Editor_Full.et").exists())
 

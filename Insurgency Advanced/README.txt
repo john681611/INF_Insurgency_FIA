@@ -760,3 +760,11 @@ with saved progress, partial spawn retries, independent GM debug toggles and
 prisoner/document single-use state. Collect server logs and INS_Saves files
 from an early-end incident before resetting anything. Offline source/model
 checks are not Enfusion compilation or multiplayer verification.
+
+Non-functional base lists
+  Block control (m_bINFBuildingGrid) stops the garrison manager spawning, so INS_GarrisonManager
+  m_aInfantryGroupPrefabs and m_aVehicleGroupPrefabs (Non Functional) are cleared in the Insurgency
+  Advanced and Insurgency Advanced FIA game mode prefabs. The base Insurgency FIA and FIA Ext Veh
+  prefabs keep them because non-Advanced missions still use the garrison. Every other base list
+  (ambient m_aGroupPrefabs, counterattack m_aSquadPrefabs, field threat m_aGroupPrefabs,
+  ambient m_aVehiclePrefabs) is still used.
