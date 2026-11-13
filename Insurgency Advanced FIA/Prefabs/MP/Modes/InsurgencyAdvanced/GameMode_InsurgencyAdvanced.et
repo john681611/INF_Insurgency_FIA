@@ -3,7 +3,21 @@ SCR_GameModeEditor : "{DA3986AF1B5032B8}Prefabs/MP/Modes/Editor/GameMode_Editor_
  components {
   INS_AmbientPatrolManager "{69226EB846FFAEFF}" {
    m_bINFBuildingGrid 1
+   m_aGroupPrefabs {
+   }
    m_fINFCampFootprintRadius 9
+  }
+  INS_AmbientVehicleManager "{69226EB8BFD90B34}" {
+   m_aVehiclePrefabs {
+   }
+  }
+  INS_CounterAttackManager "{69226E8E281D0511}" {
+   m_aSquadPrefabs {
+   }
+  }
+  INS_FieldThreatManager "{698A92B7AC6D98DB}" {
+   m_aGroupPrefabs {
+   }
   }
   INF_PrefabManagerComponent "{6AA19CB200000400}" {
    m_sOfficer "{7353710EFA08FF92}Prefabs/Characters/Factions/INDFOR/FIA/Character_FIA_Officer.et"
@@ -22,6 +36,15 @@ SCR_GameModeEditor : "{DA3986AF1B5032B8}Prefabs/MP/Modes/Editor/GameMode_Editor_
    }
    m_aPassengers {
     "{8515E8BD26A5D5F8}Prefabs/Characters/Factions/INDFOR/FIA/Character_FIA_Randomized.et"
+   }
+   m_aDefenderGroups {
+    "{CE41AF625D05D0F0}Prefabs/Groups/INDFOR/Group_FIA_RifleSquad.et" "{2CC26054775FBA2C}Prefabs/Groups/INDFOR/Group_FIA_Team_AT.et" "{9328FE7DD0019E60}Prefabs/Groups/INDFOR/Group_FIA_Team_LAT.et" "{22F33D3EC8F281AB}Prefabs/Groups/INDFOR/Group_FIA_MachineGunTeam.et" "{1BB20A4B3A53D0F5}Prefabs/Groups/INDFOR/Group_FIA_LightFireTeam.et" "{5BEA04939D148B1D}Prefabs/Groups/INDFOR/Group_FIA_FireTeam.et" "{C1E39427E43B1E79}Prefabs/Groups/INDFOR/Group_FIA_AmmoTeam.et" "{DB3D2D4FC5922C6A}Prefabs/Groups/INDFOR/AmbientPatrols/Group_FIA_PartisanTeam_NotSpawned.et" "{4FB92A28AC66B970}Prefabs/Groups/INDFOR/AmbientPatrols/Group_FIA_SniperTeam_NotSpawned.et"
+   }
+   m_aCounterAttackSquads {
+    "{870472E4AE81F971}Prefabs/Groups/INDFOR/AmbientPatrols/Group_FIA_MachineGunTeam_Elite_NotSpawned.et" "{2E9C920C3ACA2C6F}Prefabs/Groups/INDFOR/Group_FIA_ReconTeam.et" "{265B11E8E53F9FBA}Prefabs/Groups/INDFOR/AmbientPatrols/Group_FIA_RifleSquad_NotSpawned.et"
+   }
+   m_aFieldThreatGroups {
+    "{CE41AF625D05D0F0}Prefabs/Groups/INDFOR/Group_FIA_RifleSquad.et" "{2CC26054775FBA2C}Prefabs/Groups/INDFOR/Group_FIA_Team_AT.et" "{0C9C86FCE951AF19}Prefabs/Groups/INDFOR/AmbientPatrols/Group_FIA_LoneWolfSniper_NotSpawned.et"
    }
    m_aDefences {
     "{17B68DA54A970140}PrefabsEditable/Auto/Compositions/Slotted/SlotRoadSmall/E_Barricade_S_USSR_01.et" "{1236588FCEA4848F}PrefabsEditable/Auto/Compositions/Slotted/SlotRoadMedium/E_Barricade_M_USSR_01.et" "{3FB42D0A5589A530}PrefabsEditable/Auto/Compositions/Slotted/SlotRoadLarge/E_Barricade_L_USSR_01.et" "{5AF4E84CA11058F4}PrefabsEditable/Auto/Compositions/Slotted/SlotRoadSmall/E_Checkpoint_S_USSR_01.et" "{1DF9835399B603EB}PrefabsEditable/Auto/Compositions/Slotted/SlotRoadMedium/E_Checkpoint_M_USSR_01.et" "{612AB9E420809989}PrefabsEditable/Auto/Compositions/Slotted/SlotRoadLarge/E_Checkpoint_L_USSR_01.et" "{1EED86CBA983241E}PrefabsEditable/Auto/Compositions/Slotted/SlotFlatSmall/E_Bunker_S_FIA_01.et" "{336DB98AC1B21594}PrefabsEditable/Auto/Compositions/Slotted/SlotFlatSmall/E_MachineGunNest_S_FIA_02.et" "{BB201FF4DC275DBB}PrefabsEditable/Auto/Compositions/Slotted/SlotFlatSmall/E_MachineGunNest_Scoped_S_FIA_01.et" "{CE74090473B270DE}PrefabsEditable/Auto/Compositions/Slotted/SlotFlatSmall/E_SandbagPosition_S_FIA_01.et"

@@ -9,10 +9,13 @@ Requires:
 
 This addon overrides Advanced's existing game-mode prefab resource:
   {CC46DF266B89439D}Prefabs/MP/Modes/InsurgencyAdvanced/GameMode_InsurgencyAdvanced.et
-It preserves the Advanced settings and replaces only the camp composition:
-  USSR: {8809D070C43CD78C}Prefabs/Compositions/Slotted/SlotFlatSmall/PlayerHub_S_USSR_01.et
+It keeps the Advanced settings and defines the FIA units on Advanced's prefab manager
+(INF_PrefabManagerComponent): FIA vehicles (light and heavy), FIA crews and passengers,
+the FIA defender groups, counterattack squads and field threat groups (the same prefabs as
+Insurgency FIA's lists), the FIA officer and the FIA camp composition:
   FIA:  {B7C71CFC27B3EE24}Prefabs/Compositions/Slotted/SlotFlatSmall/PlayerHub_S_FIA_01.et
-The latter is the native FIA Encampment composition, not a standalone tent.
+The camp is the native FIA Encampment composition, not a standalone tent. The base managers'
+own lists are emptied in this prefab; the prefab manager fills them at init.
 The 9m placement footprint and Advanced's composition preparation remain:
 embedded spawn points are disabled and unbudgeted embedded groups rejected.
 
@@ -24,8 +27,9 @@ Character_Base override is required. Reload the world/project to apply these
 attachments to newly spawned soldiers. Use this compatibility addon, not just
 Insurgency FIA, when Advanced capture/question interactions are required.
 
-No gameplay scripts, infantry/vehicle pools, cache prefabs or faction relations
-are duplicated here. The existing Insurgency FIA addon remains their owner.
+No gameplay scripts, cache prefabs or faction relations are duplicated here; the existing
+Insurgency FIA addon remains their owner. Its infantry and vehicle lists are repeated on the
+prefab manager so a mission is configured in one place; keep them in step with Insurgency FIA.
 The optional Insurgency FIA Ext Veh addon can still be loaded separately.
 No map dependency is introduced, and Advanced's USSR default is untouched
 when this compatibility addon is not loaded.

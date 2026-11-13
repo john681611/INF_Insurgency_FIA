@@ -2,6 +2,7 @@
 !/.gitignore
 !/Insurgency*/
 !/AGENTS.md
+/Insurgency Advanced FIA Ext Veh/
 
 __pycache__/
 *.pyc

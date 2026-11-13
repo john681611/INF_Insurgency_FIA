@@ -22,15 +22,18 @@ class AdvancedFIAIntegration(unittest.TestCase):
         self.assertNotIn("6A96C1C49DDE20B1", project)
         self.assertNotIn("61D57616CAFBB23D", project)
 
-    def test_only_change_to_advanced_prefab_is_fia_camp(self):
+    def test_prefab_keeps_advanced_settings_and_defines_fia_units_on_the_prefab_manager(self):
         original = (ADVANCED / MODE).read_text()
         override = (ROOT / MODE).read_text()
-        self.assertEqual(original.count(USSR_CAMP), 1)
+        for setting in ("m_bINFBuildingGrid 1", "m_fINFCampFootprintRadius 9", "m_bINFShowZoneAreas 1",
+                        "m_bINFCacheObjective 1", "m_sEditorMapConfigPath"):
+            self.assertIn(setting, original)
+            self.assertIn(setting, override)
         self.assertEqual(override.count(FIA_CAMP), 1)
-        self.assertEqual(override.splitlines(),
-                         original.replace(USSR_CAMP, FIA_CAMP).splitlines())
+        self.assertIn('m_sCamp "' + FIA_CAMP + '"', override)
         self.assertNotIn(USSR_CAMP, override)
-
+        self.assertIn("Character_FIA_Officer.et", override)
+        self.assertNotIn("USSR_Army", override)
     def test_overrides_same_resource_identity_without_self_inheritance(self):
         meta_path = Path(str(MODE) + ".meta")
         self.assertEqual((ROOT / meta_path).read_text().splitlines(),
@@ -39,16 +42,22 @@ class AdvancedFIAIntegration(unittest.TestCase):
                       (ROOT / meta_path).read_text())
         self.assertNotIn('SCR_GameModeEditor : "{CC46DF266B89439D}', (ROOT / MODE).read_text())
 
-    def test_does_not_duplicate_fia_pools_or_gameplay(self):
+    def test_fia_groups_match_the_fia_mod_and_nothing_else_is_duplicated(self):
         self.assertFalse(any((ROOT / "Scripts").rglob("*.c")))
         self.assertFalse((ROOT / "Worlds").exists())
         self.assertFalse((ROOT / "Missions").exists())
         override = (ROOT / MODE).read_text()
-        for field in ("m_aGroupPrefabs", "m_aSquadPrefabs", "m_aVehiclePrefabs", "m_sCachePrefab", "m_aFriendlyFactionsIds"):
+        original_fia = (FIA / "Prefabs" / "MP" / "Modes" / "Editor" / "GameMode_Editor_Full.et").read_text()
+        for field in ("m_sCachePrefab", "m_aFriendlyFactionsIds"):
             self.assertNotIn(field, override)
-            original_fia = (FIA / "Prefabs" / "MP" / "Modes" / "Editor" / "GameMode_Editor_Full.et").read_text()
             self.assertIn(field, original_fia)
 
+        def guids(text, name):
+            return set(re.findall(r'"(\{[0-9A-F]{16}\})', re.search(r"\n   " + name + r" \{\n(.*?)\n   \}", text, re.S).group(1)))
+        for fia_field, field in (("m_aGroupPrefabs", "m_aDefenderGroups"), ("m_aSquadPrefabs", "m_aCounterAttackSquads")):
+            self.assertEqual(guids(override, field), guids(original_fia, fia_field), field)
+        for base in ("m_aGroupPrefabs", "m_aSquadPrefabs", "m_aVehiclePrefabs"):
+            self.assertRegex(override, base + r" \{\n   \}")
     def test_preserves_footprint_and_runtime_composition_safeguards(self):
         self.assertIn("m_fINFCampFootprintRadius 9", (ROOT / MODE).read_text())
         source = (ADVANCED / "Scripts" / "Game" / "INF_ForestCamps.c").read_text()
