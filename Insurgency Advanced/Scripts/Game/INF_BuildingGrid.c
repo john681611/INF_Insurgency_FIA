@@ -610,7 +610,6 @@ modded class INS_AmbientPatrolManager
 		m_sINFCampComposition = prefabs.GetCamp();
 		m_sINFMortarComposition = prefabs.GetMortar();
 		m_sINFOfficerPrefab = prefabs.GetOfficer();
-		m_sINFDefenceSlotCache = prefabs.GetDefenceSlotCache();
 		m_aINFDefenceCompositions = INF_PrefabManagerComponent.PreferList(prefabs.GetDefences(), m_aINFDefenceCompositions);
 	}
 
@@ -635,6 +634,7 @@ modded class INS_AmbientPatrolManager
 	[Attribute("4", UIWidgets.Slider, "Soldiers in each road defence guard group (small flat defences use 2 to 4). They count as defenders of the owning zone.", "2 8 1", category: "Defences")]
 	protected int m_iINFDefenceGuards = 4;
 	protected ref array<ResourceName> m_aINFDefenceCompositions;
+	[Attribute("", UIWidgets.ResourceNamePicker, "Baked list of the world's slots (a config of INF_DefenceSlotCache), used when the world creates no slot entities at runtime, as on a dedicated server. It is map data, so set it in the mission's game mode prefab, not the prefab manager.", "conf", category: "Defences")]
 	protected ResourceName m_sINFDefenceSlotCache;
 	protected ref INF_Defences m_INFDefences;
 

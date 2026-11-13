@@ -780,10 +780,13 @@ Prefab manager (INF_PrefabManagerComponent, on the game mode prefab)
     Crews          m_aLightCrew, m_aHeavyCrew (crew seats), m_aPassengers (every vehicle)
     Infantry       m_aDefenderGroups, m_aCounterAttackSquads, m_aFieldThreatGroups
     Specials       m_sOfficer
-    Compositions   m_sCamp, m_sMortar, m_aDefences, m_sDefenceSlotCache
+    Compositions   m_sCamp, m_sMortar, m_aDefences
   At init it writes each value into the manager that uses it (including the base mod's lists), so the base
   mod needs no changes. A list left empty keeps the base mod's own list. The old INS_AmbientPatrolManager
-  attributes (camp, mortar, officer, defence compositions, slot cache) are gone, and the mission header no longer
+  attributes for the camp, mortar, officer and defence compositions are gone, and the mission header no longer
   overrides the camp or mortar composition: prefabs are set on the prefab manager only. Empty crew or passenger
   lists keep the vehicle's native occupants.
+  Map data is not a prefab choice and stays with the mission: the baked defence slot cache is still
+  INS_AmbientPatrolManager m_sINFDefenceSlotCache, set in the mission's game mode prefab.
+  Heavy vehicles use m_aHeavyCrew; every other vehicle uses m_aLightCrew.
   Heavy vehicles use m_aHeavyCrew; every other vehicle uses m_aLightCrew.

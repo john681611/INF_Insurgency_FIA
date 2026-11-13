@@ -295,7 +295,7 @@ class INF_Defences
 	{
 		if (m_Config.m_sSlotCache.IsEmpty())
 		{
-			Fail("No slot cache is configured (INF_PrefabManagerComponent m_sDefenceSlotCache), so there is no fallback; no defences placed.");
+			Fail("No slot cache is configured (INS_AmbientPatrolManager m_sINFDefenceSlotCache), so there is no fallback; no defences placed.");
 			return;
 		}
 		INF_DefenceSlotCache cache = INF_DefenceSlotCache.Load(m_Config.m_sSlotCache);

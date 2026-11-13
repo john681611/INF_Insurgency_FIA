@@ -4,7 +4,8 @@ class INF_PrefabManagerComponentClass : ScriptComponentClass
 }
 
 // Set on the game mode prefab. A list left empty here keeps the value the base mod's own managers already hold;
-// the composition, officer and slot cache values have no other source.
+// the composition and officer values have no other source. Map data such as the defence slot cache is not
+// defined here: it belongs to the mission, not the faction.
 class INF_PrefabManagerComponent : ScriptComponent
 {
 	[Attribute("", UIWidgets.ResourceNamePicker, "Light vehicles for ambient routes and zones (written to INS_AmbientVehicleManager m_aVehiclePrefabs).", "et", category: "Vehicles")]
@@ -33,8 +34,6 @@ class INF_PrefabManagerComponent : ScriptComponent
 	protected ResourceName m_sMortar;
 	[Attribute("", UIWidgets.ResourceNamePicker, "Defence compositions (road and flat slot compositions, preferably the editable PrefabsEditable E_ variants).", "et", category: "Compositions")]
 	protected ref array<ResourceName> m_aDefences;
-	[Attribute("", UIWidgets.ResourceNamePicker, "Baked slot list config (INF_DefenceSlotCache) for worlds without runtime slot entities.", "conf", category: "Compositions")]
-	protected ResourceName m_sDefenceSlotCache;
 
 	array<ResourceName> GetLightVehicles() { return m_aLightVehicles; }
 	array<ResourceName> GetHeavyVehicles() { return m_aHeavyVehicles; }
@@ -48,7 +47,6 @@ class INF_PrefabManagerComponent : ScriptComponent
 	ResourceName GetCamp() { return m_sCamp; }
 	ResourceName GetMortar() { return m_sMortar; }
 	array<ResourceName> GetDefences() { return m_aDefences; }
-	ResourceName GetDefenceSlotCache() { return m_sDefenceSlotCache; }
 
 	// A copy of source when it has entries, otherwise fallback.
 	static array<ResourceName> PreferList(array<ResourceName> source, array<ResourceName> fallback)

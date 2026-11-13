@@ -16,9 +16,10 @@ class PrefabManager(unittest.TestCase):
     def test_component_holds_every_definition_with_plain_attribute_names(self):
         for name in ("m_aLightVehicles", "m_aHeavyVehicles", "m_aLightCrew", "m_aHeavyCrew", "m_aPassengers",
                      "m_aDefenderGroups", "m_aCounterAttackSquads", "m_aFieldThreatGroups", "m_sOfficer",
-                     "m_sCamp", "m_sMortar", "m_aDefences", "m_sDefenceSlotCache"):
+                     "m_sCamp", "m_sMortar", "m_aDefences"):
             self.assertRegex(MANAGER, r"protected (ref array<ResourceName>|ResourceName) " + name + ";")
         self.assertNotRegex(MANAGER, r"protected [^\n]* m_\w*INF\w*;")
+        self.assertNotIn("SlotCache", MANAGER)
 
     def test_every_manager_receives_the_definitions_at_init(self):
         init = MANAGER.split("override void EOnInit(", 1)[1]
@@ -31,8 +32,9 @@ class PrefabManager(unittest.TestCase):
         self.assertIn("if (!source || source.IsEmpty())\n\t\t\treturn fallback;", MANAGER.replace("\r\n", "\n"))
         patrols = GRID.split("void INF_ApplyPrefabs(INF_PrefabManagerComponent prefabs)", 1)[1].split("}", 1)[0]
         for field, getter in (("m_sINFCampComposition", "GetCamp"), ("m_sINFMortarComposition", "GetMortar"),
-                              ("m_sINFOfficerPrefab", "GetOfficer"), ("m_sINFDefenceSlotCache", "GetDefenceSlotCache")):
+                              ("m_sINFOfficerPrefab", "GetOfficer")):
             self.assertIn(field + " = prefabs." + getter + "();", patrols)
+        self.assertNotIn("m_sINFDefenceSlotCache", patrols)
         self.assertIn("m_aGroupPrefabs = INF_PrefabManagerComponent.PreferList(", patrols)
         self.assertIn("m_aSquadPrefabs = INF_PrefabManagerComponent.PreferList(", GRID)
         self.assertIn("m_aGroupPrefabs = INF_PrefabManagerComponent.PreferList(", BLOCK)
@@ -44,9 +46,13 @@ class PrefabManager(unittest.TestCase):
 
     def test_legacy_attributes_on_the_patrol_manager_are_gone(self):
         for field in ("m_sINFCampComposition", "m_sINFMortarComposition", "m_sINFOfficerPrefab",
-                      "m_aINFDefenceCompositions", "m_sINFDefenceSlotCache"):
+                      "m_aINFDefenceCompositions"):
             self.assertRegex(GRID, r"\n\tprotected (ref array<ResourceName>|ResourceName) " + field + ";")
             self.assertNotRegex(GRID, r"\[Attribute\([^\n]*\)\]\r?\n\tprotected [^\n]* " + field + ";")
+
+    def test_slot_cache_is_mission_map_data_not_a_prefab_manager_setting(self):
+        self.assertRegex(GRID, r"\[Attribute\([^\n]*\)\]\r?\n\tprotected ResourceName m_sINFDefenceSlotCache;")
+        self.assertNotIn("GetDefenceSlotCache", GRID + MANAGER)
     def test_vehicle_manager_reads_crews_and_heavy_list_from_the_prefab_manager(self):
         for old in ("m_aINFHeavyVehiclePrefabs", "m_aINFCrewPrefabs", "m_aINFHeavyCrewPrefabs", "m_aINFPassengerPrefabs"):
             self.assertNotIn(old, VEHICLES)
