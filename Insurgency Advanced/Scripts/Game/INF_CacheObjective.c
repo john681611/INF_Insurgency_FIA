@@ -274,9 +274,9 @@ modded class INS_IntelManager
 			{
 				m_bINFCaptureCountsReady = false;
 				m_INFCampTask = INF_UpdateCaptureTask(m_INFCampTask, "INF_CaptureHostileCamps",
-					"Camps - initialising", patrols.INF_GetStartupStatus());
+					"Camps - initialising" + INF_OptionalTag(m_bINFRequireCamps), patrols.INF_GetStartupStatus());
 				m_INFZoneTask = INF_UpdateCaptureTask(m_INFZoneTask, "INF_CaptureHostileZones",
-					"Zones - initialising", "Discovered building zones are playable while terrain discovery continues. Final capture-zone counts appear after camp/cache placement finishes.");
+					"Zones - initialising" + INF_OptionalTag(m_bINFRequireZones), "Discovered building zones are playable while terrain discovery continues. Final capture-zone counts appear after camp/cache placement finishes.");
 			}
 		}
 		if (!discoveryReady)
@@ -299,10 +299,10 @@ modded class INS_IntelManager
 		if (m_bINFCacheObjective)
 		{
 			m_INFCampTask = INF_UpdateCaptureTask(m_INFCampTask, "INF_CaptureHostileCamps",
-				string.Format("Captured %1/%2 Camps", m_iINFCampsCaptured, m_iINFCampsTotal),
+				string.Format("Captured %1/%2 Camps%3", m_iINFCampsCaptured, m_iINFCampsTotal, INF_OptionalTag(m_bINFRequireCamps)),
 				"Capture woodland camp squares on foot. Yellow is capturing; orange means a counterattack is pending or active. Secure the square permanently (green) to transfer camp ownership and complete its objective.");
 			m_INFZoneTask = INF_UpdateCaptureTask(m_INFZoneTask, "INF_CaptureHostileZones",
-				string.Format("Captured %1/%2 Zones", m_iINFZonesCaptured, m_iINFZonesTotal),
+				string.Format("Captured %1/%2 Zones%3", m_iINFZonesCaptured, m_iINFZonesTotal, INF_OptionalTag(m_bINFRequireZones)),
 				"Capture every non-camp 100m building/cache square. Each square counts once. Capture credit is retained for this mission even if a counterattack retakes the zone.");
 			INF_UpdateOfficerTask(patrols);
 		}
@@ -322,8 +322,16 @@ modded class INS_IntelManager
 		if (!states || !states.OfficersEnabled())
 			return;
 		m_INFOfficerTask = INF_UpdateCaptureTask(m_INFOfficerTask, "INF_NeutraliseOfficers",
-			string.Format("Officers remaining: %1", states.OfficerCount()),
+			string.Format("Officers remaining: %1%2", states.OfficerCount(), INF_OptionalTag(m_bINFRequireOfficers)),
 			"Enemy officers hold zones marked with a gold border. Kill or capture each one; searching or questioning a secured officer gives better intel odds. His zone is ordinary again once he is down.");
+	}
+
+	// Objectives the mission does not require for completion are flagged in their titles.
+	protected string INF_OptionalTag(bool required)
+	{
+		if (required)
+			return string.Empty;
+		return " (Optional)";
 	}
 
 	protected SCR_Task INF_UpdateCaptureTask(SCR_Task task, string id, string title, string description)
