@@ -21,6 +21,8 @@ class INF_ForestCampSite
 	ref array<IEntity> m_Props = {};
 	IEntity m_Service;
 	string m_sLastFailure;
+	// Restored from the save: placed even when something now blocks the footprint, so a restart cannot stall.
+	bool m_bSaved;
 }
 
 [ComponentEditorProps(category: "Insurgency Advanced", description: "Replicated ownership of a permanently secured camp.")]
@@ -228,6 +230,7 @@ class INF_ForestCamps
 				restored.m_Center = saved.m_Center;
 				restored.m_Position = saved.m_Position;
 				restored.m_Yaw = saved.m_Yaw;
+				restored.m_bSaved = true;
 				ConfigureSite(restored);
 				m_Sites.Insert(restored);
 			}
@@ -782,7 +785,14 @@ class INF_ForestCamps
 		{
 			if (camp.m_CompositionReady)
 				continue;
-			int footprint = FootprintFailure(camp, false, true);
+			int footprint = 0;
+			if (!camp.m_bSaved)
+				footprint = FootprintFailure(camp, false, true);
+			else if (FootprintFailure(camp, false, true) != 0 && camp.m_sLastFailure == string.Empty)
+			{
+				camp.m_sLastFailure = "saved";
+				Print("[INF_ForestCamps] Saved camp " + camp.m_Key + " has a blocked footprint (" + s_sLastBlocker + "); placing it anyway.", LogLevel.WARNING);
+			}
 			if (footprint != 0 || !SpawnLayout(camp))
 			{
 				Cleanup(camp);

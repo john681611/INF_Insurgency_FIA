@@ -16,7 +16,10 @@ class IntegratedSites(unittest.TestCase):
         self.assertIn("!intel.INF_IsIntelReady()", layout)
         self.assertNotIn("PlayerSafe", layout)
         self.assertNotIn("m_Players", layout)
-        self.assertIn("int footprint = FootprintFailure(camp, false, true)", layout)
+        self.assertIn("footprint = FootprintFailure(camp, false, true)", layout)
+        # A saved camp is placed even when its footprint is blocked, so a restart cannot stall.
+        self.assertIn("if (!camp.m_bSaved)", layout)
+        self.assertIn("restored.m_bSaved = true;", self.read("INF_ForestCamps.c") if hasattr(self, "read") else open(__import__("os").path.join(__import__("os").path.dirname(__file__), "..", "Scripts", "Game", "INF_ForestCamps.c"), encoding="utf-8").read())
         self.assertNotIn("m_bRecovered", CAMP)
         self.assertIn("footprint != 0 || !SpawnLayout(camp)", layout)
         self.assertIn("Cleanup(camp)", layout)
