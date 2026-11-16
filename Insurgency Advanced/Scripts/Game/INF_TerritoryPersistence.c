@@ -136,7 +136,18 @@ class INF_TerritoryPersistence
 		}
 		m_Ready = !exists || m_Slot >= 0;
 		if (!m_Ready)
-			Print("[INF_Territory] No valid territory snapshot; startup blocked and existing files preserved.", LogLevel.ERROR);
+		{
+			// Unusable snapshots (another world's, or corrupt) must not block startup: discard them and start clean.
+			Print("[INF_Territory] No valid territory snapshot; discarding the unusable files and starting with no secured zones.", LogLevel.WARNING);
+			for (int stale = 0; stale < 2; stale++)
+			{
+				if (FileIO.FileExists(PathFor(stale)) && !FileIO.DeleteFile(PathFor(stale)))
+					Print("[INF_Territory] Cannot delete unusable snapshot: " + PathFor(stale), LogLevel.ERROR);
+			}
+			m_State = new INF_TerritorySnapshot();
+			m_Slot = -1;
+			m_Ready = true;
+		}
 	}
 
 	bool HasCell(string key)

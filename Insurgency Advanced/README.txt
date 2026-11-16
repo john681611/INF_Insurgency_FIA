@@ -517,8 +517,8 @@ Unfinished captures and pending/active counterattacks restart hostile, without
 restoring temporary credit, AI or timers. Markers, cache/intel saves, settings
 and prisoners are unchanged. Territory never belongs in a reusable terrain index.
 If one snapshot is invalid, recovery logs an error and uses the other valid
-generation; if neither existing snapshot is valid, startup blocks and preserves
-the files for diagnosis. Back up both files before investigating a failure.
+generation; if neither existing snapshot is valid (corrupt, or written by another world), both are
+discarded and the mission starts with no secured zones, so startup is never blocked.
 Old versions did not save territory: already-lost captures cannot be recovered.
 For a fresh campaign, stop the server and remove both territory snapshots along
 with the existing campaign saves. Do not remove INF_TerrainIndexes. Removing

@@ -28,6 +28,11 @@ class SaveWorldGuardTests(unittest.TestCase):
     def test_unrecoverable_cache_saves_start_fresh_instead_of_blocking(self):
         self.assertNotIn("blocking fresh selection", read("INF_ForestCampRewards.c"))
 
+    def test_unusable_territory_snapshots_are_discarded_not_blocking(self):
+        territory = read("INF_TerritoryPersistence.c")
+        self.assertNotIn("startup blocked", territory)
+        self.assertIn("discarding the unusable files", territory)
+
 
 if __name__ == "__main__":
     unittest.main()
