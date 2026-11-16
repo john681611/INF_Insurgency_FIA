@@ -163,7 +163,8 @@ parent is the upstream Insurgency prefab DA3986AF1B5032B8, not the stock
 editor prefab DA3986AF1B5032B7. This keeps the scenario out of its own
 upstream inheritance chain and preserves native manager settings/pools.
 Existing INS_Saves filenames and data formats are unchanged. Do not delete
-saves for this extraction. Use separate server profiles for different maps:
+saves for this extraction. Use separate server profiles for different maps,
+or rely on the world guard (see the territory section), which clears the saves on a map change:
 the inherited saves are not automatically namespaced per scenario.
 
 Publishing/deployment
@@ -523,6 +524,12 @@ For a fresh campaign, stop the server and remove both territory snapshots along
 with the existing campaign saves. Do not remove INF_TerrainIndexes. Removing
 only both territory snapshots explicitly resets territory, not caches/markers.
 Keep separate server profiles for different maps/campaigns; these are not slots.
+Saves are guarded against a change of map: $profile:INS_Saves/world.dat records which world wrote the
+saves. At startup (server only, before anything is read) the folder is cleared, keeping only world.dat,
+when that world differs from the current one, or when the base mod's cache save (INS_CACHE_SAVE_FILE)
+is missing. A missing world.dat is added. Nothing is archived, so the old map's saves are not kept.
+Unreadable camp manifests and cache saves are discarded and rebuilt fresh, so recovery never blocks startup.
+A camp restored from its save is placed even if its footprint is blocked, so a restart cannot stall.
 Validate both permanent transitions, a different-faction captor, native USSR
 and FIA arsenals, late joining, and deployment at a secured camp in-game.
 

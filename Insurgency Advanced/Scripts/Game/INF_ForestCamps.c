@@ -219,6 +219,7 @@ class INF_ForestCamps
 			Print("[INF_ForestCamps] Invalid camp composition or footprint radius (expected 3-24m); holding static-site startup.", LogLevel.ERROR);
 			return;
 		}
+		INF_SaveWorldGuard.Ensure();
 		INF_ForestCampRewards.BeginDiscovery();
 		array<ref INF_ForestCampRewardSite> recovered = {};
 		if (INF_ForestCampRewards.GetRecoveredSites(recovered))

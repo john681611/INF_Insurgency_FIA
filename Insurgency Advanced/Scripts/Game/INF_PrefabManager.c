@@ -74,6 +74,7 @@ class INF_PrefabManagerComponent : ScriptComponent
 	// existing readers see them without knowing about this component.
 	override void EOnInit(IEntity owner)
 	{
+		INF_SaveWorldGuard.Ensure();
 		INS_AmbientPatrolManager patrols = INS_AmbientPatrolManager.Cast(owner.FindComponent(INS_AmbientPatrolManager));
 		if (patrols)
 			patrols.INF_ApplyPrefabs(this);

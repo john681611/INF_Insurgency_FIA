@@ -100,8 +100,8 @@ class CaptureObjectives(unittest.TestCase):
     def test_task_style_and_late_join_assignment(self):
         self.assertIn('"INF_CaptureHostileCamps"', INTEL)
         self.assertIn('"INF_CaptureHostileZones"', INTEL)
-        self.assertIn('"Captured %1/%2 Camps"', INTEL)
-        self.assertIn('"Captured %1/%2 Zones"', INTEL)
+        self.assertIn('"Captured %1/%2 Camps%3"', INTEL)
+        self.assertIn('"Captured %1/%2 Zones%3"', INTEL)
         helper = INTEL.split("protected SCR_Task INF_UpdateCaptureTask", 1)[1].split(
             "protected bool INF_CanCompleteMission", 1)[0]
         self.assertIn("SCR_TaskSystem.GetTaskFromTaskID(id, false)", helper)

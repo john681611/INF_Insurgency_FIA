@@ -131,16 +131,17 @@ class ForestCampRewardContracts(unittest.TestCase):
                         "Invalid camp manifest count", "Cannot read camp manifest entry"):
             self.assertIn(message, recover)
 
-    def test_corrupt_manifest_is_recovered_empty_not_rediscovered(self):
+    def test_corrupt_manifest_is_scrapped_and_rediscovered(self):
         recover = body("static bool GetRecoveredSites(")
         self.assertIn("count > 24", recover)
         self.assertIn("keys.Contains(site.m_Key)", recover)
         self.assertIn("coordinates.Contains(coordinate)", recover)
         self.assertIn("sites.Clear()", recover)
         failure = body("protected static bool UnavailableManifest(")
-        self.assertIn("s_bManifestValid = false", failure)
+        self.assertNotIn("s_bManifestValid = false", failure)
         self.assertIn("s_aLayouts.Clear()", failure)
-        self.assertIn("return true", failure)
+        self.assertIn("FileIO.DeleteFile(SITE_SAVE)", failure)
+        self.assertIn("return false", failure)
         complete = body("static void CompleteDiscovery(")
         guard = complete[complete.index("if (!s_bManifestValid)"):complete.index("if (!SaveSites())")]
         self.assertIn("s_bDiscoveryReady = true", guard)

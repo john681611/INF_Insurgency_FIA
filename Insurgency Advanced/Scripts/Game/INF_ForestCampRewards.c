@@ -192,13 +192,15 @@ class INF_ForestCampRewards
 		return true;
 	}
 
+	// An unreadable manifest is scrapped: camps are discovered fresh and the saved caches still restore.
 	protected static bool UnavailableManifest(string reason)
 	{
-		s_bManifestValid = false;
 		s_aSites.Clear();
 		s_aLayouts.Clear();
-		Print("[INF_ForestCampRewards] " + reason + " Camp recovery is fail-closed; preserving the manifest, with no fresh camps. Saved caches will still restore.", LogLevel.ERROR);
-		return true;
+		if (FileIO.FileExists(SITE_SAVE) && !FileIO.DeleteFile(SITE_SAVE))
+			Print("[INF_ForestCampRewards] Cannot delete the unreadable camp manifest: " + SITE_SAVE, LogLevel.ERROR);
+		Print("[INF_ForestCampRewards] " + reason + " Discarding the manifest and discovering camps fresh. Saved caches will still restore.", LogLevel.WARNING);
+		return false;
 	}
 
 	protected static bool SaveSites()
@@ -407,9 +409,7 @@ class INF_ForestCampRewards
 			return;
 		if (FileIO.FileExists(SEARCH_SAVE) && !FileIO.DeleteFile(SEARCH_SAVE))
 			Print("[INF_ForestCampRewards] Cannot delete saved searches on clean mission end: " + SEARCH_SAVE, LogLevel.ERROR);
-		if (!s_bManifestValid && FileIO.FileExists(SITE_SAVE))
-			Print("[INF_ForestCampRewards] Preserving unreadable camp manifest on mission end for diagnosis: " + SITE_SAVE, LogLevel.WARNING);
-		else if (FileIO.FileExists(SITE_SAVE) && !FileIO.DeleteFile(SITE_SAVE))
+		if (FileIO.FileExists(SITE_SAVE) && !FileIO.DeleteFile(SITE_SAVE))
 			Print("[INF_ForestCampRewards] Cannot delete camp manifest on clean mission end: " + SITE_SAVE, LogLevel.ERROR);
 		INF_TerritoryPersistence.DeleteSaves();
 		if (FileIO.FileExists(INF_Defences.SAVE_FILE) && !FileIO.DeleteFile(INF_Defences.SAVE_FILE))
@@ -478,8 +478,12 @@ modded class INS_CacheSpawnManager
 		bool recovered = LoadCachePositions(chosen);
 		if (!recovered && (FileIO.FileExists(INS_CACHE_SAVE_FILE) || FileIO.FileExists(INS_INTEL_SAVE_FILE)))
 		{
-			Print("[INF_ForestCampRewards] Cache position recovery failed or paired positions are missing; preserving saves and blocking fresh selection.", LogLevel.ERROR);
-			return;
+			// Unrecoverable cache saves must not block startup: drop them and select fresh caches.
+			Print("[INF_ForestCampRewards] Cache position recovery failed or paired positions are missing; discarding the cache and intel saves and selecting fresh caches.", LogLevel.ERROR);
+			if (FileIO.FileExists(INS_CACHE_SAVE_FILE) && !FileIO.DeleteFile(INS_CACHE_SAVE_FILE))
+				Print("[INF_ForestCampRewards] Cannot delete the cache save: " + INS_CACHE_SAVE_FILE, LogLevel.ERROR);
+			if (FileIO.FileExists(INS_INTEL_SAVE_FILE) && !FileIO.DeleteFile(INS_INTEL_SAVE_FILE))
+				Print("[INF_ForestCampRewards] Cannot delete the intel save: " + INS_INTEL_SAVE_FILE, LogLevel.ERROR);
 		}
 		if (!recovered)
 		{
