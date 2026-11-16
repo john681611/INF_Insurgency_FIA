@@ -23,13 +23,15 @@ class INF_SaveWorldGuard
 	{
 		if (s_bChecked || !Replication.IsServer())
 			return;
-		s_bChecked = true;
 		string current = WorldKey(GetGame().GetWorldFile());
+		// The world file may not be known yet at the earliest call; a later call does the check.
 		if (current.IsEmpty())
 			return;
+		s_bChecked = true;
 		FileIO.MakeDirectory(DIRECTORY);
 		INF_SaveWorldGuard guard = new INF_SaveWorldGuard();
 		string saved = ReadMarker();
+		Print("[INF_SaveWorldGuard] World " + current + "; saves belong to " + saved + ".");
 		if (!saved.IsEmpty() && saved != current)
 			guard.Clear("the saves were written by world " + saved + ", not " + current);
 		else if (!FileIO.FileExists(INS_CACHE_SAVE_FILE))
