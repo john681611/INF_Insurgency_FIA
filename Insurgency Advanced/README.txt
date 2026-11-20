@@ -90,6 +90,13 @@ automatic initial default, or an explicit probability from 0 to 1.
 Dialogue currently has twelve refusal lines and four helpful lines. The
 questioner's reliable owner RPC shows their response; successful intel follows
 the existing shared map/hint system. No reward is consumed before intel startup.
+Intel spread: each intel item is given to a cache chosen by weighted random instead of
+uniform random. Weight = (1 + hints)^H / (1 + distance / scale)^P, where hints is the
+intel the cache already has and distance runs from the searcher to the cache (ignored
+when the searcher has no body, e.g. questioning without a position). Defaults H=0.5,
+P=1, scale=1500 m; weights are floored at 5% of the best so no cache is starved. The
+"Intel Spread" attributes on the intel manager tune this; unticking Weighted Intel
+restores vanilla uniform random.
 Captured prisoners' native damage callbacks treat a real attack attributed to a player
 after capture as abuse, whatever the weapon (shooting, melee, blast, fire, vehicles).
 Bleeding, its fatal damage, healing and regeneration are exempt, so a prisoner dying of

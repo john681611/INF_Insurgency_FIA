@@ -87,8 +87,8 @@ modded class SCR_MapDotCircleHandler
 		LineDrawCommand border = new LineDrawCommand();
 		border.m_iColor = Color.FromRGBA(base.R() * 255 * 0.7, base.G() * 255 * 0.7, base.B() * 255 * 0.7, 255).PackToInt();
 		border.m_fWidth = Math.Clamp(m_fActualRadius * 0.01, 0.75, 3);
-		// Officer zones keep a thicker gold border whatever state the fill shows.
-		if (area.INF_IsOfficer())
+		// A stale officer flag must not override a terminal cleared/safe appearance.
+		if (area.INF_ShowsOfficerBorder())
 		{
 			border.m_iColor = Color.FromRGBA(255, 200, 40, 255).PackToInt();
 			border.m_fWidth = Math.Clamp(m_fActualRadius * 0.02, 1.5, 5);
@@ -135,6 +135,12 @@ class INF_GarrisonMapArea : SCR_MapMarkerDotCircle
 	bool INF_IsOfficer()
 	{
 		return m_bINFOfficer;
+	}
+
+	bool INF_ShowsOfficerBorder()
+	{
+		return m_bINFOfficer && m_eINFState != INF_EGarrisonMapState.CLEARED
+			&& m_eINFState != INF_EGarrisonMapState.SAFE;
 	}
 
 	bool INF_IsSquare()

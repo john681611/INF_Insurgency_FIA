@@ -44,6 +44,12 @@ class INF_ZoneStateSystem
 	void CommitCaptureState(INS_AmbientPatrolZoneState state)
 	{
 		SavePermanent(state);
+		string key = INF_BuildingGrid.Key(state.m_vCenter);
+		if (state.m_bINFPermanent && (state.m_bINFOfficer || m_Persistence.IsOfficer(key)))
+		{
+			OfficerDown(key);
+			return;
+		}
 		NotifyChanged(state, true);
 	}
 
@@ -246,6 +252,13 @@ class INF_ZoneStateSystem
 			string key = INF_BuildingGrid.Key(state.m_vCenter);
 			if (!m_Persistence.IsOfficer(key))
 				continue;
+			if (state.m_bINFPermanent)
+			{
+				m_Persistence.RemoveOfficer(key);
+				state.m_bINFOfficer = false;
+				state.m_INFOfficerPost = null;
+				continue;
+			}
 			state.m_bINFOfficer = true;
 			state.m_INFOfficerPost = INF_Officers.CreatePost(state);
 			NotifyChanged(state);
@@ -257,12 +270,16 @@ class INF_ZoneStateSystem
 	void OfficerDown(string key)
 	{
 		INS_AmbientPatrolZoneState state = m_Cells.Get(key);
+		bool changed = m_Persistence.IsOfficer(key);
 		if (state)
 		{
+			changed = changed || state.m_bINFOfficer || state.m_INFOfficerPost != null;
 			state.m_bINFOfficer = false;
 			state.m_INFOfficerPost = null;
 		}
 		m_Persistence.RemoveOfficer(key);
+		if (!changed)
+			return;
 		FlushPermanent();
 		if (state)
 			NotifyChanged(state, true);

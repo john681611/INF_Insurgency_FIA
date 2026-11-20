@@ -40,8 +40,11 @@ class Officers(unittest.TestCase):
         self.assertIn("m_Persistence.MarkOfficersAssigned()", assign)
         self.assertIn("m_Persistence.AddOfficer(", assign)
         self.assertIn("m_Persistence.IsOfficer(key)", assign)
+        self.assertIn("if (state.m_bINFPermanent)", assign)
+        self.assertLess(assign.index("m_Persistence.RemoveOfficer(key)"), assign.index("state.m_bINFOfficer = true"))
         self.assertIn("m_Persistence.RemoveOfficer(key)", method_body(ZONES, "void OfficerDown("))
         self.assertIn("state.m_bINFOfficer = false", method_body(ZONES, "void OfficerDown("))
+        self.assertIn("if (!changed)", method_body(ZONES, "void OfficerDown("))
         self.assertLess(GRID.index("RestorePermanentCamps()"), GRID.index("AssignOfficers("))
         self.assertIn("file.Write(3)", PERSISTENCE)
         self.assertIn("version >= 1 && version <= 3", PERSISTENCE)
@@ -67,6 +70,10 @@ class Officers(unittest.TestCase):
         self.assertIn("Color.FromRGBA(255, 200, 40, 255)", MAP)
         self.assertIn("state.m_bINFOfficer);", MAP)
         self.assertIn("border.m_fWidth = Math.Clamp(m_fActualRadius * 0.02, 1.5, 5)", MAP)
+        border = method_body(MAP, "bool INF_ShowsOfficerBorder(")
+        self.assertIn("area.INF_ShowsOfficerBorder()", MAP)
+        self.assertIn("m_eINFState != INF_EGarrisonMapState.CLEARED", border)
+        self.assertIn("m_eINFState != INF_EGarrisonMapState.SAFE", border)
 
     def test_intel_odds_and_captured_or_dead_officer_is_gone(self):
         self.assertIn("chance = INF_Officers.QUESTION_CHANCE", PRISONERS)
@@ -76,6 +83,11 @@ class Officers(unittest.TestCase):
         self.assertIn("OfficerOut()", capture)
         self.assertIn("m_DamageManager.IsDestroyed()", method_body(PRISONERS, "protected void OnOfficerDamage("))
         self.assertIn("officer.SearchOfficer(pUserEntity)", PRISONERS)
+        capture = method_body(ZONES, "void CommitCaptureState(")
+        self.assertIn("state.m_bINFPermanent && (state.m_bINFOfficer || m_Persistence.IsOfficer(key))", capture)
+        self.assertIn("OfficerDown(key)", capture)
+        deletion = method_body(PRISONERS, "override void OnDelete(")
+        self.assertLess(deletion.index("m_DamageManager.IsDestroyed()"), deletion.index("Remove(OnOfficerDamage)"))
 
     def test_officer_objective_switch_is_wired_to_the_saved_set(self):
         cleared = method_body(ZONES, "bool OfficersCleared(")

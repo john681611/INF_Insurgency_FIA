@@ -89,6 +89,70 @@ modded class INS_IntelManager
 		return false;
 	}
 
+	[Attribute("1", UIWidgets.CheckBox, "Weight which cache receives intel by hints already found and distance from the searcher. Off = vanilla uniform random.", category: "Intel Spread")]
+	protected bool m_bINFWeightedIntel;
+	[Attribute("0.5", UIWidgets.EditBox, "Hint bias H: weight is (1 + hints)^H. 0 ignores hints; higher finishes a cache before starting another.", category: "Intel Spread")]
+	protected float m_fINFIntelHintBias;
+	[Attribute("1", UIWidgets.EditBox, "Distance bias P: weight is divided by (1 + distance / scale)^P. 0 ignores distance.", category: "Intel Spread")]
+	protected float m_fINFIntelDistanceBias;
+	[Attribute("1500", UIWidgets.EditBox, "Distance scale in metres for the intel distance weighting.", category: "Intel Spread")]
+	protected float m_fINFIntelDistanceScale;
+
+	protected const float INF_INTEL_MIN_WEIGHT_RATIO = 0.05;
+
+	// Picks the active cache index to receive intel. Falls back to uniform random if weights are unusable.
+	protected int INF_PickCacheForIntel(array<int> active, int searcherID)
+	{
+		if (active.Count() < 2)
+			return active[0];
+
+		bool hasPos = false;
+		vector searcherPos;
+		if (searcherID >= 0)
+		{
+			IEntity searcher = GetGame().GetPlayerManager().GetPlayerControlledEntity(searcherID);
+			if (searcher)
+			{
+				searcherPos = searcher.GetOrigin();
+				hasPos = true;
+			}
+		}
+
+		float scale = Math.Max(m_fINFIntelDistanceScale, 1);
+		array<float> weights = {};
+		float maxWeight = 0;
+		foreach (int idx : active)
+		{
+			float w = Math.Pow(1 + m_aCacheIntelCounts[idx], Math.Max(m_fINFIntelHintBias, 0));
+			IEntity cache = m_aCacheEntities[idx];
+			if (hasPos && cache)
+				w = w / Math.Pow(1 + vector.Distance(searcherPos, cache.GetOrigin()) / scale, Math.Max(m_fINFIntelDistanceBias, 0));
+			weights.Insert(w);
+			if (w > maxWeight)
+				maxWeight = w;
+		}
+
+		if (!(maxWeight > 0))
+			return active[Math.RandomInt(0, active.Count())];
+
+		float floorWeight = maxWeight * INF_INTEL_MIN_WEIGHT_RATIO;
+		float total = 0;
+		for (int i = 0; i < weights.Count(); i++)
+		{
+			weights.Set(i, Math.Max(weights[i], floorWeight));
+			total += weights[i];
+		}
+
+		float roll = Math.RandomFloat(0, total);
+		for (int j = 0; j < weights.Count(); j++)
+		{
+			roll -= weights[j];
+			if (roll <= 0)
+				return active[j];
+		}
+		return active[active.Count() - 1];
+	}
+
 	[Attribute("0", UIWidgets.CheckBox, "Show a shared objective to destroy hostile caches using intel map hints.")]
 	protected bool m_bINFCacheObjective;
 
@@ -954,7 +1018,41 @@ modded class INS_IntelManager
 			Print("[INF_Objectives] Intel award rejected before recovery is complete.", LogLevel.WARNING);
 			return;
 		}
-		super.AddIntelAndBroadcast(amount, searcherID);
+		if (!m_bINFWeightedIntel || !INF_ZoneEditorContext.Grid(GetOwner()))
+		{
+			super.AddIntelAndBroadcast(amount, searcherID);
+			return;
+		}
+
+		// Mirrors vanilla AddIntelAndBroadcast with a weighted cache pick instead of uniform random.
+		array<int> active = {};
+		for (int i = 0; i < m_aCacheEntities.Count(); i++)
+		{
+			if (!m_aCacheDestroyed[i] && !m_aCacheRevealed[i])
+				active.Insert(i);
+		}
+		if (active.IsEmpty())
+			return;
+
+		int pick = INF_PickCacheForIntel(active, searcherID);
+		if (m_bDebugLog)
+			Print(string.Format("[INF_Intel] Weighted pick: cache %1 (hints %2) of %3 active, searcher %4", pick, m_aCacheIntelCounts[pick], active.Count(), searcherID));
+		m_aCacheIntelCounts.Set(pick, m_aCacheIntelCounts[pick] + amount);
+
+		AddProgressMarker(pick);
+
+		ShowFoundHint();
+		Rpc(RpcBroadcastFoundHint);
+
+		if (m_aCacheIntelCounts[pick] >= m_iIntelThreshold)
+		{
+			m_aCacheRevealed.Set(pick, true);
+			int remaining = m_aCacheEntities.Count() - m_iCachesDestroyed;
+			ShowRevealHint(remaining);
+			Rpc(RpcAnnounceReveal, remaining);
+		}
+
+		SaveIntelState();
 	}
 
 	override void OnGameModeEnd(SCR_GameModeEndData data)

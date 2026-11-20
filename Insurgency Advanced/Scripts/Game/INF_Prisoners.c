@@ -749,7 +749,7 @@ class INF_PrisonerComponent : ScriptComponent
 		m_fNextLoiterAttempt = now + 5000;
 		SCR_LoiterCustomAnimData data = SCR_LoiterCustomAnimData.Default;
 		if (m_PrisonerLoiter == ELoiteringType.SMOKING)
-			data = SCR_LoiterCustomAnimData.CreateInstance(itemPreset: SCR_EAnimationItemID.CIGAR);
+			data = SCR_LoiterCustomAnimData.CreateInstance(commandValue: ELoiteringType.SMOKING, itemPreset: SCR_EAnimationItemID.CIGAR);
 		vector transform[4];
 		GetOwner().GetWorldTransform(transform);
 		character.StartLoitering(null, m_PrisonerLoiter, false, false, false, transform, true, data);
@@ -778,6 +778,8 @@ class INF_PrisonerComponent : ScriptComponent
 
 	override void OnDelete(IEntity owner)
 	{
+		if (Replication.IsServer() && m_DamageManager && m_DamageManager.IsDestroyed())
+			OfficerOut();
 		if (m_DamageManager)
 		{
 			m_DamageManager.GetOnDamage().Remove(OnCapturedDamage);

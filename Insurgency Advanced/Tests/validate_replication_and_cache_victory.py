@@ -186,6 +186,17 @@ class ReplicationAndCacheVictory(unittest.TestCase):
         self.assertIn("continue;", branch)
         self.assertIn("m_aINFZoneCachePositions = positions", load)
 
+    def test_intel_pick_is_weighted_by_hints_and_distance_with_vanilla_fallback(self):
+        add = method(INTEL, "override void AddIntelAndBroadcast(")
+        self.assertIn("!m_bINFWeightedIntel", add)
+        self.assertIn("super.AddIntelAndBroadcast(amount, searcherID)", add)
+        self.assertIn("INF_PickCacheForIntel(active, searcherID)", add)
+        self.assertNotIn("Math.RandomInt", add)
+        pick = method(INTEL, "protected int INF_PickCacheForIntel(")
+        for needle in ("m_aCacheIntelCounts[idx]", "vector.Distance(searcherPos", "INF_INTEL_MIN_WEIGHT_RATIO",
+                       "Math.RandomFloat(0, total)"):
+            self.assertIn(needle, pick)
+
     def test_intel_readiness_is_replicated_but_rewards_and_save_are_server_only(self):
         self.assertRegex(INTEL, r"\[RplProp\(\)\]\s+protected bool m_bINFIntelLoaded")
         self.assertIn("Replication.BumpMe()", method(INTEL, "override protected void LoadIntelState()"))
