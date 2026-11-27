@@ -31,8 +31,8 @@ class CacheHintMarkerContracts(unittest.TestCase):
         for threshold in ("distMetres < 300", "distMetres < 750", "distMetres < 1250", "distMetres < 2000"):
             self.assertIn(threshold, colour)
         self.assertIn("placed.GetColorEntries()", colour)
-        self.assertIn("if (count < 5)", colour)
-        self.assertIn("return count - 1 - tier", colour)
+        self.assertIn("if (entries.Count() < 5)", colour)
+        self.assertIn("return tier", colour)
         creation = method_body(MANAGER, "override protected void CreateCacheMarker(")
         self.assertIn("override protected void CreateCacheMarker(int worldX, int worldZ, int distMetres, int cacheIndex)", MANAGER)
         self.assertIn("super.CreateCacheMarker(worldX, worldZ, distMetres, cacheIndex)", creation)

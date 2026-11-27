@@ -254,10 +254,9 @@ modded class INS_IntelManager
 			return 0;
 
 		array<ref SCR_MarkerColorEntry> entries = placed.GetColorEntries();
-		int count = entries.Count();
-		if (count < 5)
+		if (entries.Count() < 5)
 			return 0;
-		return count - 1 - tier;
+		return tier;
 	}
 
 	void INF_QueueCampaignObjectives()
