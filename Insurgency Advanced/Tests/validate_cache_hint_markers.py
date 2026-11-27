@@ -11,13 +11,13 @@ MANAGER = (ROOT / "Scripts/Game/INF_CacheObjective.c").read_text()
 
 def hint_colour(distance):
     if distance < 300:
-        return "gold"
+        return "dark red"
     if distance < 750:
         return "red"
     if distance < 1250:
-        return "purple"
+        return "pink red"
     if distance < 2000:
-        return "blue"
+        return "pale red"
     return "white"
 
 
@@ -25,7 +25,7 @@ class CacheHintMarkerContracts(unittest.TestCase):
     def test_colour_bands_are_coarse_and_ordered_cold_to_hot(self):
         self.assertEqual(
             [hint_colour(value) for value in (0, 299, 300, 749, 750, 1249, 1250, 1999, 2000, 5000)],
-            ["gold", "gold", "red", "red", "purple", "purple", "blue", "blue", "white", "white"],
+            ["dark red", "dark red", "red", "red", "pink red", "pink red", "pale red", "pale red", "white", "white"],
         )
         colour = method_body(MANAGER, "protected int INF_CacheHintColorEntry(")
         for threshold in ("distMetres < 300", "distMetres < 750", "distMetres < 1250", "distMetres < 2000"):

@@ -235,13 +235,13 @@ modded class INS_IntelManager
 	{
 		Color target;
 		if (distMetres < 300)
-			target = Color.FromRGBA(245, 190, 45, 255);
+			target = Color.FromRGBA(130, 20, 20, 255);
 		else if (distMetres < 750)
 			target = Color.FromRGBA(220, 45, 45, 255);
 		else if (distMetres < 1250)
-			target = Color.FromRGBA(145, 75, 200, 255);
+			target = Color.FromRGBA(235, 120, 120, 255);
 		else if (distMetres < 2000)
-			target = Color.FromRGBA(55, 140, 225, 255);
+			target = Color.FromRGBA(240, 195, 195, 255);
 		else
 			target = Color.FromRGBA(245, 245, 245, 255);
 
