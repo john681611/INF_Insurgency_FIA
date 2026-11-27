@@ -218,9 +218,9 @@ modded class INS_IntelManager
 	protected ref array<vector> m_aINFDebugCachePositions = {};
 	protected ref array<vector> m_aINFDebugCampPositions = {};
 
-	override protected void CreateCacheMarker(int x, int z, int distance, int cacheIndex)
+	override protected void CreateCacheMarker(int worldX, int worldZ, int distance, int cacheIndex)
 	{
-		super.CreateCacheMarker(x, z, distance, cacheIndex);
+		super.CreateCacheMarker(worldX, worldZ, distance, cacheIndex);
 		if (cacheIndex < 0 || cacheIndex >= m_aCacheMarkers.Count())
 			return;
 
