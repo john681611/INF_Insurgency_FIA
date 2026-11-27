@@ -218,6 +218,47 @@ modded class INS_IntelManager
 	protected ref array<vector> m_aINFDebugCachePositions = {};
 	protected ref array<vector> m_aINFDebugCampPositions = {};
 
+	override protected void CreateCacheMarker(int worldX, int worldZ, int distMetres, int cacheIndex)
+	{
+		super.CreateCacheMarker(worldX, worldZ, distMetres, cacheIndex);
+		if (cacheIndex < 0 || cacheIndex >= m_aCacheMarkers.Count())
+			return;
+
+		array<SCR_MapMarkerBase> markers = m_aCacheMarkers[cacheIndex];
+		if (markers.IsEmpty())
+			return;
+		SCR_MapMarkerBase marker = markers[markers.Count() - 1];
+		marker.SetColorEntry(INF_CacheHintColorEntry(distMetres));
+	}
+
+	protected int INF_CacheHintColorEntry(int distMetres)
+	{
+		int tier;
+		if (distMetres < 300)
+			tier = 4;
+		else if (distMetres < 750)
+			tier = 3;
+		else if (distMetres < 1250)
+			tier = 2;
+		else if (distMetres < 2000)
+			tier = 1;
+		else
+			tier = 0;
+
+		SCR_MapMarkerManagerComponent markerMgr = SCR_MapMarkerManagerComponent.GetInstance();
+		if (!markerMgr)
+			return 0;
+		SCR_MapMarkerEntryPlaced placed = SCR_MapMarkerEntryPlaced.Cast(
+			markerMgr.GetMarkerConfig().GetMarkerEntryConfigByType(ResolveMarkerType()));
+		if (!placed)
+			return 0;
+
+		array<ref SCR_MarkerColorEntry> entries = placed.GetColorEntries();
+		if (entries.Count() < 5)
+			return 0;
+		return tier;
+	}
+
 	void INF_QueueCampaignObjectives()
 	{
 		if (!Replication.IsServer() || m_bINFMissionEnded || m_bINFObjectiveUpdateQueued)
