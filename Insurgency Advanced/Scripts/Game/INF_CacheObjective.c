@@ -218,6 +218,26 @@ modded class INS_IntelManager
 	protected ref array<vector> m_aINFDebugCachePositions = {};
 	protected ref array<vector> m_aINFDebugCampPositions = {};
 
+	bool INF_TryGetCacheMarkerDistance(SCR_MapMarkerBase marker, out int distance)
+	{
+		if (!marker)
+			return false;
+
+		int cacheCount = Math.Min(m_aCacheMarkers.Count(), m_aCacheMarkerDists.Count());
+		for (int cacheIndex = 0; cacheIndex < cacheCount; cacheIndex++)
+		{
+			int markerCount = Math.Min(m_aCacheMarkers[cacheIndex].Count(), m_aCacheMarkerDists[cacheIndex].Count());
+			for (int markerIndex = 0; markerIndex < markerCount; markerIndex++)
+			{
+				if (m_aCacheMarkers[cacheIndex][markerIndex] != marker)
+					continue;
+				distance = m_aCacheMarkerDists[cacheIndex][markerIndex];
+				return true;
+			}
+		}
+		return false;
+	}
+
 	void INF_QueueCampaignObjectives()
 	{
 		if (!Replication.IsServer() || m_bINFMissionEnded || m_bINFObjectiveUpdateQueued)
