@@ -238,6 +238,34 @@ modded class INS_IntelManager
 		return false;
 	}
 
+	override protected void CreateCacheMarker(int x, int z, int distance, int cacheIndex)
+	{
+		super.CreateCacheMarker(x, z, distance, cacheIndex);
+		if (cacheIndex < 0 || cacheIndex >= m_aCacheMarkers.Count())
+			return;
+
+		array<SCR_MapMarkerBase> markers = m_aCacheMarkers[cacheIndex];
+		if (markers.IsEmpty())
+			return;
+		SCR_MapMarkerBase marker = markers[markers.Count() - 1];
+		marker.SetColorEntry(INF_CacheHintColorEntry(distance));
+		SCR_MapMarkerWidgetComponent widget = marker.GetMarkerComponent();
+		if (!widget)
+			return;
+		widget.SetTextVisible(true);
+	}
+
+	protected static int INF_CacheHintColorEntry(int distance)
+	{
+		if (distance < 250)
+			return 1;
+		if (distance < 500)
+			return 2;
+		if (distance < 1000)
+			return 3;
+		return 4;
+	}
+
 	void INF_QueueCampaignObjectives()
 	{
 		if (!Replication.IsServer() || m_bINFMissionEnded || m_bINFObjectiveUpdateQueued)

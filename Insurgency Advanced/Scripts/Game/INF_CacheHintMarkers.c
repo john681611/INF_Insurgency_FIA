@@ -13,8 +13,6 @@ modded class SCR_MapMarkerWidgetComponent
 			return;
 
 		m_bINFCacheHint = true;
-		SetColor(INF_CacheHintColor(distance));
-		SetText(marker.GetCustomText(), true);
 		SetTextVisible(true);
 	}
 
@@ -31,14 +29,4 @@ modded class SCR_MapMarkerWidgetComponent
 		super.HandlerDeattached(w);
 	}
 
-	protected static Color INF_CacheHintColor(int distance)
-	{
-		if (distance < 250)
-			return Color.FromRGBA(225, 55, 55, 255);
-		if (distance < 500)
-			return Color.FromRGBA(235, 135, 45, 255);
-		if (distance < 1000)
-			return Color.FromRGBA(225, 205, 70, 255);
-		return Color.FromRGBA(65, 145, 225, 255);
-	}
 }
