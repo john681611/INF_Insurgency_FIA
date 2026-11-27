@@ -7,7 +7,6 @@ from source_contracts import method_body
 
 ROOT = Path(__file__).resolve().parents[1]
 MANAGER = (ROOT / "Scripts/Game/INF_CacheObjective.c").read_text()
-MARKERS = (ROOT / "Scripts/Game/INF_CacheHintMarkers.c").read_text()
 
 
 def hint_colour(distance):
@@ -23,18 +22,6 @@ def hint_colour(distance):
 
 
 class CacheHintMarkerContracts(unittest.TestCase):
-    def test_only_cache_hint_text_is_forced_visible(self):
-        attach = method_body(MARKERS, "override void SetMarkerObject(")
-        visible = method_body(MARKERS, "override void SetTextVisible(")
-        self.assertIn('text.IndexOf("~") == 0', attach)
-        self.assertIn('text.IndexOf("m") > 1', attach)
-        self.assertIn("m_bINFCacheHint", visible)
-        self.assertIn("state = true", visible)
-        self.assertIn("override bool OnMouseLeave", MARKERS)
-        self.assertIn("override bool OnFocusLost", MARKERS)
-        self.assertEqual(MARKERS.count("m_wMarkerText.SetVisible(true)"), 2)
-        self.assertNotIn("SetText(", MARKERS)
-
     def test_colour_bands_are_coarse_and_ordered_cold_to_hot(self):
         self.assertEqual(
             [hint_colour(value) for value in (0, 299, 300, 749, 750, 1249, 1250, 1999, 2000, 5000)],
@@ -49,7 +36,7 @@ class CacheHintMarkerContracts(unittest.TestCase):
         self.assertIn("override protected void CreateCacheMarker(int worldX, int worldZ, int distMetres, int cacheIndex)", MANAGER)
         self.assertIn("super.CreateCacheMarker(worldX, worldZ, distMetres, cacheIndex)", creation)
         self.assertIn("marker.SetColorEntry(INF_CacheHintColorEntry(distMetres))", creation)
-        self.assertIn("widget.SetTextVisible(true)", creation)
+        self.assertNotIn("SetTextVisible", creation)
         self.assertNotIn("SetText(", creation)
         self.assertNotIn("SetIconEntry", creation)
         self.assertNotIn("SetWorldPos", creation)

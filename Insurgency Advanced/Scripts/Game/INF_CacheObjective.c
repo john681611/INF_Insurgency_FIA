@@ -229,10 +229,6 @@ modded class INS_IntelManager
 			return;
 		SCR_MapMarkerBase marker = markers[markers.Count() - 1];
 		marker.SetColorEntry(INF_CacheHintColorEntry(distMetres));
-		SCR_MapMarkerWidgetComponent widget = marker.GetMarkerComponent();
-		if (!widget)
-			return;
-		widget.SetTextVisible(true);
 	}
 
 	protected int INF_CacheHintColorEntry(int distMetres)
