@@ -218,9 +218,9 @@ modded class INS_IntelManager
 	protected ref array<vector> m_aINFDebugCachePositions = {};
 	protected ref array<vector> m_aINFDebugCampPositions = {};
 
-	override protected void CreateCacheMarker(int worldX, int worldZ, int distance, int cacheIndex)
+	override protected void CreateCacheMarker(int worldX, int worldZ, int distMetres, int cacheIndex)
 	{
-		super.CreateCacheMarker(worldX, worldZ, distance, cacheIndex);
+		super.CreateCacheMarker(worldX, worldZ, distMetres, cacheIndex);
 		if (cacheIndex < 0 || cacheIndex >= m_aCacheMarkers.Count())
 			return;
 
@@ -228,22 +228,50 @@ modded class INS_IntelManager
 		if (markers.IsEmpty())
 			return;
 		SCR_MapMarkerBase marker = markers[markers.Count() - 1];
-		marker.SetColorEntry(INF_CacheHintColorEntry(distance));
+		marker.SetColorEntry(INF_CacheHintColorEntry(distMetres));
 		SCR_MapMarkerWidgetComponent widget = marker.GetMarkerComponent();
 		if (!widget)
 			return;
 		widget.SetTextVisible(true);
 	}
 
-	protected static int INF_CacheHintColorEntry(int distance)
+	protected int INF_CacheHintColorEntry(int distMetres)
 	{
-		if (distance < 250)
-			return 1;
-		if (distance < 500)
-			return 2;
-		if (distance < 1000)
-			return 3;
-		return 4;
+		Color target;
+		if (distMetres < 300)
+			target = Color.FromRGBA(245, 190, 45, 255);
+		else if (distMetres < 750)
+			target = Color.FromRGBA(220, 45, 45, 255);
+		else if (distMetres < 1250)
+			target = Color.FromRGBA(235, 125, 35, 255);
+		else if (distMetres < 2000)
+			target = Color.FromRGBA(55, 140, 225, 255);
+		else
+			target = Color.FromRGBA(245, 245, 245, 255);
+
+		SCR_MapMarkerManagerComponent markerMgr = SCR_MapMarkerManagerComponent.GetInstance();
+		if (!markerMgr)
+			return 0;
+		SCR_MapMarkerEntryPlaced placed = SCR_MapMarkerEntryPlaced.Cast(
+			markerMgr.GetMarkerConfig().GetMarkerEntryConfigByType(ResolveMarkerType()));
+		if (!placed)
+			return 0;
+
+		int best = 0;
+		float bestDelta = float.MAX;
+		foreach (int index, SCR_MarkerColorEntry entry : placed.GetColorEntries())
+		{
+			Color candidate = entry.GetColor();
+			float red = candidate.R() - target.R();
+			float green = candidate.G() - target.G();
+			float blue = candidate.B() - target.B();
+			float delta = red * red + green * green + blue * blue;
+			if (delta >= bestDelta)
+				continue;
+			bestDelta = delta;
+			best = index;
+		}
+		return best;
 	}
 
 	void INF_QueueCampaignObjectives()

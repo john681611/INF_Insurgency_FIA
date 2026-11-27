@@ -7,32 +7,48 @@ from source_contracts import method_body
 
 ROOT = Path(__file__).resolve().parents[1]
 MANAGER = (ROOT / "Scripts/Game/INF_CacheObjective.c").read_text()
+MARKERS = (ROOT / "Scripts/Game/INF_CacheHintMarkers.c").read_text()
 
 
 def hint_colour(distance):
-    if distance < 250:
+    if distance < 300:
+        return "gold"
+    if distance < 750:
         return "red"
-    if distance < 500:
+    if distance < 1250:
         return "orange"
-    if distance < 1000:
-        return "yellow"
-    return "blue"
+    if distance < 2000:
+        return "blue"
+    return "white"
 
 
 class CacheHintMarkerContracts(unittest.TestCase):
+    def test_only_cache_hint_text_is_forced_visible(self):
+        attach = method_body(MARKERS, "override void SetMarkerObject(")
+        visible = method_body(MARKERS, "override void SetTextVisible(")
+        self.assertIn('text.IndexOf("~") == 0', attach)
+        self.assertIn('text.IndexOf("m") > 1', attach)
+        self.assertIn("m_bINFCacheHint", visible)
+        self.assertIn("state = true", visible)
+        self.assertIn("override bool OnMouseLeave", MARKERS)
+        self.assertIn("override bool OnFocusLost", MARKERS)
+        self.assertEqual(MARKERS.count("m_wMarkerText.SetVisible(true)"), 2)
+        self.assertNotIn("SetText(", MARKERS)
+
     def test_colour_bands_are_coarse_and_ordered_cold_to_hot(self):
         self.assertEqual(
-            [hint_colour(value) for value in (0, 249, 250, 499, 500, 999, 1000, 5000)],
-            ["red", "red", "orange", "orange", "yellow", "yellow", "blue", "blue"],
+            [hint_colour(value) for value in (0, 299, 300, 749, 750, 1249, 1250, 1999, 2000, 5000)],
+            ["gold", "gold", "red", "red", "orange", "orange", "blue", "blue", "white", "white"],
         )
-        colour = method_body(MANAGER, "protected static int INF_CacheHintColorEntry(")
-        for threshold in ("distance < 250", "distance < 500", "distance < 1000"):
+        colour = method_body(MANAGER, "protected int INF_CacheHintColorEntry(")
+        for threshold in ("distMetres < 300", "distMetres < 750", "distMetres < 1250", "distMetres < 2000"):
             self.assertIn(threshold, colour)
-        self.assertEqual(colour.count("return "), 4)
+        self.assertIn("placed.GetColorEntries()", colour)
+        self.assertIn("entry.GetColor()", colour)
         creation = method_body(MANAGER, "override protected void CreateCacheMarker(")
-        self.assertIn("override protected void CreateCacheMarker(int worldX, int worldZ, int distance, int cacheIndex)", MANAGER)
-        self.assertIn("super.CreateCacheMarker(worldX, worldZ, distance, cacheIndex)", creation)
-        self.assertIn("marker.SetColorEntry(INF_CacheHintColorEntry(distance))", creation)
+        self.assertIn("override protected void CreateCacheMarker(int worldX, int worldZ, int distMetres, int cacheIndex)", MANAGER)
+        self.assertIn("super.CreateCacheMarker(worldX, worldZ, distMetres, cacheIndex)", creation)
+        self.assertIn("marker.SetColorEntry(INF_CacheHintColorEntry(distMetres))", creation)
         self.assertIn("widget.SetTextVisible(true)", creation)
         self.assertNotIn("SetText(", creation)
         self.assertNotIn("SetIconEntry", creation)
