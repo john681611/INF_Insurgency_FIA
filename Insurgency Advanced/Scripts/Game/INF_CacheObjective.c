@@ -233,17 +233,17 @@ modded class INS_IntelManager
 
 	protected int INF_CacheHintColorEntry(int distMetres)
 	{
-		Color target;
+		int tier;
 		if (distMetres < 300)
-			target = Color.FromRGBA(255, 35, 35, 255);
+			tier = 4;
 		else if (distMetres < 750)
-			target = Color.FromRGBA(130, 20, 20, 255);
+			tier = 3;
 		else if (distMetres < 1250)
-			target = Color.FromRGBA(225, 145, 35, 255);
+			tier = 2;
 		else if (distMetres < 2000)
-			target = Color.FromRGBA(245, 210, 110, 255);
+			tier = 1;
 		else
-			target = Color.FromRGBA(245, 245, 245, 255);
+			tier = 0;
 
 		SCR_MapMarkerManagerComponent markerMgr = SCR_MapMarkerManagerComponent.GetInstance();
 		if (!markerMgr)
@@ -253,21 +253,11 @@ modded class INS_IntelManager
 		if (!placed)
 			return 0;
 
-		int best = 0;
-		float bestDelta = float.MAX;
-		foreach (int index, SCR_MarkerColorEntry entry : placed.GetColorEntries())
-		{
-			Color candidate = entry.GetColor();
-			float red = candidate.R() - target.R();
-			float green = candidate.G() - target.G();
-			float blue = candidate.B() - target.B();
-			float delta = red * red + green * green + blue * blue;
-			if (delta >= bestDelta)
-				continue;
-			bestDelta = delta;
-			best = index;
-		}
-		return best;
+		array<ref SCR_MarkerColorEntry> entries = placed.GetColorEntries();
+		int count = entries.Count();
+		if (count < 5)
+			return 0;
+		return count - 1 - tier;
 	}
 
 	void INF_QueueCampaignObjectives()
