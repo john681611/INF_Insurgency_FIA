@@ -11,6 +11,14 @@ class INF_Persistence
 
 class INF_Spawn
 {
+	// Use before spawning an individual character through an API that takes a raw prefab.
+	static ResourceName ResolveCharacterPrefab(ResourceName prefab)
+	{
+		if (prefab.IsEmpty())
+			return prefab;
+		return SCR_EditableEntityComponentClass.GetRandomVariant(prefab);
+	}
+
 	static IEntity Prefab(Resource resource, vector position, float yaw = 0)
 	{
 		EntitySpawnParams params = new EntitySpawnParams();

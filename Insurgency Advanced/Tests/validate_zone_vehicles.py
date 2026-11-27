@@ -8,6 +8,7 @@ from source_contracts import method_body
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "Scripts" / "Game"
 SOURCE = (SCRIPTS / "INF_ZoneVehicles.c").read_text()
+HELPERS = (SCRIPTS / "INF_Helpers.c").read_text()
 BLOCK = (SCRIPTS / "INF_BlockControl.c").read_text()
 GRID = (SCRIPTS / "INF_BuildingGrid.c").read_text()
 EDITOR = (SCRIPTS / "INF_ZoneEditorAttributes.c").read_text()
@@ -128,7 +129,16 @@ class ZoneVehicles(unittest.TestCase):
         passengers = body("void INF_SpawnPassengers(")
         self.assertIn("GetPassengers()", passengers)
         self.assertNotIn("INF_PickCrewPrefab", passengers)
-        self.assertIn("SpawnDefaultCharacterInCompartment(group)", passengers)
+        self.assertRegex(passengers, r"if \(passengerPrefab\.IsEmpty\(\)\)\s+"
+                         r"passenger = selected\.SpawnDefaultCharacterInCompartment\(group\);")
+
+    def test_custom_occupants_resolve_editable_variants_before_seating(self):
+        crew = body("protected bool INF_SpawnPoolCrew(")
+        passengers = body("void INF_SpawnPassengers(")
+        resolver = method_body(HELPERS, "static ResourceName ResolveCharacterPrefab(")
+        self.assertIn("return SCR_EditableEntityComponentClass.GetRandomVariant(prefab);", resolver)
+        self.assertIn("SpawnCharacterInCompartment(INF_Spawn.ResolveCharacterPrefab(crewPrefab), group)", crew)
+        self.assertIn("SpawnCharacterInCompartment(INF_Spawn.ResolveCharacterPrefab(passengerPrefab), group)", passengers)
 
     def test_reuses_current_vehicle_list_and_native_crew_not_a_duplicate_pool(self):
         spawn = body("protected void INF_TryZoneVehicle(")

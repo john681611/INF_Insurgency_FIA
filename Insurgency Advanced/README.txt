@@ -555,6 +555,10 @@ the crew's existing AI group; empty/defaultless seats never get faction fallback
 Crew seats take their character from m_aLightCrew or, for heavy vehicles,
 m_aHeavyCrew via BaseCompartmentSlot.SpawnCharacterInCompartment; ambient vehicles
 then get their crew group and drive waypoint from the same code.
+Custom crew and passenger picks resolve weighted editable character variants before
+seating. Plain character prefabs and native default occupants are unchanged.
+Use INF_Spawn.ResolveCharacterPrefab before other raw individual character spawns;
+normal AI group member spawning already resolves variants.
 The count is chosen once per vehicle from the crew-completion callback.
 Native crew and successful passengers are recorded immediately, so early
 dismounts, deaths and captures cannot turn a valid vehicle into a polling timeout.

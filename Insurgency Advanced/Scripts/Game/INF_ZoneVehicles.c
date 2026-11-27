@@ -338,7 +338,8 @@ modded class INS_AmbientVehicleManager
 		{
 			if (!slot || slot.IsOccupied() || !slot.IsCompartmentAccessible() || slot.GetDefaultOccupantPrefab().IsEmpty())
 				continue;
-			IEntity member = slot.SpawnCharacterInCompartment(INF_PrefabManagerComponent.RandomPrefab(pool), group);
+			ResourceName crewPrefab = INF_PrefabManagerComponent.RandomPrefab(pool);
+			IEntity member = slot.SpawnCharacterInCompartment(INF_Spawn.ResolveCharacterPrefab(crewPrefab), group);
 			if (!member)
 			{
 				Print("[INF_VehicleCrew] Failed to spawn a pool crew member.", LogLevel.ERROR);
@@ -504,7 +505,7 @@ modded class INS_AmbientVehicleManager
 			if (passengerPrefab.IsEmpty())
 				passenger = selected.SpawnDefaultCharacterInCompartment(group);
 			else
-				passenger = selected.SpawnCharacterInCompartment(passengerPrefab, group);
+				passenger = selected.SpawnCharacterInCompartment(INF_Spawn.ResolveCharacterPrefab(passengerPrefab), group);
 			if (!passenger)
 			{
 				Print("[INF_VehiclePassengers] Failed to spawn a selected seat's default passenger.", LogLevel.ERROR);
